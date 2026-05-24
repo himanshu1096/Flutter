@@ -1,0 +1,324 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/field_def.dart';
+import '../providers/app_state.dart';
+import '../theme/app_theme.dart';
+import '../widgets/side_numpad.dart';
+
+/// ─────────────────────────────────────────
+/// MENU DETAIL SCREEN
+/// Layout:
+///   [content area (fields)] | [side numpad 90px]
+/// - Shows 10 fields at a time
+/// - Selected row highlighted yellow
+/// - Range + input box shown at bottom
+/// - 前項/次項 on numpad scrolls field pages
+/// ─────────────────────────────────────────
+class MenuDetailScreen extends ConsumerWidget {
+  const MenuDetailScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final menu      = ref.watch(openMenuProvider)!;
+    final offset    = ref.watch(fieldPageOffsetProvider);
+    final selIdx    = ref.watch(selectedFieldIndexProvider);
+    final fieldVals = ref.watch(fieldValuesProvider);
+    final npState   = ref.watch(numpadStateProvider);
+    final execState = ref.watch(execProvider);
+
+    // Visible 10 fields for current page
+    final allFields    = menu.fields;
+    final visibleFields = allFields.skip(offset * 10).take(10).toList();
+
+    // Currently selected field
+    final selField = selIdx < visibleFields.length ? visibleFields[selIdx] : null;
+    final selValue = selField != null
+        ? (fieldVals[menu.code]?[selField.num] ?? selField.defaultValue)
+        : '';
+
+    return Row(children: [
+      // ── Main content area ──
+      Expanded(
+        child: Column(children: [
+          // Breadcrumb + instruction
+          _SubHeader(menu: menu),
+
+          // Field table
+          Expanded(
+            child: Container(
+              color: AppColors.surface,
+              child: ListView.builder(
+                itemCount: visibleFields.length,
+                itemBuilder: (ctx, i) {
+                  final field   = visibleFields[i];
+                  final value   = fieldVals[menu.code]?[field.num] ?? field.defaultValue;
+                  final isSelected = i == selIdx;
+                  final isReadonly = field.type == FieldType.readonly;
+                  final isToggle   = field.type == FieldType.toggle;
+
+                  return GestureDetector(
+                    onTap: isReadonly ? null : () {
+                      ref.read(selectedFieldIndexProvider.notifier).state = i;
+                      ref.read(numpadStateProvider.notifier).activate(value);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.rowSelected
+                            : (i.isEven ? AppColors.surface : AppColors.rowAlt),
+                        border: const Border(
+                          bottom: BorderSide(color: AppColors.tableBorder))),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                      child: Row(children: [
+                        // Row number
+                        SizedBox(width: 24,
+                          child: Text(field.num, style: AppText.fieldNum)),
+                        const SizedBox(width: 8),
+                        // Label
+                        Expanded(flex: 3,
+                          child: Text(field.label,
+                            style: isSelected
+                                ? AppText.fieldLabel.copyWith(fontWeight: FontWeight.w700)
+                                : AppText.fieldLabel,
+                            overflow: TextOverflow.ellipsis)),
+                        // Value
+                        Expanded(flex: 2,
+                          child: isToggle
+                            ? _ToggleChip(on: value == '1')
+                            : Text(
+                                // Show buffer if this field is actively being edited
+                                isSelected && npState.active
+                                    ? npState.buffer
+                                    : value,
+                                style: AppText.fieldValue.copyWith(
+                                  color: isSelected && npState.active
+                                      ? AppColors.accent
+                                      : AppColors.textPrimary),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis)),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // ── Bottom area: selected field name + range + input box ──
+          if (selField != null)
+            _BottomInputArea(
+              field: selField,
+              npBuffer: npState.active ? npState.buffer : selValue,
+              isActive: npState.active,
+            ),
+
+          // ── Exec status banner ──
+          if (execState.status != ExecStatus.idle)
+            _ExecBanner(state: execState),
+
+          // ── 実行 / 取消 buttons ──
+          _ActionButtons(
+            onExec: () {
+              // Confirm any active numpad input first
+              if (npState.active && selField != null) {
+                ref.read(numpadStateProvider.notifier).confirm(menu.code, selField.num);
+              }
+              final vals = ref.read(fieldValuesProvider)[menu.code] ?? {};
+              ref.read(execProvider.notifier).run(menu.code, vals);
+            },
+            onCancel: () {
+              ref.read(openMenuProvider.notifier).state = null;
+              ref.read(numpadStateProvider.notifier).cancel();
+              ref.read(selectedFieldIndexProvider.notifier).state = 0;
+              ref.read(fieldPageOffsetProvider.notifier).state = 0;
+            },
+          ),
+        ]),
+      ),
+
+      // ── Permanent right numpad ──
+      SideNumpad(menuCode: menu.code),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────
+// SUB HEADER
+// ─────────────────────────────────────────
+class _SubHeader extends StatelessWidget {
+  final dynamic menu;
+  const _SubHeader({required this.menu});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      // Breadcrumb
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        color: AppColors.rowAlt,
+        child: Text('< ${menu.label}  >',
+          style: const TextStyle(fontFamily: AppText.mono,
+            fontSize: 9, color: AppColors.textSec)),
+      ),
+      // Yellow instruction bar
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        color: AppColors.warnBg,
+        child: Text(menu.instruction, style: AppText.instruction)),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────
+// BOTTOM INPUT AREA
+// Shows: field label | range text | input box
+// ─────────────────────────────────────────
+class _BottomInputArea extends StatelessWidget {
+  final FieldDef field;
+  final String npBuffer;
+  final bool isActive;
+  const _BottomInputArea({
+    required this.field, required this.npBuffer, required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.rowAlt,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(children: [
+        // Field label repeated (as in original)
+        Text('${field.num}  ${field.label}',
+          style: const TextStyle(fontFamily: AppText.mono,
+            fontSize: 9, color: AppColors.textSec)),
+        const SizedBox(width: 12),
+        // Range text: "0x30〜0x7f" or "000.000.000.000〜255.255.255.255"
+        if (field.range != null)
+          Text(field.range!.displayRange,
+            style: AppText.rangeText),
+        const Spacer(),
+        // Input box — shows the typed value
+        Container(
+          width: 160,
+          height: 26,
+          decoration: BoxDecoration(
+            color: AppColors.inputBox,
+            border: Border.all(
+              color: isActive ? AppColors.accent : AppColors.tableBorder,
+              width: isActive ? 1.5 : 1)),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          alignment: Alignment.centerLeft,
+          child: Row(children: [
+            Expanded(child: Text(npBuffer,
+              style: AppText.fieldValue.copyWith(
+                color: isActive ? AppColors.accent : AppColors.textPrimary),
+              overflow: TextOverflow.ellipsis)),
+            if (isActive)
+              Container(width: 1.5, height: 16, color: AppColors.accent),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// ACTION BUTTONS — 実行 / 取消
+// ─────────────────────────────────────────
+class _ActionButtons extends StatelessWidget {
+  final VoidCallback onExec;
+  final VoidCallback onCancel;
+  const _ActionButtons({required this.onExec, required this.onCancel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.rowAlt,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        _Btn('実行', AppColors.accent, Colors.white, onExec),
+        const SizedBox(width: 20),
+        _Btn('取消', Colors.white, AppColors.textSec, onCancel,
+          border: AppColors.tableBorder),
+      ]),
+    );
+  }
+}
+
+class _Btn extends StatelessWidget {
+  final String label;
+  final Color bg, fg;
+  final VoidCallback onTap;
+  final Color? border;
+  const _Btn(this.label, this.bg, this.fg, this.onTap, {this.border});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: 100, height: 32,
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border.all(color: border ?? bg),
+        borderRadius: BorderRadius.circular(3)),
+      alignment: Alignment.center,
+      child: Text(label,
+        style: TextStyle(fontFamily: AppText.mono,
+          fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+    ),
+  );
+}
+
+// ─────────────────────────────────────────
+// EXEC BANNER
+// ─────────────────────────────────────────
+class _ExecBanner extends StatelessWidget {
+  final ExecState state;
+  const _ExecBanner({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    Color bg, fg;
+    switch (state.status) {
+      case ExecStatus.loading: bg = AppColors.warnBg;              fg = AppColors.warn;    break;
+      case ExecStatus.success: bg = const Color(0xFFEAF6EA);       fg = AppColors.success; break;
+      case ExecStatus.error:   bg = const Color(0xFFFAEAEA);       fg = AppColors.danger;  break;
+      default:                 bg = AppColors.rowAlt;              fg = AppColors.textDim;
+    }
+    return Container(
+      width: double.infinity, color: bg,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      child: Row(children: [
+        if (state.status == ExecStatus.loading)
+          SizedBox(width: 12, height: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: fg)),
+        const SizedBox(width: 8),
+        Text(state.message,
+          style: TextStyle(fontFamily: AppText.mono, fontSize: 10, color: fg)),
+      ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// TOGGLE CHIP
+// ─────────────────────────────────────────
+class _ToggleChip extends StatelessWidget {
+  final bool on;
+  const _ToggleChip({required this.on});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    decoration: BoxDecoration(
+      color: on ? const Color(0xFFDDF0DD) : const Color(0xFFF0F0F0),
+      border: Border.all(
+        color: on ? AppColors.success : AppColors.tableBorder),
+      borderRadius: BorderRadius.circular(2)),
+    child: Text(on ? '1' : '0',
+      style: TextStyle(fontFamily: AppText.mono, fontSize: 10,
+        color: on ? AppColors.success : AppColors.textSec,
+        fontWeight: FontWeight.w600)),
+  );
+}
