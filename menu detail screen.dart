@@ -5,30 +5,20 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/side_numpad.dart';
 
-/// ─────────────────────────────────────────
-/// MENU DETAIL SCREEN
-/// Layout:
-///   [content area (fields)] | [side numpad 90px]
-/// - Shows 10 fields at a time
-/// - Selected row highlighted yellow
-/// - Range + input box shown at bottom
-/// - 前項/次項 on numpad scrolls field pages
-/// ─────────────────────────────────────────
 class MenuDetailScreen extends ConsumerWidget {
   const MenuDetailScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final menu      = ref.watch(openMenuProvider)!;
-    final offset    = ref.watch(fieldPageOffsetProvider);
+    final offset    = ref.watch(fieldGroupOffsetProvider);   // ← fixed name
     final selIdx    = ref.watch(selectedFieldIndexProvider);
     final fieldVals = ref.watch(fieldValuesProvider);
     final npState   = ref.watch(numpadStateProvider);
     final execState = ref.watch(execProvider);
 
-    // Visible 10 fields for current page
-    final allFields    = menu.fields;
-    final visibleFields = allFields.skip(offset * 10).take(10).toList();
+    // Visible 10 fields for current group
+    final visibleFields = menu.fields.skip(offset * 10).take(10).toList();
 
     // Currently selected field
     final selField = selIdx < visibleFields.length ? visibleFields[selIdx] : null;
@@ -40,24 +30,30 @@ class MenuDetailScreen extends ConsumerWidget {
       // ── Main content area ──
       Expanded(
         child: Column(children: [
-          // Breadcrumb + instruction
+
+          // ── Breadcrumb + instruction ──
           _SubHeader(menu: menu),
 
-          // Field table
+          // ── Field rows (10 at a time) ──
           Expanded(
             child: Container(
               color: AppColors.surface,
               child: ListView.builder(
                 itemCount: visibleFields.length,
                 itemBuilder: (ctx, i) {
-                  final field   = visibleFields[i];
-                  final value   = fieldVals[menu.code]?[field.num] ?? field.defaultValue;
+                  final field      = visibleFields[i];
+                  final value      = fieldVals[menu.code]?[field.num] ?? field.defaultValue;
                   final isSelected = i == selIdx;
                   final isReadonly = field.type == FieldType.readonly;
                   final isToggle   = field.type == FieldType.toggle;
 
                   return GestureDetector(
                     onTap: isReadonly ? null : () {
+                      // Confirm previous input before switching
+                      if (npState.active && selField != null) {
+                        ref.read(numpadStateProvider.notifier)
+                            .confirm(menu.code, selField.num);
+                      }
                       ref.read(selectedFieldIndexProvider.notifier).state = i;
                       ref.read(numpadStateProvider.notifier).activate(value);
                     },
@@ -69,25 +65,29 @@ class MenuDetailScreen extends ConsumerWidget {
                         border: const Border(
                           bottom: BorderSide(color: AppColors.tableBorder))),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                          horizontal: 12, vertical: 7),
                       child: Row(children: [
+
                         // Row number
-                        SizedBox(width: 24,
+                        SizedBox(width: 26,
                           child: Text(field.num, style: AppText.fieldNum)),
                         const SizedBox(width: 8),
+
                         // Label
                         Expanded(flex: 3,
                           child: Text(field.label,
                             style: isSelected
-                                ? AppText.fieldLabel.copyWith(fontWeight: FontWeight.w700)
+                                ? AppText.fieldLabel.copyWith(
+                                    fontWeight: FontWeight.w700)
                                 : AppText.fieldLabel,
                             overflow: TextOverflow.ellipsis)),
+
                         // Value
                         Expanded(flex: 2,
                           child: isToggle
-                            ? _ToggleChip(on: value == '1')
+                            ? Center(child: _ToggleChip(on: value == '1'))
                             : Text(
-                                // Show buffer if this field is actively being edited
+                                // Show live buffer when this field is being edited
                                 isSelected && npState.active
                                     ? npState.buffer
                                     : value,
@@ -105,7 +105,7 @@ class MenuDetailScreen extends ConsumerWidget {
             ),
           ),
 
-          // ── Bottom area: selected field name + range + input box ──
+          // ── Bottom: selected field label + range + input box ──
           if (selField != null)
             _BottomInputArea(
               field: selField,
@@ -113,16 +113,16 @@ class MenuDetailScreen extends ConsumerWidget {
               isActive: npState.active,
             ),
 
-          // ── Exec status banner ──
+          // ── Execution status banner ──
           if (execState.status != ExecStatus.idle)
             _ExecBanner(state: execState),
 
-          // ── 実行 / 取消 buttons ──
+          // ── 実行 / 取消 ──
           _ActionButtons(
             onExec: () {
-              // Confirm any active numpad input first
               if (npState.active && selField != null) {
-                ref.read(numpadStateProvider.notifier).confirm(menu.code, selField.num);
+                ref.read(numpadStateProvider.notifier)
+                    .confirm(menu.code, selField.num);
               }
               final vals = ref.read(fieldValuesProvider)[menu.code] ?? {};
               ref.read(execProvider.notifier).run(menu.code, vals);
@@ -131,7 +131,7 @@ class MenuDetailScreen extends ConsumerWidget {
               ref.read(openMenuProvider.notifier).state = null;
               ref.read(numpadStateProvider.notifier).cancel();
               ref.read(selectedFieldIndexProvider.notifier).state = 0;
-              ref.read(fieldPageOffsetProvider.notifier).state = 0;
+              ref.read(fieldGroupOffsetProvider.notifier).state = 0;  // ← fixed
             },
           ),
         ]),
@@ -149,20 +149,16 @@ class MenuDetailScreen extends ConsumerWidget {
 class _SubHeader extends StatelessWidget {
   final dynamic menu;
   const _SubHeader({required this.menu});
-
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      // Breadcrumb
       Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         color: AppColors.rowAlt,
         child: Text('< ${menu.label}  >',
           style: const TextStyle(fontFamily: AppText.mono,
-            fontSize: 9, color: AppColors.textSec)),
-      ),
-      // Yellow instruction bar
+            fontSize: 9, color: AppColors.textSec))),
       Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -174,7 +170,6 @@ class _SubHeader extends StatelessWidget {
 
 // ─────────────────────────────────────────
 // BOTTOM INPUT AREA
-// Shows: field label | range text | input box
 // ─────────────────────────────────────────
 class _BottomInputArea extends StatelessWidget {
   final FieldDef field;
@@ -189,25 +184,28 @@ class _BottomInputArea extends StatelessWidget {
       color: AppColors.rowAlt,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(children: [
-        // Field label repeated (as in original)
-        Text('${field.num}  ${field.label}',
-          style: const TextStyle(fontFamily: AppText.mono,
-            fontSize: 9, color: AppColors.textSec)),
-        const SizedBox(width: 12),
-        // Range text: "0x30〜0x7f" or "000.000.000.000〜255.255.255.255"
+        // Selected field label
+        Flexible(
+          child: Text('${field.num}  ${field.label}',
+            style: const TextStyle(fontFamily: AppText.mono,
+              fontSize: 9, color: AppColors.textSec),
+            overflow: TextOverflow.ellipsis)),
+        const SizedBox(width: 10),
+        // Range text e.g. "0x30〜0x7f" or "000.000.000.000〜255.255.255.255"
         if (field.range != null)
-          Text(field.range!.displayRange,
-            style: AppText.rangeText),
+          Flexible(
+            child: Text(field.range!.displayRange,
+              style: AppText.rangeText,
+              overflow: TextOverflow.ellipsis)),
         const Spacer(),
-        // Input box — shows the typed value
+        // Input box
         Container(
-          width: 160,
-          height: 26,
+          width: 160, height: 26,
           decoration: BoxDecoration(
             color: AppColors.inputBox,
             border: Border.all(
               color: isActive ? AppColors.accent : AppColors.tableBorder,
-              width: isActive ? 1.5 : 1)),
+              width: isActive ? 1.5 : 1.0)),
           padding: const EdgeInsets.symmetric(horizontal: 6),
           alignment: Alignment.centerLeft,
           child: Row(children: [
@@ -225,22 +223,21 @@ class _BottomInputArea extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────
-// ACTION BUTTONS — 実行 / 取消
+// ACTION BUTTONS
 // ─────────────────────────────────────────
 class _ActionButtons extends StatelessWidget {
   final VoidCallback onExec;
   final VoidCallback onCancel;
   const _ActionButtons({required this.onExec, required this.onCancel});
-
   @override
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.rowAlt,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        _Btn('実行', AppColors.accent, Colors.white, onExec),
+        _Btn('実行',  AppColors.accent,      Colors.white,     onExec),
         const SizedBox(width: 20),
-        _Btn('取消', Colors.white, AppColors.textSec, onCancel,
+        _Btn('取消',  Colors.white,          AppColors.textSec, onCancel,
           border: AppColors.tableBorder),
       ]),
     );
@@ -253,7 +250,6 @@ class _Btn extends StatelessWidget {
   final VoidCallback onTap;
   final Color? border;
   const _Btn(this.label, this.bg, this.fg, this.onTap, {this.border});
-
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
@@ -264,9 +260,8 @@ class _Btn extends StatelessWidget {
         border: Border.all(color: border ?? bg),
         borderRadius: BorderRadius.circular(3)),
       alignment: Alignment.center,
-      child: Text(label,
-        style: TextStyle(fontFamily: AppText.mono,
-          fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+      child: Text(label, style: TextStyle(fontFamily: AppText.mono,
+        fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
     ),
   );
 }
@@ -277,15 +272,14 @@ class _Btn extends StatelessWidget {
 class _ExecBanner extends StatelessWidget {
   final ExecState state;
   const _ExecBanner({required this.state});
-
   @override
   Widget build(BuildContext context) {
     Color bg, fg;
     switch (state.status) {
-      case ExecStatus.loading: bg = AppColors.warnBg;              fg = AppColors.warn;    break;
-      case ExecStatus.success: bg = const Color(0xFFEAF6EA);       fg = AppColors.success; break;
-      case ExecStatus.error:   bg = const Color(0xFFFAEAEA);       fg = AppColors.danger;  break;
-      default:                 bg = AppColors.rowAlt;              fg = AppColors.textDim;
+      case ExecStatus.loading: bg = AppColors.warnBg;          fg = AppColors.warn;    break;
+      case ExecStatus.success: bg = const Color(0xFFEAF6EA);   fg = AppColors.success; break;
+      case ExecStatus.error:   bg = const Color(0xFFFAEAEA);   fg = AppColors.danger;  break;
+      default:                 bg = AppColors.rowAlt;          fg = AppColors.textDim;
     }
     return Container(
       width: double.infinity, color: bg,
