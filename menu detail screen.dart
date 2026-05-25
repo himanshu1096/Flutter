@@ -34,74 +34,23 @@ class MenuDetailScreen extends ConsumerWidget {
           // ── Breadcrumb + instruction ──
           _SubHeader(menu: menu),
 
-          // ── Field rows (10 at a time) ──
+          // ── Field rows (10 at a time) with scroll indicator ──
           Expanded(
-            child: Container(
-              color: AppColors.surface,
-              child: ListView.builder(
-                itemCount: visibleFields.length,
-                itemBuilder: (ctx, i) {
-                  final field      = visibleFields[i];
-                  final value      = fieldVals[menu.code]?[field.num] ?? field.defaultValue;
-                  final isSelected = i == selIdx;
-                  final isReadonly = field.type == FieldType.readonly;
-                  final isToggle   = field.type == FieldType.toggle;
-
-                  return GestureDetector(
-                    onTap: isReadonly ? null : () {
-                      // Confirm previous input before switching
-                      if (npState.active && selField != null) {
-                        ref.read(numpadStateProvider.notifier)
-                            .confirm(menu.code, selField.num);
-                      }
-                      ref.read(selectedFieldIndexProvider.notifier).state = i;
-                      ref.read(numpadStateProvider.notifier).activate(value);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.rowSelected
-                            : (i.isEven ? AppColors.surface : AppColors.rowAlt),
-                        border: const Border(
-                          bottom: BorderSide(color: AppColors.tableBorder))),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 7),
-                      child: Row(children: [
-
-                        // Row number
-                        SizedBox(width: 26,
-                          child: Text(field.num, style: AppText.fieldNum)),
-                        const SizedBox(width: 8),
-
-                        // Label
-                        Expanded(flex: 3,
-                          child: Text(field.label,
-                            style: isSelected
-                                ? AppText.fieldLabel.copyWith(
-                                    fontWeight: FontWeight.w700)
-                                : AppText.fieldLabel,
-                            overflow: TextOverflow.ellipsis)),
-
-                        // Value
-                        Expanded(flex: 2,
-                          child: isToggle
-                            ? Center(child: _ToggleChip(on: value == '1'))
-                            : Text(
-                                // Show live buffer when this field is being edited
-                                isSelected && npState.active
-                                    ? npState.buffer
-                                    : value,
-                                style: AppText.fieldValue.copyWith(
-                                  color: isSelected && npState.active
-                                      ? AppColors.accent
-                                      : AppColors.textPrimary),
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis)),
-                      ]),
-                    ),
-                  );
-                },
-              ),
+            child: _FieldListWithArrow(
+              fields: visibleFields,
+              selIdx: selIdx,
+              menuCode: menu.code,
+              fieldVals: fieldVals,
+              npState: npState,
+              selField: selField,
+              onTapField: (i, value) {
+                if (npState.active && selField != null) {
+                  ref.read(numpadStateProvider.notifier)
+                      .confirm(menu.code, selField.num);
+                }
+                ref.read(selectedFieldIndexProvider.notifier).state = i;
+                ref.read(numpadStateProvider.notifier).activate(value);
+              },
             ),
           ),
 
@@ -144,6 +93,139 @@ class MenuDetailScreen extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────
+// FIELD LIST WITH SCROLL DOWN ARROW
+// ─────────────────────────────────────────
+class _FieldListWithArrow extends StatefulWidget {
+  final List<FieldDef> fields;
+  final int selIdx;
+  final String menuCode;
+  final Map<String, Map<String, String>> fieldVals;
+  final NumpadState npState;
+  final FieldDef? selField;
+  final void Function(int index, String value) onTapField;
+
+  const _FieldListWithArrow({
+    required this.fields, required this.selIdx, required this.menuCode,
+    required this.fieldVals, required this.npState, required this.selField,
+    required this.onTapField,
+  });
+  @override
+  State<_FieldListWithArrow> createState() => _FieldListWithArrowState();
+}
+
+class _FieldListWithArrowState extends State<_FieldListWithArrow> {
+  final ScrollController _scroll = ScrollController();
+  bool _canScrollDown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_check);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  @override
+  void didUpdateWidget(_FieldListWithArrow old) {
+    super.didUpdateWidget(old);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  void _check() {
+    if (!_scroll.hasClients) return;
+    final can = _scroll.position.maxScrollExtent > 0 &&
+        _scroll.offset < _scroll.position.maxScrollExtent - 1;
+    if (can != _canScrollDown) setState(() => _canScrollDown = can);
+  }
+
+  void _scrollToBottom() => _scroll.animateTo(
+    _scroll.position.maxScrollExtent,
+    duration: const Duration(milliseconds: 300),
+    curve: Curves.easeOut);
+
+  @override
+  void dispose() { _scroll.removeListener(_check); _scroll.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(children: [
+      Container(
+        color: AppColors.surface,
+        child: ListView.builder(
+          controller: _scroll,
+          itemCount: widget.fields.length,
+          itemBuilder: (ctx, i) {
+            final field      = widget.fields[i];
+            final value      = widget.fieldVals[widget.menuCode]?[field.num] ?? field.defaultValue;
+            final isSelected = i == widget.selIdx;
+            final isReadonly = field.type == FieldType.readonly;
+            final isToggle   = field.type == FieldType.toggle;
+
+            return GestureDetector(
+              onTap: isReadonly ? null : () => widget.onTapField(i, value),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.rowSelected
+                      : (i.isEven ? AppColors.surface : AppColors.rowAlt),
+                  border: const Border(bottom: BorderSide(color: AppColors.tableBorder))),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                child: Row(children: [
+                  SizedBox(width: 26, child: Text(field.num, style: AppText.fieldNum)),
+                  const SizedBox(width: 8),
+                  Expanded(flex: 3,
+                    child: Text(field.label,
+                      style: isSelected
+                          ? AppText.fieldLabel.copyWith(fontWeight: FontWeight.w700)
+                          : AppText.fieldLabel,
+                      overflow: TextOverflow.ellipsis)),
+                  Expanded(flex: 2,
+                    child: isToggle
+                        ? Center(child: _ToggleChip(on: value == '1'))
+                        : Text(
+                            isSelected && widget.npState.active
+                                ? widget.npState.buffer : value,
+                            style: AppText.fieldValue.copyWith(
+                              color: isSelected && widget.npState.active
+                                  ? AppColors.accent : AppColors.textPrimary),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis)),
+                ]),
+              ),
+            );
+          },
+        ),
+      ),
+
+      // ── Down arrow — shown when more content below ──
+      if (_canScrollDown)
+        Positioned(
+          bottom: 6, left: 0, right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: _scrollToBottom,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.12),
+                  border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+                  borderRadius: BorderRadius.circular(20)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.keyboard_arrow_down,
+                      size: 15, color: AppColors.accent),
+                  const SizedBox(width: 3),
+                  Text('下へ', style: TextStyle(
+                    fontFamily: AppText.mono, fontSize: 8,
+                    color: AppColors.accent.withOpacity(0.85))),
+                ]),
+              ),
+            ),
+          ),
+        ),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────
 // SUB HEADER
 // ─────────────────────────────────────────
 class _SubHeader extends StatelessWidget {
@@ -162,8 +244,11 @@ class _SubHeader extends StatelessWidget {
       Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        color: AppColors.warnBg,
-        child: Text(menu.instruction, style: AppText.instruction)),
+        color: const Color(0xFFDDE8F4), // distinct light blue — never confused with yellow row
+        child: Text(menu.instruction,
+          style: const TextStyle(
+            fontFamily: AppText.mono, fontSize: 9,
+            color: Color(0xFF1A4A7A), fontWeight: FontWeight.w600))),
     ]);
   }
 }

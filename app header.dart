@@ -22,7 +22,8 @@ class _AppHeaderState extends ConsumerState<AppHeader> {
     if (!mounted) return;
     final n = DateTime.now();
     final dow = ['月','火','水','木','金','土','日'][n.weekday - 1];
-    setState(() => _time = '${n.year}.${_p(n.month)}.${_p(n.day)}($dow)${_p(n.hour)}:${_p(n.minute)}');
+    setState(() => _time =
+      '${n.year}.${_p(n.month)}.${_p(n.day)}(${dow})${_p(n.hour)}:${_p(n.minute)}');
     Future.delayed(const Duration(seconds: 1), _tick);
   }
   String _p(int v) => v.toString().padLeft(2, '0');
@@ -61,10 +62,8 @@ class _AppHeaderState extends ConsumerState<AppHeader> {
               color: Colors.white, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(width: 10),
-        // Date/time
-        Text(_time,
-          style: const TextStyle(fontFamily: AppText.mono, fontSize: 9,
-            color: Color(0xFF8AB0CC))),
+        // Date/time — day of week smaller inside ()
+        _DateTimeWidget(time: _time),
         const SizedBox(width: 12),
         // Logoff — right side
         GestureDetector(
@@ -80,6 +79,52 @@ class _AppHeaderState extends ConsumerState<AppHeader> {
                 color: Color(0xFFCC8888), fontWeight: FontWeight.w600)),
           ),
         ),
+      ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// DATE TIME WIDGET
+// Renders: 2027.04.08(水)12:17
+// Day of week is smaller font inside ()
+// ─────────────────────────────────────────
+class _DateTimeWidget extends StatelessWidget {
+  final String time; // format: "2027.04.08(水)12:17"
+  const _DateTimeWidget({required this.time});
+
+  @override
+  Widget build(BuildContext context) {
+    // Split on ( and ) to isolate the day character
+    final openParen  = time.indexOf('(');
+    final closeParen = time.indexOf(')');
+    if (openParen == -1 || closeParen == -1) {
+      return Text(time,
+        style: const TextStyle(fontFamily: AppText.mono,
+          fontSize: 9, color: Color(0xFF8AB0CC)));
+    }
+
+    final before = time.substring(0, openParen);       // "2027.04.08"
+    final day    = time.substring(openParen + 1, closeParen); // "水"
+    final after  = time.substring(closeParen + 1);      // "12:17"
+
+    return RichText(
+      text: TextSpan(children: [
+        TextSpan(text: before,
+          style: const TextStyle(fontFamily: AppText.mono,
+            fontSize: 9, color: Color(0xFF8AB0CC))),
+        TextSpan(text: '(',
+          style: const TextStyle(fontFamily: AppText.mono,
+            fontSize: 9, color: Color(0xFF6A90AA))),
+        TextSpan(text: day,
+          style: const TextStyle(fontFamily: AppText.mono,
+            fontSize: 7, color: Color(0xFF6AAAC8))), // smaller day
+        TextSpan(text: ')',
+          style: const TextStyle(fontFamily: AppText.mono,
+            fontSize: 9, color: Color(0xFF6A90AA))),
+        TextSpan(text: after,
+          style: const TextStyle(fontFamily: AppText.mono,
+            fontSize: 9, color: Color(0xFF8AB0CC))),
       ]),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/field_def.dart';
+import '../models/menu_def.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 
@@ -229,7 +231,7 @@ class _SideNumpadState extends ConsumerState<SideNumpad> {
       focusNode: _focus,
       onKeyEvent: _handleKey,
       child: Container(
-        width: 92,
+        width: 120,
         decoration: const BoxDecoration(
           color: AppColors.numpadBg,
           border: Border(left: BorderSide(color: AppColors.tableBorder))),
@@ -372,7 +374,7 @@ class _Btn extends StatelessWidget {
     this.bg = AppColors.numpadKey,
     this.fg,
     this.flex = 1,
-    this.height = 34,
+    this.height = 38,
     this.enabled = true,
   });
 
