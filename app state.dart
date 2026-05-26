@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/pages_data.dart';
 import '../models/field_def.dart';
+import '../models/field_format.dart';
 import '../models/menu_def.dart';
 import '../models/page_def.dart';
 import '../services/memory_service.dart';
@@ -42,7 +43,8 @@ class FieldValuesNotifier extends StateNotifier<Map<String, Map<String, String>>
     state = m;
   }
 
-  String getValue(String menuCode, String num) => state[menuCode]?[num] ?? '';
+  String getValue(String menuCode, String num) =>
+      state[menuCode]?[num] ?? '';
 
   void setValue(String menuCode, String num, String val) {
     /// TODO [BACKEND]: Write back to KBA .exe before updating UI:
@@ -55,15 +57,13 @@ class FieldValuesNotifier extends StateNotifier<Map<String, Map<String, String>>
   }
 }
 
-// ── Selected field index within the VISIBLE 10 fields ──
+// ── Selected field index within visible group ──
 final selectedFieldIndexProvider = StateProvider<int>((ref) => 0);
 
-// ── Field group offset
-// 0 = fields index 0–9, 1 = fields index 10–19, 2 = fields index 20–29 etc.
-// Controlled by 前項 / 次項 on the numpad
+// ── Field group offset: 0=fields 0-9, 1=fields 10-19, 2=fields 20-29 ──
 final fieldGroupOffsetProvider = StateProvider<int>((ref) => 0);
 
-/// How many groups exist for a given menu
+/// Total groups for a menu (ceil of fields/10)
 int fieldGroupCount(MenuDef menu) => (menu.fields.length / 10).ceil();
 
 /// Can go to previous group?
@@ -72,7 +72,7 @@ bool canGoPrev(int offset) => offset > 0;
 /// Can go to next group?
 bool canGoNext(MenuDef menu, int offset) => offset + 1 < fieldGroupCount(menu);
 
-// ── Numpad buffer ──
+// ── Numpad state ──
 class NumpadState {
   final String buffer;
   final bool active;
@@ -82,7 +82,8 @@ class NumpadState {
 }
 
 final numpadStateProvider =
-    StateNotifierProvider<NumpadNotifier, NumpadState>((ref) => NumpadNotifier(ref));
+    StateNotifierProvider<NumpadNotifier, NumpadState>(
+        (ref) => NumpadNotifier(ref));
 
 class NumpadNotifier extends StateNotifier<NumpadState> {
   final Ref _ref;
@@ -91,21 +92,43 @@ class NumpadNotifier extends StateNotifier<NumpadState> {
   void activate(String currentValue) =>
       state = NumpadState(buffer: currentValue, active: true);
 
-  void pressKey(String key) {
+  /// Smart key press — uses FieldFormat if available, else plain append
+  void pressKey(String key, {FieldFormat? format}) {
     if (!state.active) return;
-    if (key == '⌫') {
-      final b = state.buffer;
-      state = state.copyWith(buffer: b.isEmpty ? '' : b.substring(0, b.length - 1));
-    } else if (key == 'CLR') {
+
+    if (key == 'CLR') {
       state = state.copyWith(buffer: '');
+      return;
+    }
+
+    if (format != null) {
+      // Format-aware processing — auto separators, range enforcement
+      final result = format.processKey(state.buffer, key);
+      if (result != null) {
+        state = state.copyWith(buffer: result);
+      }
+      // null means key is ignored (out of range / wrong char)
     } else {
-      state = state.copyWith(buffer: state.buffer + key);
+      // Plain fallback
+      if (key == '⌫') {
+        final b = state.buffer;
+        state = state.copyWith(
+            buffer: b.isEmpty ? '' : b.substring(0, b.length - 1));
+      } else {
+        state = state.copyWith(buffer: state.buffer + key);
+      }
     }
   }
 
-  void confirm(String menuCode, String fieldNum) {
-    if (state.active && state.buffer.isNotEmpty) {
-      _ref.read(fieldValuesProvider.notifier).setValue(menuCode, fieldNum, state.buffer);
+  void confirm(String menuCode, String fieldNum, {FieldFormat? format}) {
+    final val = state.buffer;
+    if (val.isNotEmpty) {
+      // Validate before saving
+      final valid = format == null || format.isValid(val);
+      if (valid) {
+        _ref.read(fieldValuesProvider.notifier).setValue(menuCode, fieldNum, val);
+      }
+      // If invalid, we still close but don't save — original value stays
     }
     state = const NumpadState();
   }
@@ -123,7 +146,8 @@ class ExecState {
 }
 
 final execProvider =
-    StateNotifierProvider<ExecNotifier, ExecState>((ref) => ExecNotifier(ref));
+    StateNotifierProvider<ExecNotifier, ExecState>(
+        (ref) => ExecNotifier(ref));
 
 class ExecNotifier extends StateNotifier<ExecState> {
   final Ref _ref;
@@ -132,10 +156,11 @@ class ExecNotifier extends StateNotifier<ExecState> {
   Future<void> run(String menuCode, Map<String, String> values) async {
     state = const ExecState(status: ExecStatus.loading, message: '実行中...');
     try {
-      final r = await _ref.read(memServiceProvider).executeCommand(menuCode, values);
+      final r = await _ref.read(memServiceProvider)
+          .executeCommand(menuCode, values);
       state = ExecState(
-        status: r.success ? ExecStatus.success : ExecStatus.error,
-        message: r.message);
+          status: r.success ? ExecStatus.success : ExecStatus.error,
+          message: r.message);
       await Future.delayed(const Duration(seconds: 3));
       if (mounted) state = const ExecState();
     } catch (e) {
@@ -146,4 +171,4 @@ class ExecNotifier extends StateNotifier<ExecState> {
 
 // ── Connection ──
 final connProvider = FutureProvider<bool>(
-  (ref) => ref.read(memServiceProvider).ping());
+    (ref) => ref.read(memServiceProvider).ping());

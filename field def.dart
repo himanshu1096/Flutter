@@ -1,4 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'field_format.dart';
+
+export 'field_format.dart';
 
 enum FieldType { hex, numeric, text, toggle, readonly }
 enum MemoryAccessType { readWrite, readOnly, writeOnly }
@@ -8,7 +11,6 @@ class FieldRange {
   final String max;
   final String description;
   const FieldRange({required this.min, required this.max, required this.description});
-  // Display format matching original: "000.000.000.000〜255.255.255.255"
   String get displayRange => '$min〜$max';
 }
 
@@ -21,8 +23,7 @@ class FieldDef extends Equatable {
   /// TODO [BACKEND — KBA REALTIME FETCH]:
   ///   final raw = await KbaInterface.read(
   ///     address: int.parse(memoryAddress!.replaceFirst('0x',''), radix:16),
-  ///     size: memorySize,
-  ///   );
+  ///     size: memorySize);
   ///   return bytesToValue(raw);
   final String defaultValue;
 
@@ -33,6 +34,9 @@ class FieldDef extends Equatable {
   final MemoryAccessType memoryAccess;
   final String? description;
   final FieldRange? range;
+
+  /// Smart input format — controls auto-separators, allowed chars, range
+  final FieldFormat? format;
 
   const FieldDef({
     required this.num,
@@ -45,6 +49,7 @@ class FieldDef extends Equatable {
     this.memoryAccess = MemoryAccessType.readWrite,
     this.description,
     this.range,
+    this.format,
   });
 
   @override
@@ -53,7 +58,7 @@ class FieldDef extends Equatable {
   List<int> valueToBytes(String value) {
     try {
       if (type == FieldType.hex) {
-        final v = int.parse(value.replaceAll(' ', ''), radix: 16);
+        final v = int.parse(value.replaceAll(RegExp(r'[^0-9A-Fa-f]'), ''), radix: 16);
         return List.generate(memorySize, (i) => (v >> ((memorySize-1-i)*8)) & 0xFF);
       } else if (type == FieldType.numeric) {
         final v = int.tryParse(value.replaceAll(RegExp(r'[^\d]'), '')) ?? 0;

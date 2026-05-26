@@ -46,7 +46,7 @@ class MenuDetailScreen extends ConsumerWidget {
               onTapField: (i, value) {
                 if (npState.active && selField != null) {
                   ref.read(numpadStateProvider.notifier)
-                      .confirm(menu.code, selField.num);
+                      .confirm(menu.code, selField.num, format: selField.format);
                 }
                 ref.read(selectedFieldIndexProvider.notifier).state = i;
                 ref.read(numpadStateProvider.notifier).activate(value);
@@ -71,7 +71,7 @@ class MenuDetailScreen extends ConsumerWidget {
             onExec: () {
               if (npState.active && selField != null) {
                 ref.read(numpadStateProvider.notifier)
-                    .confirm(menu.code, selField.num);
+                    .confirm(menu.code, selField.num, format: selField.format);
               }
               final vals = ref.read(fieldValuesProvider)[menu.code] ?? {};
               ref.read(execProvider.notifier).run(menu.code, vals);
@@ -265,44 +265,61 @@ class _BottomInputArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fmt      = field.format;
+    final rangeStr = fmt?.rangeDisplay ?? field.range?.displayRange ?? '';
+    final enumStr  = fmt?.enumDesc;
+
     return Container(
       color: AppColors.rowAlt,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(children: [
-        // Selected field label
-        Flexible(
-          child: Text('${field.num}  ${field.label}',
-            style: const TextStyle(fontFamily: AppText.mono,
-              fontSize: 9, color: AppColors.textSec),
-            overflow: TextOverflow.ellipsis)),
-        const SizedBox(width: 10),
-        // Range text e.g. "0x30〜0x7f" or "000.000.000.000〜255.255.255.255"
-        if (field.range != null)
-          Flexible(
-            child: Text(field.range!.displayRange,
-              style: AppText.rangeText,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            // Field label
+            Flexible(child: Text('${field.num}  ${field.label}',
+              style: const TextStyle(fontFamily: AppText.mono,
+                fontSize: 9, color: AppColors.textSec),
               overflow: TextOverflow.ellipsis)),
-        const Spacer(),
-        // Input box
-        Container(
-          width: 160, height: 26,
-          decoration: BoxDecoration(
-            color: AppColors.inputBox,
-            border: Border.all(
-              color: isActive ? AppColors.accent : AppColors.tableBorder,
-              width: isActive ? 1.5 : 1.0)),
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          alignment: Alignment.centerLeft,
-          child: Row(children: [
-            Expanded(child: Text(npBuffer,
-              style: AppText.fieldValue.copyWith(
-                color: isActive ? AppColors.accent : AppColors.textPrimary),
-              overflow: TextOverflow.ellipsis)),
-            if (isActive)
-              Container(width: 1.5, height: 16, color: AppColors.accent),
+            const SizedBox(width: 10),
+            // Range
+            if (rangeStr.isNotEmpty)
+              Flexible(child: Text(rangeStr,
+                style: AppText.rangeText,
+                overflow: TextOverflow.ellipsis)),
+            const Spacer(),
+            // Input box
+            Container(
+              width: 160, height: 26,
+              decoration: BoxDecoration(
+                color: AppColors.inputBox,
+                border: Border.all(
+                  color: isActive ? AppColors.accent : AppColors.tableBorder,
+                  width: isActive ? 1.5 : 1.0)),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.centerLeft,
+              child: Row(children: [
+                Expanded(child: Text(npBuffer,
+                  style: AppText.fieldValue.copyWith(
+                    color: isActive ? AppColors.accent : AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis)),
+                if (isActive)
+                  Container(width: 1.5, height: 16, color: AppColors.accent),
+              ]),
+            ),
           ]),
-        ),
-      ]),
+          // Enum description line (e.g. "0: なし / 1: あり")
+          if (enumStr != null) ...[
+            const SizedBox(height: 2),
+            Text(enumStr,
+              style: const TextStyle(
+                fontFamily: AppText.mono, fontSize: 8,
+                color: AppColors.accent),
+              overflow: TextOverflow.ellipsis),
+          ],
+        ],
+      ),
     );
   }
 }
