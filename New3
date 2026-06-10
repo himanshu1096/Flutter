@@ -1,0 +1,95 @@
+if (pageKind == QrReadPageBtnKind.zyouhoHyouzi)
+  // 情報表示: 3 cards in a Row — left column: 入出場情報, right column: ステータス + カード乗車券情報
+  IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Left column: 入出場情報
+        Expanded(
+          child: CardInfoBlock(
+            title: '入出場情報',
+            content: _cardInfoContent(
+              context,
+              cardInfo: historyInfo,
+              fontColor: fontColor,
+            ),
+            icon: Icon(
+              Icons.history_edu_outlined,
+              size: 40.0,
+              color: fontColor,
+            ),
+            fontColor: fontColor,
+            cardBackgroundColor: cardBackgroundColor,
+            cardOutlineColor: cardOutlineColor,
+          ),
+        ),
+        // Right column: ステータス on top, カード乗車券情報 below
+        Expanded(
+          child: Column(
+            children: [
+              CardInfoBlock(
+                title: 'ステータス',
+                content: _cardInfoContent(
+                  context,
+                  cardInfo: statusInfo,
+                  fontColor: fontColor,
+                ),
+                icon: DualIconOverlay(
+                  baseIcon: Icons.info_outline_rounded,
+                  topIcon: Icons.qr_code_rounded,
+                  baseColor: fontColor,
+                  topColor: fontColor,
+                  topBackgroundColor: cardBackgroundColor,
+                  topOffset: Offset(5, 0),
+                ),
+                fontColor: fontColor,
+                cardBackgroundColor: cardBackgroundColor,
+                cardOutlineColor: cardOutlineColor,
+              ),
+              CardInfoBlock(
+                title: 'カード乗車券情報',
+                content: _cardInfoContent(
+                  context,
+                  cardInfo: cardTicketInfo,
+                  fontColor: fontColor,
+                ),
+                icon: DualIconOverlay(
+                  baseIcon: Icons.confirmation_num_outlined,
+                  topIcon: Icons.info_outline_rounded,
+                  baseColor: fontColor,
+                  topColor: fontColor,
+                  topBackgroundColor: cardBackgroundColor,
+                  topOffset: Offset(5, 0),
+                ),
+                fontColor: fontColor,
+                cardBackgroundColor: cardBackgroundColor,
+                cardOutlineColor: cardOutlineColor,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  )
+else
+  // 他のページ: ステータスのみ表示
+  CardInfoBlock(
+    title: 'ステータス',
+    content: _cardInfoContent(
+      context,
+      cardInfo: statusInfo,
+      fontColor: fontColor,
+    ),
+    icon: DualIconOverlay(
+      baseIcon: Icons.info_outline_rounded,
+      topIcon: Icons.qr_code_rounded,
+      baseColor: fontColor,
+      topColor: fontColor,
+      topBackgroundColor: cardBackgroundColor,
+      topOffset: Offset(5, 0),
+    ),
+    fontColor: fontColor,
+    cardBackgroundColor: cardBackgroundColor,
+    cardOutlineColor: cardOutlineColor,
+  ),
+Also remove the ListView wrapper — the parent Flexible in _SecondaryTabContentTop already handles scrolling if needed. Change the return type from ListView to just returning the widget directly — wrap everything in a single Column or just return the conditional above directly from build().
