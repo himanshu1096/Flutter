@@ -1,0 +1,38 @@
+      ), // SizedBox
+      SizedBox(width: 12),
+      ActiveLargeButton(
+        text: 'QRチケット番号を入力する',
+        onPressed: () async {
+          final result = await showDialog<String?>(
+            context: context,
+            builder: (context) => SoftwareKeyboard(
+              keyboardUsage: KeyboardUsage.qrTicketNo,
+              initialText: qrNoTextFieldController.text,
+            ),
+          );
+          if (result != null) {
+            qrNoTextFieldController.text = result;
+            if (result.length >= 12) {
+              ref.read(qrTicketNoProvider.notifier).changeNo(result);
+              disableQrReferenceButton.value = true;
+            } else {
+              disableQrReferenceButton.value = false;
+            }
+          }
+        },
+      ), // ActiveLargeButton
+    ],
+  ), // Row
+  SizedBox(height: 25),
+
+
+
+SizeRow(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    SizedBox(
+      width: 670,
+      child: TextFieldShadow(
+
+
+
