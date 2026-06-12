@@ -1,0 +1,28 @@
+SizedBox(
+  height: 65,
+  child: ElevatedButton.icon(
+    icon: Icon(Icons.dialpad_rounded, size: 32, color: Colors.white),
+    label: Text('番号入力', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+    style: ElevatedButton.styleFrom(
+      padding: EdgeInsets.zero,
+      minimumSize: Size(160, 65),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 3,
+    ).copyWith(
+      backgroundColor: WidgetStateProperty.all(Colors.transparent),
+      shadowColor: WidgetStateProperty.all(Colors.transparent),
+    ),
+    onPressed: () async {
+
+
+Ink(
+  decoration: BoxDecoration(
+    gradient: LinearGradient(
+      colors: orengeGradient,
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    borderRadius: BorderRadius.circular(8),
+    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+  ),
+  child: // SizedBox starts here
