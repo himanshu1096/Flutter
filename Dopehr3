@@ -1,0 +1,58 @@
+SizedBox(
+  height: 65,
+  child: DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: orengeGradient,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(8),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black26,
+          blurRadius: 4,
+          offset: Offset(0, 2),
+        ),
+      ],
+    ),
+    child: ElevatedButton.icon(
+      icon: Icon(Icons.dialpad_rounded, size: 32, color: Colors.white),
+      label: Text(
+        '番号入力',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        minimumSize: Size(160, 65),
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      onPressed: () async {
+        final result = await showDialog<String?>(
+          context: context,
+          builder: (context) => SoftwareKeyboard(
+            keyboardUsage: KeyboardUsage.qrTicketNo,
+            initialText: qrNoTextFieldController.text,
+          ),
+        );
+        if (result != null) {
+          qrNoTextFieldController.text = result;
+          if (result.length >= 12) {
+            ref.read(qrTicketNoProvider.notifier).changeNo(result);
+            disableQrReferenceButton.value = true;
+          } else {
+            disableQrReferenceButton.value = false;
+          }
+        }
+      },
+    ),
+  ),
+),
