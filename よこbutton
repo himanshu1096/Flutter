@@ -1,0 +1,34 @@
+decoration: InputDecoration(
+  hintText: 'タップして入力...',
+  hintStyle: TextStyle(color: Colors.grey, fontSize: 24),
+  border: OutlineInputBorder(),
+  fillColor: Colors.white,
+  filled: true,
+
+
+
+
+      ), // SizedBox
+      SizedBox(width: 12),
+      ActiveLargeButton(
+        text: '⌨️ 番号入力',
+        onPressed: () async {
+          final result = await showDialog<String?>(
+            context: context,
+            builder: (context) => SoftwareKeyboard(
+              keyboardUsage: KeyboardUsage.qrTicketNo,
+              initialText: qrNoTextFieldController.text,
+            ),
+          );
+          if (result != null) {
+            qrNoTextFieldController.text = result;
+            if (result.length >= 12) {
+              ref.read(qrTicketNoProvider.notifier).changeNo(result);
+              disableQrReferenceButton.value = true;
+            } else {
+              disableQrReferenceButton.value = false;
+            }
+          }
+        },
+      ), // ActiveLargeButton
+      SizedBox(width: 12),
