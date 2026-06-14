@@ -1,0 +1,99 @@
+    return _SecondaryTabMenuWithActions(
+      tabNames: ['締切□', '締切速報', '締切再出力', '接客履歴'],
+      tabViews: const [
+        CloseTally(),
+        CloseQuickTally(),
+        CloseTallyReExport(),
+        CustomerServiceHistory(),
+      ],
+      extraButtons: [
+        TransitionButton(
+          onPressed: () {
+            // 廃券処理 — サーバー接続後に実装予定
+          },
+          text: '廃券処理',
+          isPushed: false,
+          width: 170.0,
+        ),
+        TransitionButton(
+          onPressed: () {
+            // 発駅キャンセル — サーバー接続後に実装予定
+          },
+          text: '発駅キャンセル',
+          isPushed: false,
+          width: 170.0,
+          fontSize: 22.0,
+        ),
+      ],
+    );
+
+
+class _SecondaryTabMenuWithActions extends HookWidget {
+  final List<String> tabNames;
+  final List<Widget> tabViews;
+  final List<Widget> extraButtons;
+
+  const _SecondaryTabMenuWithActions({
+    required this.tabNames,
+    required this.tabViews,
+    required this.extraButtons,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tabController = useTabController(
+      initialLength: tabViews.length,
+      animationDuration: tabAnimationDuration,
+    );
+
+    return DecoratedContainer(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: AnimatedBuilder(
+              animation: tabController.animation!,
+              builder: (context, child) {
+                return Row(
+                  spacing: 8,
+                  children: [
+                    // 既存タブボタン
+                    for (final MapEntry(key: index, value: tabName)
+                        in tabNames.asMap().entries)
+                      TransitionButton(
+                        isPushed: tabController.index == index,
+                        text: tabName,
+                        onPressed: () {
+                          tabController.animateTo(index);
+                        },
+                        width: 170.0,
+                      ),
+                    // 廃券処理・発駅キャンセルボタン
+                    ...extraButtons,
+                  ],
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: tabController,
+              physics: NeverScrollableScrollPhysics(),
+              children: tabViews,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+
+
+
+import '../secondary_tab_content_core.dart';
+import '../app_color.dart';
+
+
