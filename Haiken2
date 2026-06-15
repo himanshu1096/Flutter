@@ -1,0 +1,86 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../process_completed.dart';
+import '../qr_process/secondary_tab_process_information.dart';
+import '../secondary_tab_content_core.dart';
+import '../utility/confirm_dialog.dart';
+
+class HaikenSyori extends ConsumerStatefulWidget {
+  const HaikenSyori({super.key});
+
+  @override
+  ConsumerState<HaikenSyori> createState() => _HaikenSyoriState();
+}
+
+class _HaikenSyoriState extends ConsumerState<HaikenSyori> {
+  bool _completed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // 実行完了後は ProcessCompleted 画面を表示
+    if (_completed) {
+      return ProcessCompleted(
+        onCompleteButtonPressed: () {
+          setState(() => _completed = false);
+        },
+      );
+    }
+
+    return Column(
+      children: [
+        // 情報カード（上部）
+        const Flexible(
+          child: SingleChildScrollView(
+            child: CardInfoContents(),
+          ),
+        ),
+
+        // 下部 実行ボタン行
+        Padding(
+          padding: const EdgeInsets.all(10),
+          child: SizedBox(
+            height: 70,
+            child: Row(
+              children: [
+                const SizedBox(width: 60),
+                const Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '廃券処理を実行します',
+                      style: TextStyle(
+                        fontSize: 45,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 60,
+                  width: 200,
+                  child: ActiveLargeButton(
+                    text: '実行',
+                    onPressed: () async {
+                      final isExecute = await showDialog<bool?>(
+                        barrierColor: Colors.transparent,
+                        context: context,
+                        builder:
+                            (context) =>
+                                ConfirmDialog(porpose: '廃券処理'),
+                      );
+                      if ((isExecute ?? false) && context.mounted) {
+                        // TODO: サーバーへ廃券処理リクエスト送信
+                        setState(() => _completed = true);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
