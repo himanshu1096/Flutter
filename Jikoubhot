@@ -1,0 +1,16 @@
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              text,
+              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 30.0),
+            ),
+            SizedBox(width: 8),
+            FaIcon(
+              FontAwesomeIcons.chevronRight,
+              color: Colors.black,
+              size: 24,
+            ),
+          ],
+        ),
