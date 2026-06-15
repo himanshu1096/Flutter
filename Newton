@@ -1,0 +1,383 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_multidemo/app_color.dart';
+import 'package:qr_multidemo/provider/provider.dart';
+import 'package:qr_multidemo/qr_process/qr_process_menu.dart';
+import 'package:qr_multidemo/secondary_tab_content_core.dart';
+import 'package:intl/intl.dart';
+
+import '../app_icon.dart';
+import '../utility/confirm_dialog.dart';
+import '../utility/constant.dart';
+import 'secondary_tab_content_unselected.dart';
+
+// 券情報部分
+class CardInfoContents extends ConsumerWidget {
+  const CardInfoContents({super.key});
+
+  static double titleStrWidth = 260;
+  static double titleStrHeight = 32;
+  final double itemStrWidth = 270;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusInfo = <CardInfoEnum>[
+      CardInfoEnum.qrYukoMukoStatus,
+      CardInfoEnum.siyouStatus,
+      CardInfoEnum.qrHakkouStatus,
+      CardInfoEnum.nyuusyutuzyouStatus,
+    ];
+
+    // カード・乗車券情報 普通券(QR) — サーバー接続後に切り替え予定
+    // final cardTicketInfo = <CardInfoEnum>[
+    //   CardInfoEnum.baitaiSyubetu,
+    //   CardInfoEnum.yukoSyuryoubi,
+    //   CardInfoEnum.hatueki,
+    //   CardInfoEnum.hatuekiKusu,
+    //   CardInfoEnum.renrakueki,
+    //   CardInfoEnum.renrakuekiKusu,
+    // ];
+
+    final historyInfo = <CardInfoEnum>[
+      CardInfoEnum.zyosyaeki,
+      CardInfoEnum.zyosyaTukihi,
+      CardInfoEnum.nyusyutuzyoBit,
+      CardInfoEnum.zyosyaZikoku,
+    ];
+
+    final pageKind = ref.watch(qrReadPageSelectedBtnProvider);
+
+    final fontColor = Theme.of(context).colorScheme.onSecondaryContainer;
+    final cardBackgroundColor =
+        Theme.of(context).colorScheme.secondaryContainer;
+    final cardOutlineColor = Theme.of(context).colorScheme.surfaceContainer;
+
+    return ListView(
+      shrinkWrap: true,
+      children: [
+        // カード乗車券情報 — 企画券表示
+        CardInfoBlock(
+          title: 'カード乗車券情報',
+          content: _kikakukenContent(context, fontColor: fontColor),
+          icon: DualIconOverlay(
+            baseIcon: Icons.confirmation_num_outlined,
+            topIcon: Icons.info_outline_rounded,
+            baseColor: fontColor,
+            topColor: fontColor,
+            topBackgroundColor: cardBackgroundColor,
+            topOffset: Offset(5, 0),
+          ),
+          fontColor: fontColor,
+          cardBackgroundColor: cardBackgroundColor,
+          cardOutlineColor: cardOutlineColor,
+        ), // CardInfoBlock カード乗車券情報
+
+        // 入出場情報
+        if (pageKind != QrReadPageBtnKind.seisanSyori)
+          CardInfoBlock(
+            title: '入出場情報',
+            content: _cardInfoContent(
+              context,
+              cardInfo: historyInfo,
+              fontColor: fontColor,
+            ),
+            icon: Icon(
+              Icons.history_edu_outlined,
+              size: 40.0,
+              color: fontColor,
+            ),
+            fontColor: fontColor,
+            cardBackgroundColor: cardBackgroundColor,
+            cardOutlineColor: cardOutlineColor,
+          ), // CardInfoBlock 入出場情報
+
+        // ステータス
+        if (pageKind == QrReadPageBtnKind.zyouhoHyouzi)
+          CardInfoBlock(
+            title: 'ステータス',
+            content: _cardInfoContent(
+              context,
+              cardInfo: statusInfo,
+              fontColor: fontColor,
+            ),
+            icon: DualIconOverlay(
+              baseIcon: Icons.info_outline_rounded,
+              topIcon: Icons.qr_code_rounded,
+              baseColor: fontColor,
+              topColor: fontColor,
+              topBackgroundColor: cardBackgroundColor,
+              topOffset: Offset(5, 0),
+            ),
+            fontColor: fontColor,
+            cardBackgroundColor: cardBackgroundColor,
+            cardOutlineColor: cardOutlineColor,
+          ), // CardInfoBlock ステータス
+      ],
+    ); // ListView
+  } // build
+
+  // ─── 普通券(QR) コンテンツ ───────────────────────────────
+  Widget _cardInfoContent(
+    BuildContext context, {
+    required List<CardInfoEnum> cardInfo,
+    required Color fontColor,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final bool singleColumn = w < 600.0;
+        final double maxWidth = singleColumn ? w : w / 2;
+        final double maxWidth2 = maxWidth * 0.5;
+
+        return Wrap(
+          runSpacing: 6.0,
+          children:
+              cardInfo
+                  .map(
+                    (item) => SizedBox(
+                      width: maxWidth,
+                      child:
+                          item.value != ''
+                              ? Row(
+                                children: [
+                                  SizedBox(
+                                    width: maxWidth2,
+                                    child: Text(
+                                      item.name,
+                                      style: TextStyle(
+                                        fontSize: fontSize,
+                                        color: fontColor,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: maxWidth2,
+                                    child: RichText(
+                                      softWrap: false,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      text: TextSpan(
+                                        style:
+                                            DefaultTextStyle.of(context).style,
+                                        children: [
+                                          const TextSpan(
+                                            text: ' : ',
+                                            style: TextStyle(
+                                              fontSize: fontSize,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: item.value,
+                                            style: TextStyle(
+                                              fontSize: fontSize,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                              : Row(
+                                children: [
+                                  SizedBox(
+                                    width: maxWidth2 * 2,
+                                    child: Text(
+                                      item.name,
+                                      style: TextStyle(
+                                        fontSize: fontSize,
+                                        color: fontColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                    ),
+                  )
+                  .toList(),
+        ); // Wrap
+      },
+    ); // LayoutBuilder
+  } // _cardInfoContent
+
+  // ─── 企画券コンテンツ ─────────────────────────────────────
+  Widget _kikakukenContent(
+    BuildContext context, {
+    required Color fontColor,
+  }) {
+    // 企画券の表示データ（サーバー接続後に動的データに切り替え予定）
+    final rows = <(String, String)>[
+      (CardInfoEnum.yukokaisibi.name, ''),
+      (CardInfoEnum.hatueki.name, '06/01'),
+      (CardInfoEnum.tyakueki.name, '東武北千'),
+      (CardInfoEnum.yukoSyuryoubi.name, '06/04'),
+      (CardInfoEnum.keiyu1.name, '下今市'),
+      (CardInfoEnum.furicode.name, '日光・鬼怒川 F'),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final double maxWidth = w / 2;
+        final double keyWidth = maxWidth * 0.5;
+        final double valWidth = maxWidth * 0.5;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 企画券（大人）subheading + フリーコード disclaimer inline
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4.0),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '企画券（大人）  ',
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                        color: fontColor,
+                      ),
+                    ),
+                    TextSpan(
+                      text:
+                          '（※）フリーコードは改札機での判定に必要な情報のため、実際のフリー区間は企画券の券面を確認すること',
+                      style: TextStyle(
+                        fontSize: 14.0,
+                        color: fontColor,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ), // Padding subheading
+
+            // key-value rows
+            Wrap(
+              runSpacing: 2.0,
+              children:
+                  rows
+                      .map(
+                        (item) => SizedBox(
+                          width: maxWidth,
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: keyWidth,
+                                child: Text(
+                                  item.$1,
+                                  style: TextStyle(
+                                    fontSize: fontSize,
+                                    color: fontColor,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: valWidth,
+                                child: RichText(
+                                  softWrap: false,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  text: TextSpan(
+                                    style:
+                                        DefaultTextStyle.of(context).style,
+                                    children: [
+                                      TextSpan(
+                                        text: ' : ',
+                                        style: TextStyle(
+                                          fontSize: fontSize,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: item.$2,
+                                        style: TextStyle(
+                                          fontSize: fontSize,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ), // Wrap
+          ],
+        ); // Column
+      },
+    ); // LayoutBuilder
+  } // _kikakukenContent
+
+} // CardInfoContents
+
+// カード情報の一ブロック
+class CardInfoBlock extends StatelessWidget {
+  const CardInfoBlock({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.icon,
+    required this.fontColor,
+    required this.cardBackgroundColor,
+    required this.cardOutlineColor,
+  });
+
+  final String title;
+  final Widget content;
+  final Widget icon;
+  final Color fontColor;
+  final Color cardBackgroundColor;
+  final Color cardOutlineColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = titleTextStyle.copyWith(color: fontColor, height: 1.0);
+    return SizedBox(
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 5),
+        padding: EdgeInsets.all(0.1),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(Layouts.dialogRadius),
+          color: cardBackgroundColor,
+        ),
+        child: Card.outlined(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Layouts.dialogRadius),
+            side: BorderSide(color: cardOutlineColor, width: 2.0),
+          ),
+          color: cardBackgroundColor,
+          elevation: 5.0,
+          child: ListTile(
+            dense: true,
+            isThreeLine: true,
+            title: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                icon,
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: SizedBox(child: Text(title, style: textStyle)),
+                ),
+              ],
+            ),
+            subtitle: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Divider(height: 12, thickness: 1.5, color: fontColor),
+                Padding(
+                  padding: EdgeInsets.only(left: 20, top: 10.0, bottom: 15.0),
+                  child: content,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+} // CardInfoBlock
