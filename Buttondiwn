@@ -1,0 +1,106 @@
+class _SecondaryTabMenuTwoRows extends HookWidget {
+  final List<String> row1TabNames;
+  final List<String> row2TabNames;
+  final List<Widget> tabViews;
+
+  const _SecondaryTabMenuTwoRows({
+    required this.row1TabNames,
+    required this.row2TabNames,
+    required this.tabViews,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final allTabNames = [...row1TabNames, ...row2TabNames];
+    final tabController = useTabController(
+      initialLength: tabViews.length,
+      animationDuration: tabAnimationDuration,
+    );
+
+    return DecoratedContainer(
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: tabController.animation!,
+            builder: (context, child) {
+              return Column(
+                children: [
+                  // Row 1 — 締切系
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 8, right: 8, top: 8,
+                    ),
+                    child: Row(
+                      spacing: 8,
+                      children: [
+                        for (final MapEntry(key: index, value: tabName)
+                            in row1TabNames.asMap().entries)
+                          TransitionButton(
+                            isPushed: tabController.index == index,
+                            text: tabName,
+                            onPressed: () =>
+                                tabController.animateTo(index),
+                            width: 170.0,
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Row 2 — 廃券・発駅キャンセル・ログオフ
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 8, right: 8, top: 4, bottom: 8,
+                    ),
+                    child: Row(
+                      spacing: 8,
+                      children: [
+                        for (final MapEntry(key: index, value: tabName)
+                            in row2TabNames.asMap().entries)
+                          TransitionButton(
+                            isPushed:
+                                tabController.index ==
+                                index + row1TabNames.length,
+                            text: tabName,
+                            onPressed: () => tabController.animateTo(
+                              index + row1TabNames.length,
+                            ),
+                            width: 170.0,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: tabController,
+              physics: NeverScrollableScrollPhysics(),
+              children: tabViews,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+    return _SecondaryTabMenuTwoRows(
+      row1TabNames: ['締切□', '締切速報', '締切再出力', '接客履歴'],
+      row2TabNames: ['廃券処理', '発駅キャンセル', 'ログオフ'],
+      tabViews: [
+        CloseTally(),
+        CloseQuickTally(),
+        CloseTallyReExport(),
+        CustomerServiceHistory(),
+        HaikenSyori(),
+        HatuekiCancel(),
+        LogOffScreen(),
+      ],
+    );
+
+import '../related_process/log_off.dart';
+import '../secondary_tab_content_core.dart';
+import '../secondary_tab_menu_common.dart';
+
