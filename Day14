@@ -1,0 +1,101 @@
+import 'package:flutter/material.dart';
+import '../utility/confirm_dialog.dart';
+import '../qr_process/qr_process_menu.dart';
+import 'related_process_common.dart';
+
+class HaikenSyori extends StatelessWidget {
+  /// 廃券処理画面
+  const HaikenSyori({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PaddingForContent(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '廃券処理を実施します。',
+              style: TextStyle(fontSize: 50.0, fontWeight: FontWeight.w500),
+            ), // Text
+            SizedBox(height: 32),
+            ActiveLargeButton(
+              text: '実行',
+              onPressed: () async {
+                if (await showDialog<bool?>(
+                      context: context,
+                      builder:
+                          (context) => ConfirmDialog(porpose: '廃券処理'),
+                    )
+                    case final isExecute? when isExecute && context.mounted) {
+                  // TODO: サーバー接続後に廃券処理を実装
+                }
+              },
+            ), // ActiveLargeButton
+          ],
+        ), // Column
+      ), // Center
+    ); // PaddingForContent
+  }
+}
+
+
+
+import 'package:flutter/material.dart';
+import '../utility/confirm_dialog.dart';
+import '../qr_process/qr_process_menu.dart';
+import 'related_process_common.dart';
+
+class HatuekiCancel extends StatelessWidget {
+  /// 発駅キャンセル処理画面
+  const HatuekiCancel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PaddingForContent(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '発駅キャンセル処理を実施します。\n処理を実行すると係員窓口のみ\n利用が可能となります。よろしいですか？',
+              style: TextStyle(fontSize: 40.0, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
+            ), // Text
+            SizedBox(height: 32),
+            ActiveLargeButton(
+              text: '実行',
+              onPressed: () async {
+                if (await showDialog<bool?>(
+                      context: context,
+                      builder:
+                          (context) => ConfirmDialog(porpose: '発駅キャンセル'),
+                    )
+                    case final isExecute? when isExecute && context.mounted) {
+                  // TODO: サーバー接続後に発駅キャンセル処理を実装
+                }
+              },
+            ), // ActiveLargeButton
+          ],
+        ), // Column
+      ), // Center
+    ); // PaddingForContent
+  }
+}
+
+import 'haiken_syori.dart';
+import 'hatueki_cancel.dart';
+
+
+
+      tabNames: ['締切□', '締切速報', '締切再出力', '接客履歴', '廃券処理', '発駅キャンセル'],
+      tabViews: [
+        CloseTally(),
+        CloseQuickTally(),
+        CloseTallyReExport(),
+        CustomerServiceHistory(),
+        HaikenSyori(),
+        HatuekiCancel(),
+      ],
+
+
