@@ -1,0 +1,182 @@
+grep -n "customText" lib/utility/confirm_dialog.dart
+
+
+
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../utility/confirm_dialog.dart';
+import '../qr_process/qr_process_menu.dart';
+import '../qr_process/secondary_tab_process_information.dart';
+import '../secondary_tab_content_core.dart';
+
+class HatuekiCancel extends ConsumerWidget {
+  /// 発駅キャンセル処理画面
+  const HatuekiCancel({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SecondaryTabContentBase(
+      contentTop: _HatuekiCancelContent(),
+    );
+  }
+}
+
+class _HatuekiCancelContent extends ConsumerWidget {
+  const _HatuekiCancelContent();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        // 情報カード（上部）
+        Flexible(
+          child: SingleChildScrollView(
+            child: CardInfoContents(),
+          ),
+        ),
+        // 実行ボタン（下部）
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.all(10),
+            child: Container(
+              height: 70,
+              width: 1100,
+              child: Row(
+                children: [
+                  SizedBox(width: 60),
+                  SizedBox(
+                    height: 60,
+                    width: 800,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '発駅キャンセルを実行します',
+                        style: TextStyle(
+                          fontSize: 45,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.red,  // 警告色
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 60,
+                    width: 200,
+                    child: ActiveLargeButton(
+                      text: '実行',
+                      onPressed: () async {
+                        final isExecute = await showDialog<bool?>(
+                          barrierColor: Colors.transparent,
+                          context: context,
+                          builder:
+                              (context) => ConfirmDialog(
+                                porpose: '発駅キャンセル',
+                                customText:
+                                    '発駅キャンセルを実行します。\n処理を実行すると係員窓口のみ\n利用が可能となります。よろしいですか？',
+                              ),
+                        );
+                        if (isExecute == true && context.mounted) {
+                          // TODO: サーバー接続後に発駅キャンセル処理を実装
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../utility/confirm_dialog.dart';
+import '../qr_process/qr_process_menu.dart';
+import '../qr_process/secondary_tab_content_unselected.dart';
+import '../qr_process/secondary_tab_process_information.dart';
+import '../secondary_tab_content_core.dart';
+
+class HaikenSyori extends ConsumerWidget {
+  /// 廃券処理画面
+  const HaikenSyori({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SecondaryTabContentBase(
+      contentTop: _HaikenSyoriContent(),
+    );
+  }
+}
+
+class _HaikenSyoriContent extends ConsumerWidget {
+  const _HaikenSyoriContent();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        // 情報カード（上部）
+        Flexible(
+          child: SingleChildScrollView(
+            child: CardInfoContents(),
+          ),
+        ),
+        // 実行ボタン（下部）
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.all(10),
+            child: Container(
+              height: 70,
+              width: 1100,
+              child: Row(
+                children: [
+                  SizedBox(width: 60),
+                  SizedBox(
+                    height: 60,
+                    width: 800,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '廃券処理を実行します',
+                        style: TextStyle(
+                          fontSize: 45,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 60,
+                    width: 200,
+                    child: ActiveLargeButton(
+                      text: '実行',
+                      onPressed: () async {
+                        final isExecute = await showDialog<bool?>(
+                          barrierColor: Colors.transparent,
+                          context: context,
+                          builder:
+                              (context) =>
+                                  ConfirmDialog(porpose: '廃券処理'),
+                        );
+                        if (isExecute == true && context.mounted) {
+                          // TODO: サーバー接続後に廃券処理を実装
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
