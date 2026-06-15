@@ -1,0 +1,13 @@
+class _ExecuteButton extends StatelessWidget {
+  const _ExecuteButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActiveLargeButton(
+      text: '実行',
+      onPressed: onPressed,
+    );
+  }
+}
