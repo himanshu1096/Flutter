@@ -1,0 +1,125 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import '../secondary_tab_menu_btn.dart';
+import '../secondary_tab_menu_common.dart';
+import '../secondary_tab_content_core.dart';
+import 'close_quick_tally.dart';
+import 'close_tally.dart';
+import 'close_tally_re_export.dart';
+import 'customer_service_history.dart';
+import 'haiken_syori.dart';
+import 'hatueki_cancel.dart';
+import 'log_off.dart';
+
+class RelatedProcessMenu extends StatelessWidget {
+  const RelatedProcessMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _RelatedProcessMenuWithLogOff();
+  }
+}
+
+class _RelatedProcessMenuWithLogOff extends HookWidget {
+  const _RelatedProcessMenuWithLogOff();
+
+  @override
+  Widget build(BuildContext context) {
+    // -1 means no tab selected (initial state)
+    final selectedIndex = useState<int>(-1);
+
+    final tabNames = [
+      '締切□',
+      '締切速報',
+      '締切再出力',
+      '接客履歴',
+      '廃券処理',
+      '発駅キャンセル',
+    ];
+
+    final tabViews = <Widget>[
+      const CloseTally(),
+      const CloseQuickTally(),
+      const CloseTallyReExport(),
+      const CustomerServiceHistory(),
+      const HaikenSyori(),
+      const HatuekiCancel(),
+    ];
+
+    final tabController = useTabController(
+      initialLength: tabViews.length,
+      animationDuration: tabAnimationDuration,
+    );
+
+    return DecoratedContainer(
+      child: Column(
+        children: [
+          // Row 1 — all 6 tab buttons
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 8,
+              right: 8,
+              top: 8,
+              bottom: 4,
+            ),
+            child: Row(
+              spacing: 8,
+              children: [
+                for (final MapEntry(key: index, value: tabName)
+                    in tabNames.asMap().entries)
+                  TransitionButton(
+                    isPushed: selectedIndex.value == index,
+                    text: tabName,
+                    width: 155.0,
+                    onPressed: () {
+                      selectedIndex.value = index;
+                      tabController.animateTo(index);
+                    },
+                  ),
+              ],
+            ),
+          ),
+
+          // Row 2 — ログオフ only, disappears when tab selected
+          if (selectedIndex.value == -1)
+            Padding(
+              padding: const EdgeInsets.only(
+                left: 8,
+                right: 8,
+                bottom: 8,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TransitionButton(
+                    isPushed: false,
+                    text: 'ログオフ',
+                    width: 155.0,
+                    onPressed: () {
+                      selectedIndex.value = -2; // special logoff state
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+          // Content area
+          Expanded(
+            child: selectedIndex.value == -1
+                // No tab selected yet — show empty placeholder
+                ? const SizedBox()
+                : selectedIndex.value == -2
+                // ログオフ tapped — show LogOffScreen
+                ? const LogOffScreen()
+                // Tab selected — show TabBarView
+                : TabBarView(
+                    controller: tabController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: tabViews,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
