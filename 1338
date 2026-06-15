@@ -1,0 +1,143 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:go_router/go_router.dart';
+
+import '../app_color.dart';
+import '../rout_config.dart';
+import '../secondary_tab_content_core.dart';
+import '../secondary_tab_menu_common.dart';
+import '../utility/confirm_dialog.dart';
+import 'close_quick_tally.dart';
+import 'close_tally.dart';
+import 'close_tally_re_export.dart';
+import 'customer_service_history.dart';
+import 'haiken_syori.dart';
+import 'hatueki_cancel.dart';
+
+class RelatedProcessMenu extends StatelessWidget {
+  const RelatedProcessMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _RelatedProcessMenuWithLogOff();
+  }
+}
+
+class _RelatedProcessMenuWithLogOff extends HookWidget {
+  const _RelatedProcessMenuWithLogOff();
+
+  @override
+  Widget build(BuildContext context) {
+    final tabNames = const [
+      '未選択',         // index 0 — initial, invisible
+      '締切□',         // index 1
+      '締切速報',       // index 2
+      '締切再出力',     // index 3
+      '接客履歴',       // index 4
+      '廃券処理',       // index 5
+      '発駅キャンセル', // index 6
+    ];
+
+    final tabViews = const <Widget>[
+      SizedBox(),               // 未選択 — empty
+      CloseTally(),
+      CloseQuickTally(),
+      CloseTallyReExport(),
+      CustomerServiceHistory(),
+      HaikenSyori(),
+      HatuekiCancel(),
+    ];
+
+    final tabController = useTabController(
+      initialLength: tabViews.length,
+      animationDuration: tabAnimationDuration,
+    );
+
+    return DecoratedContainer(
+      child: Column(
+        children: [
+          // ── Row 1: all tab buttons ──────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 8, right: 8, top: 8, bottom: 4,
+            ),
+            child: AnimatedBuilder(
+              animation: tabController.animation!,
+              builder: (context, child) {
+                return Row(
+                  spacing: 8,
+                  children: [
+                    for (final MapEntry(key: index, value: tabName)
+                        in tabNames.asMap().entries)
+                      tabName == '未選択'
+                          ? const SizedBox(width: 0) // invisible
+                          : TransitionButton(
+                              isPushed: tabController.index == index,
+                              text: tabName,
+                              width: 155.0,
+                              fontSize: 22.0,
+                              onPressed: () {
+                                tabController.animateTo(index);
+                              },
+                            ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+          // ── Row 2: ログオフ — only when nothing selected ────
+          AnimatedBuilder(
+            animation: tabController.animation!,
+            builder: (context, child) {
+              final isUnselected = tabController.index == 0;
+              return AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                child: isUnselected
+                    ? Padding(
+                        padding: const EdgeInsets.only(
+                          left: 8, right: 8, bottom: 8,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TransitionButton(
+                              isPushed: false,
+                              text: 'ログオフ',
+                              width: 155.0,
+                              fontSize: 22.0,
+                              btnColors: completedGradient,
+                              onPressed: () async {
+                                if (await showDialog<bool?>(
+                                      context: context,
+                                      builder: (context) =>
+                                          ConfirmDialog(porpose: 'ログオフ'),
+                                    )
+                                    case final isExecute?
+                                        when isExecute && context.mounted) {
+                                  context.goNamed(Pages.login.name);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox(height: 0),
+              );
+            },
+          ),
+
+          // ── Content area ────────────────────────────────────
+          Expanded(
+            child: TabBarView(
+              controller: tabController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: tabViews,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
