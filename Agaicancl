@@ -1,0 +1,84 @@
+          // 実行ボタン行（下部）
+          Flexible(
+            child: Row(
+              children: [
+                SizedBox(width: 60),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '廃券処理を実行します',
+                      style: TextStyle(
+                        fontSize: 45,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 60,
+                  width: 200,
+                  child: _ExecuteButton(
+                    onPressed: () async {
+                      final isExecute = await showDialog<bool?>(
+                        barrierColor: Colors.black54,
+                        barrierDismissible: false,
+                        context: context,
+                        builder: (context) =>
+                            ConfirmDialog(porpose: '廃券処理'),
+                      );
+                      if ((isExecute ?? false) && context.mounted) {
+                        setState(() => _completed = true);
+                      }
+                    },
+                  ),
+                ),
+                SizedBox(width: 16),
+              ],
+            ),
+          ),
+
+
+
+
+          // 実行ボタン行（下部）
+          Flexible(
+            child: Row(
+              children: [
+                SizedBox(width: 60),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '発駅キャンセルを実行します',
+                      style: TextStyle(
+                        fontSize: 45,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 60,
+                  width: 200,
+                  child: _ExecuteButton(
+                    onPressed: () async {
+                      final isExecute = await showDialog<bool?>(
+                        barrierColor: Colors.black54,
+                        barrierDismissible: false,
+                        context: context,
+                        builder: (context) =>
+                            ConfirmDialog(porpose: '発駅キャンセル'),
+                      );
+                      if ((isExecute ?? false) && context.mounted) {
+                        setState(() => _completed = true);
+                      }
+                    },
+                  ),
+                ),
+                SizedBox(width: 16),
+              ],
+            ),
+          ),
+
