@@ -1,0 +1,101 @@
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (_completed) {
+      return ProcessCompleted(
+        onCompleteButtonPressed: () {
+          setState(() => _completed = false);
+        },
+      );
+    }
+
+    return PaddingForContent(
+      child: Column(
+        spacing: 8,
+        children: [
+          // 情報カード（上部）
+          Flexible(
+            flex: 6,
+            child: SingleChildScrollView(
+              child: CardInfoContents(),
+            ),
+          ),
+          // 実行ボタン（下部）
+          Flexible(
+            child: Center(
+              child: SizedBox(
+                height: 60,
+                width: 200,
+                child: _ExecuteButton(
+                  onPressed: () async {
+                    final isExecute = await showDialog<bool?>(
+                      barrierColor: Colors.black54,
+                      barrierDismissible: false,
+                      context: context,
+                      builder: (context) =>
+                          ConfirmDialog(porpose: '廃券処理'),
+                    );
+                    if ((isExecute ?? false) && context.mounted) {
+                      setState(() => _completed = true);
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+
+    @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (_completed) {
+      return ProcessCompleted(
+        onCompleteButtonPressed: () {
+          setState(() => _completed = false);
+        },
+      );
+    }
+
+    return PaddingForContent(
+      child: Column(
+        spacing: 8,
+        children: [
+          // 情報カード（上部）
+          Flexible(
+            flex: 6,
+            child: SingleChildScrollView(
+              child: CardInfoContents(),
+            ),
+          ),
+          // 実行ボタン（下部）
+          Flexible(
+            child: Center(
+              child: SizedBox(
+                height: 60,
+                width: 200,
+                child: _ExecuteButton(
+                  onPressed: () async {
+                    final isExecute = await showDialog<bool?>(
+                      barrierColor: Colors.black54,
+                      barrierDismissible: false,
+                      context: context,
+                      builder: (context) =>
+                          ConfirmDialog(porpose: '発駅キャンセル'),
+                    );
+                    if ((isExecute ?? false) && context.mounted) {
+                      setState(() => _completed = true);
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
