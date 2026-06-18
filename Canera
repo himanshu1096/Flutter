@@ -1,0 +1,22 @@
+/// カメラアクセス確認
+/// カメラが実際にアクセス可能か確認する
+Future<void> _checkCameraAccessible() async {
+  try {
+    await setCameraDescriptions();
+    final cameras = await CameraPlatform.instance.availableCameras();
+    if (cameras.isEmpty) {
+      debugPrint('カメラアクセス確認NG: カメラが見つかりません');
+      return;
+    }
+    // 実際にコントローラーを初期化して確認
+    final controller = CameraController(
+      cameras.first,
+      ResolutionPreset.low,
+    );
+    await controller.initialize();
+    await controller.dispose();
+    debugPrint('カメラアクセス確認OK');
+  } catch (e) {
+    debugPrint('カメラアクセスエラー: $e');
+  }
+}
