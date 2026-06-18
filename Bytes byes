@@ -1,0 +1,32 @@
+  Int32List convertToInt32List(img.Image image) {
+    final bytes = image
+        .convert(numChannels: 4)
+        .getBytes(order: img.ChannelOrder.abgr);
+    return bytes.buffer.asInt32List();
+  }
+
+
+
+
+                try {
+                  final result = reader.decode(bitmap);
+                  final rawBytes = result.rawBytes;
+                  if (rawBytes != null) {
+                    final hexString = rawBytes
+                        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+                        .join(' ');
+                    debugPrint('QR hex: $hexString');
+                    debugPrint('QR byte length: ${rawBytes.length}');
+                    _qrText.value = 'Bytes: ${rawBytes.length}';
+                    // 検知時の処理を呼ぶ
+                    widget.onDetected?.call(
+                      String.fromCharCodes(rawBytes),
+                    );
+                  } else {
+                    debugPrint('rawBytes null, text: ${result.text}');
+                    _qrText.value = "QR: ${result.text}";
+                    widget.onDetected?.call(result.text);
+                  }
+                } catch (e) {
+                  _qrText.value = 'QRコードなし';
+                }
