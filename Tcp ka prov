@@ -1,0 +1,33 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../model/init_data.dart';
+import '../service/tcp_service.dart';
+
+part 'tcp_provider.g.dart';
+
+/// TCP接続状態プロバイダー
+@riverpod
+class TcpConnectionStateNotifier extends _$TcpConnectionStateNotifier {
+  @override
+  TcpConnectionState build() => TcpConnectionState.disconnected;
+
+  void update(TcpConnectionState state) {
+    this.state = state;
+  }
+}
+
+/// 初期化データプロバイダー
+@riverpod
+class InitDataNotifier extends _$InitDataNotifier {
+  @override
+  InitData? build() => null;
+
+  void set(InitData data) {
+    state = data;
+  }
+}
+
+/// TCPサービスプロバイダー
+@Riverpod(keepAlive: true)
+TcpService tcpService(Ref ref) => TcpService();
