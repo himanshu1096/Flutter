@@ -1,0 +1,31 @@
+final result = reader.decode(bitmap);
+// デバッグ用: QRデータの内容を出力
+debugPrint('QR raw text: ${result.text}');
+debugPrint('QR byte length: ${result.text.length}');
+debugPrint('QR bytes: ${result.text.codeUnits}');
+_qrText.value = "QR: ${result.text}";
+widget.onDetected?.call(result.text);
+
+
+
+
+// Find:
+CameraScanner(
+  controller: _controller,
+  lensDirection: cameraDirection,
+  onDetected: (decodedText) {
+    Navigator.of(context).pop(decodedText);
+  },
+),
+
+// Replace:
+CameraScanner(
+  controller: _controller,
+  lensDirection: cameraDirection,
+  displayResult: true,  // ← add this
+  onDetected: (decodedText) {
+    debugPrint('Scanned: $decodedText');
+    debugPrint('Length: ${decodedText.length}');
+    Navigator.of(context).pop(decodedText);
+  },
+),
