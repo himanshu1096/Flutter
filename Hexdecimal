@@ -1,0 +1,16 @@
+final result = reader.decode(bitmap);
+// バイナリデータとして読み取る
+final rawBytes = result.rawBytes;
+if (rawBytes != null && rawBytes.isNotEmpty) {
+  // 16進数で出力
+  final hexString = rawBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+  debugPrint('QR hex: $hexString');
+  debugPrint('QR byte length: ${rawBytes.length}');
+  _qrText.value = "HEX: $hexString";
+  widget.onDetected?.call(hexString);
+} else {
+  // rawBytesがなければテキストをそのまま使う
+  debugPrint('QR text: ${result.text}');
+  _qrText.value = "QR: ${result.text}";
+  widget.onDetected?.call(result.text);
+}
