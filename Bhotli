@@ -1,0 +1,31 @@
+                try {
+                  final result = reader.decode(bitmap);
+                  // バイナリデータをresultMetadataから取得
+                  final byteSegments = result.resultMetadata?[
+                    ResultMetadataType.byteSegments
+                  ];
+                  if (byteSegments != null && byteSegments is List && byteSegments.isNotEmpty) {
+                    final signedBytes = byteSegments[0] as List<int>;
+                    // 符号付き整数を符号なしバイトに変換 (例: -121 → 0x87 = 135)
+                    final rawBytes = Uint8List.fromList(
+                      signedBytes.map((b) => b & 0xFF).toList(),
+                    );
+                    final hexString = rawBytes
+                        .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+                        .join(' ');
+                    debugPrint('QR hex: $hexString');
+                    debugPrint('QR byte length: ${rawBytes.length}');
+                    _qrText.value = 'Bytes: ${rawBytes.length}';
+                    // 検知時の処理を呼ぶ
+                    widget.onDetected?.call(
+                      String.fromCharCodes(rawBytes),
+                    );
+                  } else {
+                    // byteSegmentsがない場合はtextをそのまま使う
+                    debugPrint('byteSegments null, text: ${result.text}');
+                    _qrText.value = "QR: ${result.text}";
+                    widget.onDetected?.call(result.text);
+                  }
+                } catch (e) {
+                  _qrText.value = 'QRコードなし';
+                }
