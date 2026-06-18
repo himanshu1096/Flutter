@@ -1,0 +1,14 @@
+                try {
+                  final result = reader.decode(bitmap);
+                  // バイナリデータをバイト列として取得
+                  final rawBytes = Uint8List.fromList(
+                    result.text.codeUnits.map((c) => c & 0xFF).toList(),
+                  );
+                  debugPrint('QR byte length: ${rawBytes.length}');
+                  debugPrint('QR hex: ${rawBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+                  _qrText.value = 'Bytes: ${rawBytes.length}';
+                  // 検知時の処理を呼ぶ
+                  widget.onDetected?.call(result.text);
+                } catch (e) {
+                  _qrText.value = 'QRコードなし';
+                }
