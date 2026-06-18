@@ -1,0 +1,18 @@
+final result = reader.decode(bitmap);
+try {
+  // Base64デコード
+  final decodedBytes = base64.decode(result.text);
+  final hexString = decodedBytes
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join(' ');
+  debugPrint('QR Base64 decoded hex: $hexString');
+  debugPrint('QR decoded byte length: ${decodedBytes.length}');
+  _qrText.value = 'Decoded: $hexString';
+  widget.onDetected?.call(result.text); // Base64文字列をそのまま渡す
+} catch (e) {
+  // Base64デコード失敗の場合はそのまま使う
+  debugPrint('Base64 decode failed: $e');
+  debugPrint('QR raw text: ${result.text}');
+  _qrText.value = "QR: ${result.text}";
+  widget.onDetected?.call(result.text);
+}
