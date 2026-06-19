@@ -1,4 +1,7 @@
-/// 画面制御初期化要求 (0x0A81) のデータモデル
+/// 画面制御初期化要求 (0x0A81) データモデル
+/// JSONキー仕様:
+///   PLACESTATION      : 設置駅名 (文字列)
+///   CONNTESTRESULT    : QRモジュール通信確認結果 (Bool)
 class InitData {
   final String stationName;
   final bool connectionTestResult;
@@ -10,8 +13,8 @@ class InitData {
 
   factory InitData.fromJson(Map<String, dynamic> json) {
     return InitData(
-      stationName: json['STATIONNAME'] as String? ?? '',
-      connectionTestResult: json['CONNECTIONTESTRESULT'] as bool? ?? false,
+      stationName: json['PLACESTATION'] as String? ?? '',
+      connectionTestResult: json['CONNTESTRESULT'] as bool? ?? false,
     );
   }
 

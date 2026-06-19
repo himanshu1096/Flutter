@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,78 +6,97 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'camera_scanner.dart';
+import 'config/app_config.dart';
 import 'gen/assets.gen.dart';
 import 'provider/provider.dart';
-import 'provider/tcp_provider.dart';
 import 'rout_config.dart';
+import 'service/app_logger.dart';
 import 'service/tcp_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ライセンス登録
+  // ── ロガー初期化（最初に行う）─────────────────────────
+  await AppLogger().init();
+  AppLogger().info('Main', 'アプリ起動開始');
+
+  // ── ライセンス登録 ────────────────────────────────────
   LicenseRegistry.addLicense(() async* {
     final license = await rootBundle.loadString(Assets.font.mPLUSRounded1c.ofl);
     yield LicenseEntryWithLineBreaks(['google_fonts'], license);
   });
 
-  // TCPサービス取得
-  final tcpService = TcpService();
+  // ── 設定ファイル読み込み ──────────────────────────────
+  await AppConfig().load();
 
-  // TCP接続開始（バックグラウンド — UIをブロックしない）
+  // ── TCP接続開始（UIをブロックしない）─────────────────
+  final tcpService = TcpService();
   tcpService.connect().catchError((e) {
-    debugPrint('TCP接続エラー: $e');
+    AppLogger().error('Main', 'TCP接続エラー', e);
   });
 
-  // カメラアクセス確認
+  // ── カメラアクセス確認 ────────────────────────────────
   await _checkCameraAccessible();
 
-  // 初期化要求を待つ（0x0A81）
-  // ※ UIはまだ表示されていない
+  // ── 0x0A81 (画面制御初期化要求) 待機 ─────────────────
+  // ※ UIはまだ表示されていない — サーバーからの通知を待つ
+  AppLogger().info('Main', '0x0A81 (画面制御初期化要求) 待機中...');
   final initData = await tcpService.initDataFuture;
-  debugPrint('初期化データ受信: $initData');
+  AppLogger().info(
+    'Main',
+    '初期化完了: 駅名=${initData.stationName}, 通信確認=${initData.connectionTestResult}',
+  );
 
-  // アプリ起動
+  // ── アプリ起動 ────────────────────────────────────────
+  // TcpServiceシングルトンに initData が保持されているため
+  // ProviderScope への override は不要
+  AppLogger().info('Main', 'ログインページ表示');
   runApp(
-    ProviderScope(
-      overrides: [
-        // 初期化データをプロバイダーに設定
-        initDataProvider.overrideWith((ref) => initData),
-      ],
-      child: const MyApp(),
+    const ProviderScope(
+      child: MyApp(),
     ),
   );
 }
 
 /// カメラアクセス確認
+/// カメラが実際に使用可能か初期化を試みる
 Future<void> _checkCameraAccessible() async {
+  AppLogger().info('Main', 'カメラアクセス確認開始');
   try {
     await setCameraDescriptions();
-    debugPrint('カメラアクセス確認OK');
+    final cameras = await CameraPlatform.instance.availableCameras();
+    if (cameras.isEmpty) {
+      AppLogger().warn('Main', 'カメラが見つかりません');
+      return;
+    }
+    // 実際に初期化して確認
+    final controller = CameraController(
+      cameras.first,
+      ResolutionPreset.low,
+    );
+    await controller.initialize();
+    await controller.dispose();
+    AppLogger().info('Main', 'カメラアクセス確認OK: ${cameras.length}台検出');
   } catch (e) {
-    debugPrint('カメラアクセスエラー: $e');
+    AppLogger().error('Main', 'カメラアクセスエラー', e);
   }
 }
 
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // テーマの変更を監視
     final currentTheme = ref.watch(currentThemeProvider);
 
     return MaterialApp.router(
       routerConfig: routConfig,
-      //================================ 言語設定の日本語化 ここから
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('ja', 'JP')],
-      //================================ 言語設定の日本語化 ここまで
       title: 'Flutter Demo',
       theme: currentTheme,
       debugShowCheckedModeBanner: false,
