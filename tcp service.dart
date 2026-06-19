@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import '../config/app_config.dart';
 import '../model/init_data.dart';
 import '../model/login_response.dart';
+import '../model/qr_server_response.dart';
 import 'app_logger.dart';
 import 'packet_codec.dart';
 
@@ -83,6 +84,9 @@ class TcpService {
 
   // ログインレスポンス Completer
   Completer<LoginResponse>? _loginCompleter;
+
+  // QRサーバ照会レスポンス Completer
+  Completer<QrServerResponse>? _qrCompleter;
 
   /// TCP通信開始
   /// 1. 受信ServerSocketをport 21002でLISTEN開始（専用Isolate）
@@ -243,6 +247,24 @@ class TcpService {
         }
         break;
 
+      // QRサーバ照会要求応答 (0x1181) Server → Flutter
+      case CommandId.qrServerRefResponse:
+        AppLogger().info(_tag, '0x1181 QRサーバ照会要求応答 受信');
+        try {
+          final qrResponse = QrServerResponse.fromJson(packet.json);
+          AppLogger().info(
+            _tag,
+            'QR照会応答: RESULT=${qrResponse.result}, ERRCODE=${qrResponse.errCode}',
+          );
+          _qrCompleter?.complete(qrResponse);
+          _qrCompleter = null;
+        } catch (e) {
+          AppLogger().error(_tag, '0x1181 JSONパースエラー', e);
+          _qrCompleter?.completeError(e);
+          _qrCompleter = null;
+        }
+        break;
+
       // ログイン要求応答 (0xA181) Server → Flutter
       case CommandId.loginResponse:
         AppLogger().info(_tag, '0xA181 ログイン要求応答 受信');
@@ -314,6 +336,44 @@ class TcpService {
     await sendPacket(
       commandId: CommandId.initComplete,
       json: {'INITIALIZERESULT': result},
+    );
+  }
+
+  /// QRサーバ照会要求送信 (0x1101) Flutter → Server
+  /// designation = 1: QRデータ (バイナリ66bytes)
+  /// designation = 2: QRチケット番号 (文字列)
+  Future<QrServerResponse> sendQrServerRequest({
+    required int designation,
+    Uint8List? rawData,
+    String? qrNumber,
+  }) async {
+    AppLogger().info(
+      _tag,
+      '0x1101 QRサーバ照会要求 送信: QRDESIGNATION=$designation',
+    );
+
+    final Map<String, dynamic> json = {'QRDESIGNATION': designation};
+
+    if (designation == 1 && rawData != null) {
+      // バイナリデータを符号なし整数配列として送信 (0-255)
+      // Uint8List の値は既に符号なし (0-255) なので toList() でそのまま使用可能
+      json['QRRAWDATA'] = rawData.toList();
+      AppLogger().info(_tag, 'QRRAWDATAバイト数: ${rawData.length}');
+    } else if (designation == 2 && qrNumber != null) {
+      json['QRNUMBER'] = qrNumber;
+      AppLogger().info(_tag, 'QRNUMBER: $qrNumber');
+    }
+
+    _qrCompleter = Completer<QrServerResponse>();
+    await sendPacket(commandId: CommandId.qrServerRefRequest, json: json);
+
+    return _qrCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, 'QR照会応答タイムアウト (180秒)');
+        _qrCompleter = null;
+        throw TimeoutException('QR照会応答タイムアウト');
+      },
     );
   }
 

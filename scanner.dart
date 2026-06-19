@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -32,8 +34,9 @@ class _ScannerWidgetState extends ConsumerState<ScannerWidget> {
       body: CameraScanner(
         controller: _controller,
         lensDirection: cameraDirection,
-        onDetected: (decodedText) {
-          Navigator.of(context).pop(decodedText);
+        onDetected: (rawBytes) {
+          // バイナリデータをそのままpopで返す
+          Navigator.of(context).pop(rawBytes);
         },
       ), // CameraScanner
       floatingActionButton: FutureBuilder(
