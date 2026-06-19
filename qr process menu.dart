@@ -113,10 +113,6 @@ class _QrReading extends HookConsumerWidget {
                 MaterialPageRoute(builder: (context) => const ScannerWidget()),
               );
 
-              final qrData = await Navigator.of(context).push<Uint8List>(
-                MaterialPageRoute(builder: (context) => const ScannerWidget()),
-              );
-
               if (qrData != null && context.mounted) {
                 // 照会中ダイアログ表示
                 showCustomAlertDialog(context: context, text: '照会中');
@@ -379,27 +375,6 @@ class _QrReading extends HookConsumerWidget {
                                 text: '通信エラー: $e',
                               );
                             }
-                          }
-                        },
-                      )
-                              '000000 0000 0000 0000 0000') {
-                            // 照会失敗ダイアログ
-                            if (context.mounted) {
-                              await showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) {
-                                  return CustomConfirmDialog(
-                                    text: '照会に失敗しました',
-                                    trueBtnText: '確認',
-                                    hasFalseBtn: false,
-                                  ); // CustomConfirmDialog
-                                },
-                              );
-                            }
-                          } else {
-                            // これ以外のQRコードなら全て操作可能
-                            gotoQrState.call(true);
                           }
                         },
                       ) // ActiveLargeButton
