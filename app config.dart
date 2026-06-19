@@ -3,43 +3,46 @@ import 'dart:io';
 
 import '../service/app_logger.dart';
 
-/// アプリ設定
+/// TCP設定
 /// C:\tobu\config\app_config.json から読み込む
-/// ファイルが存在しない場合はデフォルト値を使用
 ///
 /// app_config.json の例:
 /// {
 ///   "TCP_HOST": "127.0.0.1",
-///   "TCP_PORT": 8080
+///   "TCP_RECEIVE_PORT": 21002,
+///   "TCP_SEND_PORT": 21001
 /// }
-class AppConfig {
+class TcpConfig {
   // シングルトン
-  static final AppConfig _instance = AppConfig._internal();
-  factory AppConfig() => _instance;
-  AppConfig._internal();
+  static final TcpConfig _instance = TcpConfig._internal();
+  factory TcpConfig() => _instance;
+  TcpConfig._internal();
 
   static const String _configPath = r'C:\tobu\config\app_config.json';
-  static const String _tag = 'AppConfig';
+  static const String _tag = 'TcpConfig';
 
   // デフォルト値
   static const String _defaultHost = '127.0.0.1';
-  static const int _defaultPort = 8080;
+  static const int _defaultReceivePort = 21002; // nsscreen LISTEN
+  static const int _defaultSendPort = 21001;    // main module LISTEN
 
   String _host = _defaultHost;
-  int _port = _defaultPort;
+  int _receivePort = _defaultReceivePort;
+  int _sendPort = _defaultSendPort;
 
   String get host => _host;
-  int get port => _port;
+  int get receivePort => _receivePort;
+  int get sendPort => _sendPort;
 
   /// 設定ファイル読み込み
-  /// ファイルがない or 読み込み失敗 → デフォルト値を使用
   Future<void> load() async {
     try {
       final file = File(_configPath);
       if (!await file.exists()) {
         AppLogger().warn(
           _tag,
-          '設定ファイルが見つかりません: $_configPath — デフォルト値を使用 (host=$_defaultHost, port=$_defaultPort)',
+          '設定ファイルが見つかりません: $_configPath — デフォルト値を使用 '
+          '(host=$_defaultHost, receivePort=$_defaultReceivePort, sendPort=$_defaultSendPort)',
         );
         return;
       }
@@ -48,18 +51,15 @@ class AppConfig {
       final json = jsonDecode(contents) as Map<String, dynamic>;
 
       _host = json['TCP_HOST'] as String? ?? _defaultHost;
-      _port = json['TCP_PORT'] as int? ?? _defaultPort;
+      _receivePort = json['TCP_RECEIVE_PORT'] as int? ?? _defaultReceivePort;
+      _sendPort = json['TCP_SEND_PORT'] as int? ?? _defaultSendPort;
 
       AppLogger().info(
         _tag,
-        '設定ファイル読み込み完了: host=$_host, port=$_port',
+        '設定読み込み完了: host=$_host, receivePort=$_receivePort, sendPort=$_sendPort',
       );
     } catch (e) {
-      AppLogger().error(
-        _tag,
-        '設定ファイル読み込みエラー — デフォルト値を使用',
-        e,
-      );
+      AppLogger().error(_tag, '設定ファイル読み込みエラー — デフォルト値を使用', e);
     }
   }
 }

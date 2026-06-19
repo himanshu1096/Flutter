@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import '../config/app_config.dart';
@@ -16,24 +17,45 @@ enum TcpConnectionState {
   error,
 }
 
+/// 受信Isolateへの設定データ
+class _ReceiveIsolateConfig {
+  final SendPort mainSendPort;
+  final int receivePort;
+
+  const _ReceiveIsolateConfig({
+    required this.mainSendPort,
+    required this.receivePort,
+  });
+}
+
 /// TCPサービス
-/// 本体制御との通信を管理するシングルトン
+/// 
+/// 通信構成:
+///   受信: nsscreen が ServerSocket で port 21002 をLISTEN
+///         → メインモジュールが接続してきてコマンドを送信
+///         → 専用Isolateで常時受信
+///   
+///   送信: nsscreen が Socket.connect() で port 21001 に接続
+///         → メインモジュールへコマンドを送信
 class TcpService {
+  // シングルトン
   static final TcpService _instance = TcpService._internal();
   factory TcpService() => _instance;
   TcpService._internal();
 
   static const String _tag = 'TcpService';
 
-  // 設定はAppConfigから取得（外部ファイルで変更可能）
-  String get _host => AppConfig().host;
-  int get _port => AppConfig().port;
+  // 設定はTcpConfigから取得（外部ファイルで変更可能）
+  String get _host => TcpConfig().host;
+  int get _receivePort => TcpConfig().receivePort;
+  int get _sendPort => TcpConfig().sendPort;
 
-  // ソケット
-  Socket? _socket;
+  // 送信用ソケット（Flutter → Main module）
+  Socket? _sendSocket;
 
-  // 受信バッファ
-  final List<int> _buffer = [];
+  // 受信用Isolate
+  Isolate? _receiveIsolate;
+  ReceivePort? _fromIsolatePort;
 
   // 接続状態
   TcpConnectionState _state = TcpConnectionState.disconnected;
@@ -62,50 +84,135 @@ class TcpService {
   // ログインレスポンス Completer
   Completer<LoginResponse>? _loginCompleter;
 
-  /// TCP接続開始
-  /// アプリ起動時に呼び出す — UIをブロックしない
-  Future<void> connect() async {
-    if (_state == TcpConnectionState.connected) return;
-
+  /// TCP通信開始
+  /// 1. 受信ServerSocketをport 21002でLISTEN開始（専用Isolate）
+  /// 2. 送信Socketをport 21001に接続
+  Future<void> start() async {
     _setState(TcpConnectionState.connecting);
-    AppLogger().info(_tag, 'TCP接続開始: $_host:$_port');
+    AppLogger().info(_tag, 'TCP通信開始');
 
     try {
-      _socket = await Socket.connect(_host, _port);
-      _setState(TcpConnectionState.connected);
-      AppLogger().info(_tag, 'TCP接続成功: $_host:$_port');
-      AppLogger().info(_tag, '0x0A81 (画面制御初期化要求) 待機中...');
+      // ── Step 1: 受信Isolate起動（先にLISTENING状態にする）──
+      await _startReceiveIsolate();
 
-      // 受信リスナー設定
-      _socket!.listen(
-        _onData,
-        onError: _onError,
-        onDone: _onDone,
-        cancelOnError: false,
-      );
+      // ── Step 2: 送信Socket接続 ────────────────────────────
+      await _connectSendSocket();
+
+      _setState(TcpConnectionState.connected);
+      AppLogger().info(_tag, 'TCP通信準備完了');
+      AppLogger().info(_tag, '0x0A81 (画面制御初期化要求) 待機中...');
     } catch (e) {
       _setState(TcpConnectionState.error);
-      AppLogger().error(_tag, 'TCP接続失敗: $_host:$_port', e);
+      AppLogger().error(_tag, 'TCP通信開始失敗', e);
       rethrow;
     }
   }
 
-  /// データ受信処理
-  void _onData(Uint8List data) {
-    _buffer.addAll(data);
+  /// 受信Isolate起動
+  /// port 21002 で ServerSocket をLISTEN
+  Future<void> _startReceiveIsolate() async {
+    AppLogger().info(_tag, '受信Isolate起動: port $_receivePort');
 
-    // バッファからパケットを取り出す（複数パケットが一度に来る場合も対応）
-    while (true) {
-      final packet = TcpPacket.decode(_buffer);
-      if (packet == null) break;
+    _fromIsolatePort = ReceivePort();
 
-      // バッファから消費したバイトを削除（6 = 4 length + 2 cmdID）
-      final consumed = 6 + TcpPacket.getJsonLength(_buffer);
-      _buffer.removeRange(0, consumed);
+    final config = _ReceiveIsolateConfig(
+      mainSendPort: _fromIsolatePort!.sendPort,
+      receivePort: _receivePort,
+    );
 
-      // パケット処理
-      _handlePacket(packet);
+    // Isolate起動
+    _receiveIsolate = await Isolate.spawn(
+      _receiveIsolateEntry,
+      config,
+    );
+
+    // Isolateからのメッセージを受信
+    _fromIsolatePort!.listen((message) {
+      if (message is List<int>) {
+        // バイトデータ受信 → パケット解析
+        _handleReceivedBytes(message);
+      } else if (message is String) {
+        // ログメッセージ
+        AppLogger().info('ReceiveIsolate', message);
+      }
+    });
+
+    AppLogger().info(_tag, '受信Isolate起動完了: port $_receivePort LISTENING');
+  }
+
+  /// 受信Isolateエントリーポイント
+  /// メインIsolateとは別スレッドで動作
+  static Future<void> _receiveIsolateEntry(
+    _ReceiveIsolateConfig config,
+  ) async {
+    final sendPort = config.mainSendPort;
+
+    try {
+      // ServerSocket でLISTEN
+      final serverSocket = await ServerSocket.bind(
+        InternetAddress.anyIPv4,
+        config.receivePort,
+      );
+      sendPort.send('ServerSocket LISTEN開始: port ${config.receivePort}');
+
+      // メインモジュールからの接続を待つ
+      await for (final socket in serverSocket) {
+        sendPort.send('メインモジュール接続: ${socket.remoteAddress.address}');
+
+        // 受信バッファ
+        final buffer = <int>[];
+
+        // 受信ループ — 常時受信
+        await for (final data in socket) {
+          buffer.addAll(data);
+
+          // バッファからパケットを取り出す
+          while (buffer.length >= 6) {
+            final jsonLength = TcpPacket.getJsonLength(buffer);
+            if (buffer.length < 6 + jsonLength) break;
+
+            // 完全なパケットをメインIsolateに送信
+            final packetBytes = buffer.sublist(0, 6 + jsonLength);
+            buffer.removeRange(0, 6 + jsonLength);
+            sendPort.send(packetBytes);
+          }
+        }
+        sendPort.send('メインモジュール切断');
+      }
+    } catch (e) {
+      sendPort.send('受信Isolateエラー: $e');
     }
+  }
+
+  /// 受信バイト列を処理
+  void _handleReceivedBytes(List<int> bytes) {
+    final packet = TcpPacket.decode(bytes);
+    if (packet == null) {
+      AppLogger().warn(_tag, '不正パケット受信');
+      return;
+    }
+    _handlePacket(packet);
+  }
+
+  /// 送信Socket接続
+  /// port 21001 のメインモジュールに接続
+  Future<void> _connectSendSocket() async {
+    AppLogger().info(_tag, '送信Socket接続開始: $_host:$_sendPort');
+    _sendSocket = await Socket.connect(_host, _sendPort);
+    AppLogger().info(_tag, '送信Socket接続成功: $_host:$_sendPort');
+
+    // 送信socket のエラー/切断を監視
+    _sendSocket!.listen(
+      (_) {}, // 送信socketでは受信しない
+      onError: (e) {
+        AppLogger().error(_tag, '送信Socket エラー', e);
+        _setState(TcpConnectionState.error);
+      },
+      onDone: () {
+        AppLogger().warn(_tag, '送信Socket 切断');
+        _setState(TcpConnectionState.disconnected);
+      },
+    );
   }
 
   /// パケット処理
@@ -118,7 +225,7 @@ class TcpService {
 
     switch (packet.commandId) {
 
-      // 画面制御初期化要求 (0x0A81) — Server → Flutter
+      // 画面制御初期化要求 (0x0A81) Server → Flutter
       case CommandId.initRequest:
         AppLogger().info(_tag, '0x0A81 画面制御初期化要求 受信');
         try {
@@ -136,7 +243,7 @@ class TcpService {
         }
         break;
 
-      // ログイン要求応答 (0xA181) — Server → Flutter
+      // ログイン要求応答 (0xA181) Server → Flutter
       case CommandId.loginResponse:
         AppLogger().info(_tag, '0xA181 ログイン要求応答 受信');
         try {
@@ -154,63 +261,54 @@ class TcpService {
         }
         break;
 
-      // 接続状態変化通知 (0xF181) — Server → Flutter
+      // 接続状態変化通知 (0xF181) Server → Flutter
       case CommandId.connectionStatusNotify:
         AppLogger().warn(_tag, '0xF181 接続状態変化通知 受信');
-        // UIレイヤーで処理（3つのボタンの制御）
+        // UIレイヤーで処理（3つのボタン制御）
         break;
 
-      // 本体制御異常通知 (0xFA81) — Server → Flutter
+      // 本体制御異常通知 (0xFA81) Server → Flutter
       case CommandId.systemErrorNotify:
         AppLogger().error(_tag, '0xFA81 本体制御異常通知 受信');
-        // UIレイヤーで処理（エラーダイアログ表示）
+        // UIレイヤーで処理（エラーダイアログ）
         break;
 
-      // 業務強制取消通知 (0xFB81) — Server → Flutter
+      // 業務強制取消通知 (0xFB81) Server → Flutter
       case CommandId.forceCancelNotify:
         AppLogger().warn(_tag, '0xFB81 業務強制取消通知 受信');
         // UIレイヤーで処理（QR読取ページへ戻る）
         break;
 
       default:
-        AppLogger().warn(_tag, '未処理コマンド受信: $cmdHex');
+        AppLogger().warn(
+          _tag,
+          '未処理コマンド受信: $cmdHex',
+        );
         break;
     }
   }
 
-  /// エラー処理
-  void _onError(Object error) {
-    AppLogger().error(_tag, 'TCP通信エラー', error);
-    _setState(TcpConnectionState.error);
-  }
-
-  /// 接続切断処理
-  void _onDone() {
-    AppLogger().warn(_tag, 'TCP接続切断');
-    _setState(TcpConnectionState.disconnected);
-  }
-
-  /// パケット送信
+  /// パケット送信（Flutter → Main module）
   Future<void> sendPacket({
     required int commandId,
     required Map<String, dynamic> json,
   }) async {
-    if (_socket == null || _state != TcpConnectionState.connected) {
-      AppLogger().error(_tag, 'パケット送信失敗: TCP未接続');
-      throw Exception('TCP未接続');
+    if (_sendSocket == null || _state != TcpConnectionState.connected) {
+      AppLogger().error(_tag, 'パケット送信失敗: 送信Socket未接続');
+      throw Exception('送信Socket未接続');
     }
 
     final cmdHex = '0x${commandId.toRadixString(16).toUpperCase()}';
     AppLogger().info(_tag, 'パケット送信: $cmdHex');
 
     final bytes = TcpPacket.encode(commandId: commandId, json: json);
-    _socket!.add(bytes);
-    await _socket!.flush();
+    _sendSocket!.add(bytes);
+    await _sendSocket!.flush();
 
     AppLogger().info(_tag, 'パケット送信完了: $cmdHex');
   }
 
-  /// 初期化完了通知送信 (0x0A01) — Flutter → Server
+  /// 初期化完了通知送信 (0x0A01) Flutter → Server
   Future<void> sendInitComplete({required bool result}) async {
     AppLogger().info(_tag, '0x0A01 初期化完了通知 送信');
     await sendPacket(
@@ -219,8 +317,8 @@ class TcpService {
     );
   }
 
-  /// ログイン要求送信 (0xA101) — Flutter → Server
-  /// レスポンスを Future で返す、タイムアウト180秒
+  /// ログイン要求送信 (0xA101) Flutter → Server
+  /// タイムアウト180秒
   Future<LoginResponse> sendLoginRequest({
     required String id,
     required String password,
@@ -246,17 +344,28 @@ class TcpService {
     _connectionStateController.add(newState);
   }
 
-  /// 切断
-  Future<void> disconnect() async {
-    AppLogger().info(_tag, 'TCP切断');
-    await _socket?.close();
-    _socket = null;
+  /// TCP通信停止
+  Future<void> stop() async {
+    AppLogger().info(_tag, 'TCP通信停止');
+
+    // 受信Isolate停止
+    _receiveIsolate?.kill(priority: Isolate.immediate);
+    _receiveIsolate = null;
+    _fromIsolatePort?.close();
+    _fromIsolatePort = null;
+
+    // 送信Socket切断
+    await _sendSocket?.close();
+    _sendSocket = null;
+
     _setState(TcpConnectionState.disconnected);
+    AppLogger().info(_tag, 'TCP通信停止完了');
   }
 
   /// リソース解放
   void dispose() {
-    _socket?.destroy();
+    _receiveIsolate?.kill(priority: Isolate.immediate);
+    _sendSocket?.destroy();
     _connectionStateController.close();
     _packetController.close();
   }

@@ -27,11 +27,11 @@ void main() async {
   });
 
   // ── 設定ファイル読み込み ──────────────────────────────
-  await AppConfig().load();
+  await TcpConfig().load();
 
   // ── TCP接続開始（UIをブロックしない）─────────────────
   final tcpService = TcpService();
-  tcpService.connect().catchError((e) {
+  tcpService.start().catchError((e) {
     AppLogger().error('Main', 'TCP接続エラー', e);
   });
 
