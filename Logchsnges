@@ -1,0 +1,80 @@
+import 'service/tcp_service.dart';
+
+import 'service/app_logger.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ライセンス登録
+  LicenseRegistry.addLicense(() async* {
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ── ロガー初期化（最初に行う）
+  await AppLogger().init();
+  AppLogger().info('Main', 'アプリ起動開始');
+
+  // ライセンス登録
+  LicenseRegistry.addLicense(() async* {
+
+
+
+
+  tcpService.connect().catchError((e) {
+    debugPrint('TCP接続エラー: $e');
+  });
+
+  tcpService.connect().catchError((e) {
+    AppLogger().error('Main', 'TCP接続エラー', e);
+  });
+
+
+
+
+  final initData = await tcpService.initDataFuture;
+  debugPrint('初期化データ受信: $initData');
+
+  AppLogger().info('Main', '0x0A81 待機中...');
+  final initData = await tcpService.initDataFuture;
+  AppLogger().info(
+    'Main',
+    '初期化完了: 駅名=${initData.stationName}, 通信確認=${initData.connectionTestResult}',
+  );
+
+
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
+
+  AppLogger().info('Main', 'ログインページ表示');
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
+
+
+Future<void> _checkCameraAccessible() async {
+  AppLogger().info('Main', 'カメラアクセス確認開始');
+  try {
+    await setCameraDescriptions();
+    final cameras = await CameraPlatform.instance.availableCameras();
+    if (cameras.isEmpty) {
+      AppLogger().warn('Main', 'カメラが見つかりません');
+      return;
+    }
+    final controller = CameraController(
+      cameras.first,
+      ResolutionPreset.low,
+    );
+    await controller.initialize();
+    await controller.dispose();
+    AppLogger().info('Main', 'カメラアクセス確認OK: ${cameras.length}台検出');
+  } catch (e) {
+    AppLogger().error('Main', 'カメラアクセスエラー', e);
+  }
+}
+
