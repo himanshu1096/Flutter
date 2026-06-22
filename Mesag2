@@ -1,0 +1,12 @@
+Flutter送信パケットのフォーマット確認をお願いします。
+
+現在Flutterは以下のフォーマットで送信しています:
+[4 bytes データレングス big-endian] + [2 bytes コマンドID big-endian] + [JSON UTF-8]
+
+例: 0x0A01 送信時
+00 00 00 1B  ← length (27 bytes)
+0A 01        ← cmdID (0x0A01)
+7B 22 49 4E... ← JSON
+
+このフォーマットは正しいですか？
+また受信側のフォーマット仕様を教えてください。
