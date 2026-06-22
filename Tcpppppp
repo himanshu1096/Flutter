@@ -1,0 +1,40 @@
+  Future<void> start() async {
+    _setState(TcpConnectionState.connecting);
+    AppLogger().info(_tag, 'TCP通信開始');
+
+    // ── Step 1: 受信Isolate起動（先にLISTENING状態にする）──
+    await _startReceiveIsolate();
+
+    // ── Step 2: 送信Socket接続（メインモジュールが起動したら接続）──
+    // メインモジュールが21001をLISTENするまで非同期でリトライ
+    _connectSendSocketWithRetry();
+
+    // 受信準備完了
+    _setState(TcpConnectionState.connected);
+    AppLogger().info(_tag, 'TCP通信準備完了');
+    AppLogger().info(_tag, '0x0A81 (画面制御初期化要求) 待機中...');
+  }
+
+  /// 送信Socket接続 — リトライあり
+  /// メインモジュールが21001をLISTENするまでリトライする
+  Future<void> _connectSendSocketWithRetry() async {
+    int attempt = 0;
+    while (true) {
+      try {
+        attempt++;
+        AppLogger().info(
+          _tag,
+          '送信Socket接続試行: $_host:$_sendPort (attempt $attempt)',
+        );
+        await _connectSendSocket();
+        AppLogger().info(_tag, '送信Socket接続成功: $_host:$_sendPort');
+        return;
+      } catch (e) {
+        AppLogger().warn(
+          _tag,
+          '送信Socket接続失敗 — 5秒後リトライ (attempt $attempt): $e',
+        );
+        await Future.delayed(const Duration(seconds: 5));
+      }
+    }
+  }
