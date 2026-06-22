@@ -1,0 +1,25 @@
+  Future<void> start() async {
+    AppLogger().info(_tag, 'TCP開始');
+
+    // Step 1: port 21002 でLISTEN開始
+    await _startReceiveIsolate();
+
+    // Step 2: port 21001 へ接続（バックグラウンドでリトライ）
+    _connectSendSocketWithRetry();
+
+    _setState(TcpConnectionState.connected);
+  }
+
+  /// 送信Socket接続 — 5秒間隔でリトライ
+  Future<void> _connectSendSocketWithRetry() async {
+    while (true) {
+      try {
+        await _connectSendSocket();
+        AppLogger().info(_tag, '送信Socket接続成功');
+        return;
+      } catch (e) {
+        AppLogger().warn(_tag, '送信Socket接続待機中... 5秒後リトライ');
+        await Future.delayed(const Duration(seconds: 5));
+      }
+    }
+  }
