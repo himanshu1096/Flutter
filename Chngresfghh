@@ -1,0 +1,31 @@
+  // ── TCP接続開始 ───────────────────────────────────────
+  // start()完了 = ServerSocket(21002)LISTEN完了
+  // 送信Socket(21001)はバックグラウンドでリトライ継続
+  final tcpService = TcpService();
+  try {
+    await tcpService.start();
+    AppLogger().info('Main', 'TCP受信準備完了 port:21002');
+  } catch (e) {
+    AppLogger().error('Main', 'TCP起動失敗', e);
+  }
+
+  // ── 0x0A81 (画面制御初期化要求) 待機 ─────────────────
+  // ServerSocket準備完了後に待機開始
+  AppLogger().info('Main', '0x0A81待機中');
+  final initData = await tcpService.initDataFuture;
+
+
+  final tcpService = TcpService();
+  try {
+    await tcpService.start();
+    AppLogger().info('Main', 'TCP受信準備完了 port:21002');
+  } catch (e) {
+    AppLogger().error('Main', 'TCP起動失敗', e);
+  }
+
+  // ── 0x0A81 待機 ──────────────────────────────────────
+  AppLogger().info('Main', '0x0A81待機中');
+  final initData = await tcpService.initDataFuture;
+
+  // ── カメラアクセス確認 (0x0A81受信後) ────────────────
+  await _checkCameraAccessible();
