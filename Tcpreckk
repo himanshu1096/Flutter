@@ -1,0 +1,7 @@
+        await for (final data in socket) {
+          // 受信生データをhexでログ出力
+          final hexStr = data
+              .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+              .join(' ');
+          sendPort.send('受信生データ (${data.length}bytes): $hexStr');
+          buffer.addAll(data);
