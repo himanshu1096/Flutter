@@ -1,0 +1,82 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+/// コマンドID定義
+class CommandId {
+  // Server → Flutter
+  static const int initRequest = 0x0A81;
+  static const int qrServerRefResponse = 0x1181;
+  static const int displayDataResponse = 0x1281;
+  static const int loginResponse = 0xA181;
+  static const int logoffResponse = 0xA281;
+  static const int connectionStatusNotify = 0xF181;
+  static const int systemErrorNotify = 0xFA81;
+  static const int forceCancelNotify = 0xFB81;
+
+  // Flutter → Server
+  static const int initComplete = 0x0A01;
+  static const int appExitRequest = 0x0F01;
+  static const int qrServerRefRequest = 0x1101;
+  static const int displayDataRequest = 0x1201;
+  static const int loginRequest = 0xA101;
+  static const int logoffRequest = 0xA201;
+  static const int cancelRequest = 0xB101;
+}
+
+/// TCPパケット
+/// 構造: [2bytes cmdID big-endian] + [4bytes length big-endian] + [JSON UTF-8]
+/// ※ length = JSONバイト数のみ
+class TcpPacket {
+  final int commandId;
+  final Map<String, dynamic> json;
+
+  const TcpPacket({required this.commandId, required this.json});
+
+  /// エンコード Flutter → Server
+  static Uint8List encode({
+    required int commandId,
+    required Map<String, dynamic> json,
+  }) {
+    final jsonBytes = utf8.encode(jsonEncode(json));
+    final length = jsonBytes.length;
+
+    final result = Uint8List(6 + length);
+    final buffer = ByteData.sublistView(result);
+
+    buffer.setUint16(0, commandId, Endian.big);   // 2 bytes cmdID
+    buffer.setUint32(2, length, Endian.big);      // 4 bytes length
+    result.setRange(6, 6 + length, jsonBytes);    // JSON
+
+    return result;
+  }
+
+  /// デコード Server → Flutter
+  static TcpPacket? decode(List<int> buffer) {
+    if (buffer.length < 6) return null;
+
+    final byteData = ByteData.sublistView(Uint8List.fromList(buffer));
+
+    final commandId = byteData.getUint16(0, Endian.big);   // 2 bytes cmdID
+    final length = byteData.getUint32(2, Endian.big);      // 4 bytes length
+
+    // 長さの妥当性チェック
+    if (length == 0 || length > 1024 * 1024) {
+      throw FormatException('不正なパケット長: $length');
+    }
+
+    if (buffer.length < 6 + length) return null;
+
+    final jsonBytes = buffer.sublist(6, 6 + length);
+    final jsonStr = utf8.decode(jsonBytes);
+    final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+    return TcpPacket(commandId: commandId, json: json);
+  }
+
+  /// バッファ先頭のJSONバイト数取得
+  static int getJsonLength(List<int> buffer) {
+    if (buffer.length < 6) return 0;
+    final byteData = ByteData.sublistView(Uint8List.fromList(buffer));
+    return byteData.getUint32(2, Endian.big);
+  }
+}
