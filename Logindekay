@@ -1,0 +1,22 @@
+  // ── TCP接続開始 ───────────────────────────────────────
+  final tcpService = TcpService();
+  try {
+    await tcpService.start();
+    AppLogger().info('Main', 'TCP受信準備完了');
+  } catch (e) {
+    AppLogger().error('Main', 'TCP起動失敗', e);
+  }
+
+  // ── 0x0A81 待機 ──────────────────────────────────────
+  // runApp はここより前には呼ばれない
+  // 0x0A81受信後にのみログインページを表示する
+  AppLogger().info('Main', '0x0A81待機中');
+  final initData = await tcpService.initDataFuture;
+  AppLogger().info('Main', '初期化完了: 駅名=${initData.stationName}');
+
+  // ── カメラアクセス確認 ────────────────────────────────
+  await _checkCameraAccessible();
+
+  // ── ここで初めてUIを表示 ──────────────────────────────
+  AppLogger().info('Main', 'ログインページ表示');
+  runApp(const ProviderScope(child: MyApp()));
