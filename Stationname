@@ -1,0 +1,21 @@
+const String stationName = "東武ワールドスクウェア"; // fallback only
+
+/// 動的駅名 — TCPで受信したPLACESTATIONを返す
+/// 未受信の場合はフォールバック値を返す
+String get dynamicStationName {
+  final name = _tcpStationName;
+  return (name != null && name.isNotEmpty) ? name : stationName;
+}
+
+String? _tcpStationName;
+
+void setTcpStationName(String name) {
+  _tcpStationName = name;
+}
+
+
+
+          _initData = initData;
+          AppLogger().info(_tag, '初期化: 駅名=${initData.stationName}');
+          // app_config.dartの駅名を更新
+          setTcpStationName(initData.stationName);
