@@ -1,0 +1,9 @@
+    if (designation == 1 && rawData != null) {
+      json['QRRAWDATA'] = rawData.toList();
+      // デバッグ: 送信するバイト列を確認
+      final hexStr = rawData
+          .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+          .join(' ');
+      AppLogger().info(_tag, 'QRRAWDATA bytes: ${rawData.length}');
+      AppLogger().info(_tag, 'QRRAWDATA hex: $hexStr');
+    }
