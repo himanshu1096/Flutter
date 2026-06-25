@@ -1,0 +1,65 @@
+              final qrData = await context.pushNamed<Uint8List>(Pages.QRscan.name);
+
+              if (qrData != null && context.mounted) {
+                showCustomAlertDialog(context: context, text: '照会中');
+                try {
+                  AppLogger().info('QrReading', 'QRデータ送信: ${qrData.length}bytes');
+                  final response = await TcpService().sendQrServerRequest(
+                    designation: 1,
+                    rawData: qrData,
+                  );
+                  if (context.mounted) Navigator.of(context).pop();
+                  if (response.result) {
+                    AppLogger().info('QrReading', 'QR照会成功');
+                    ref.read(qrTicketNoProvider.notifier).reset();
+                    gotoQrState.call(true);
+                  } else {
+                    AppLogger().warn('QrReading', 'QR照会失敗: ${response.errCode}');
+                    if (context.mounted) {
+                      showCustomAlertDialog(
+                        context: context,
+                        text: 'QR照会失敗\nエラーコード: ${response.errCode}',
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (context.mounted) Navigator.of(context).pop();
+                  AppLogger().error('QrReading', 'QR照会エラー', e);
+                  if (context.mounted) {
+                    showCustomAlertDialog(context: context, text: '通信エラー: $e');
+                  }
+                }
+              }
+
+
+
+                          showCustomAlertDialog(context: context, text: '照会中');
+                          try {
+                            final ticketNo = ref.read(qrTicketNoProvider);
+                            AppLogger().info('QrReading', 'QR番号照会: $ticketNo');
+                            final response = await TcpService().sendQrServerRequest(
+                              designation: 2,
+                              qrNumber: ticketNo,
+                            );
+                            if (context.mounted) Navigator.of(context).pop();
+                            if (response.result) {
+                              AppLogger().info('QrReading', 'QR照会成功');
+                              gotoQrState.call(true);
+                            } else {
+                              AppLogger().warn('QrReading', 'QR照会失敗: ${response.errCode}');
+                              if (context.mounted) {
+                                showCustomAlertDialog(
+                                  context: context,
+                                  text: 'QR照会失敗\nエラーコード: ${response.errCode}',
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (context.mounted) Navigator.of(context).pop();
+                            AppLogger().error('QrReading', 'QR照会エラー', e);
+                            if (context.mounted) {
+                              showCustomAlertDialog(context: context, text: '通信エラー: $e');
+                            }
+                          }
+
+
