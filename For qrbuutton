@@ -1,0 +1,51 @@
+import 'dart:typed_data';
+import '../service/app_logger.dart';
+import '../service/tcp_service.dart';
+
+
+
+              final qrData = await context.pushNamed<Uint8List>(Pages.QRscan.name);
+
+              if (qrData != null && context.mounted) {
+                showCustomAlertDialog(context: context, text: '照会中');
+                try {
+                  AppLogger().info('QrReading', 'QRデータ送信: ${qrData.length}bytes');
+                  final response = await TcpService().sendQrServerRequest(
+                    designation: 1,
+                    rawData: qrData,
+                  );
+                  if (context.mounted) Navigator.of(context).pop();
+                  if (response.result) {
+                    AppLogger().info('QrReading', 'QR照会成功');
+                    ref.read(qrTicketNoProvider.notifier).reset();
+                    gotoQrState.call(true);
+                  } else {
+                    AppLogger().warn('QrReading', 'QR照会失敗: ${response.errCode}');
+                    if (context.mounted) {
+                      await showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => CustomConfirmDialog(
+                          text: 'QR照会に失敗しました\nエラーコード: ${response.errCode}',
+                          trueBtnText: '確認',
+                          hasFalseBtn: false,
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (context.mounted) Navigator.of(context).pop();
+                  AppLogger().error('QrReading', 'QR照会エラー', e);
+                  if (context.mounted) {
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => CustomConfirmDialog(
+                        text: '通信エラーが発生しました',
+                        trueBtnText: '確認',
+                        hasFalseBtn: false,
+                      ),
+                    );
+                  }
+                }
+              }
