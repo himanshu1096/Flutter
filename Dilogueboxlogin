@@ -1,0 +1,24 @@
+  Future<void> _showAuthErrorDialog(int errCode) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CustomConfirmDialog(
+        text: '認証に失敗しました\nエラーコード: $errCode',
+        trueBtnText: '確認',
+        hasFalseBtn: false,
+      ),
+    );
+  }
+
+
+  Future<void> _showErrorDialog(String message) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CustomConfirmDialog(
+        text: message,
+        trueBtnText: '確認',
+        hasFalseBtn: false,
+      ),
+    );
+  }
