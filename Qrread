@@ -1,0 +1,47 @@
+                } catch (e) {
+                  if (context.mounted) Navigator.of(context).pop();
+                  AppLogger().error('QrReading', 'QR照会エラー', e);
+                  if (context.mounted) {
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => CustomConfirmDialog(
+                        text: '通信エラーが発生しました',
+                        trueBtnText: '確認',
+                        hasFalseBtn: false,
+                      ),
+                    );
+                  }
+                }
+
+
+
+                          } catch (e) {
+                            if (context.mounted) Navigator.of(context).pop();
+                            AppLogger().error('QrReading', 'QR照会エラー', e);
+                            if (context.mounted) {
+                              await showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => CustomConfirmDialog(
+                                  text: '通信エラーが発生しました',
+                                  trueBtnText: '確認',
+                                  hasFalseBtn: false,
+                                ),
+                              );
+                            }
+                          }
+
+                    if (context.mounted) {
+                      await showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => CustomConfirmDialog(
+                          text: 'QR照会に失敗しました\nエラーコード: ${response.errCode}',
+                          trueBtnText: '確認',
+                          hasFalseBtn: false,
+                        ),
+                      );
+                    }
+
+
