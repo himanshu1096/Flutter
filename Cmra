@@ -1,0 +1,7 @@
+                  child: widget.lensDirection == CameraLensDirection.front
+                      ? Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.rotationY(3.14159),
+                          child: CameraPreview(controller),
+                        )
+                      : CameraPreview(controller),
