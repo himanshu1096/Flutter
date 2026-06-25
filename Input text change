@@ -1,0 +1,6 @@
+  // 20文字後にスペースを入れる
+  String insertSpacesEveryFourChars(String input) {
+    final raw = input.replaceAll(' ', '');
+    if (raw.length <= 20) return raw;
+    return '${raw.substring(0, 20)} ${raw.substring(20)}';
+  }
