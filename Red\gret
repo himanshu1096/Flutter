@@ -1,0 +1,60 @@
+    final selectedBtn = ref.watch(qrReadPageSelectedBtnProvider);
+    final btnNotifier = ref.watch(qrReadPageSelectedBtnProvider.notifier);
+    final judgeRouteBtnNotifier = ref.watch(judgeRouteListProvider.notifier);
+    final judgeRouteBtnIdNotifier = ref.watch(judgeRouteIdProvider.notifier);
+    final displayData = ref.watch(displayDataNotifierProvider);
+
+    // 0x1281のボタン制御フラグ
+    final enterEnabled = displayData?.enterBtnEnabled ?? false;
+    final exitEnabled = displayData?.exitBtnEnabled ?? false;
+    final adjustEnabled = displayData?.adjustBtnEnabled ?? false;
+    final haisaEnabled = displayData?.haisaCancelBtnEnabled ?? false;
+    final enterCancelEnabled = displayData?.enterCancelBtnEnabled ?? false;
+
+
+
+                  TransitionButton(
+                    onPressed: () {
+                      if (exitEnabled &&
+                          QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                        btnNotifier.changePage(QrReadPageBtnKind.syutuzyou);
+                      }
+                    },
+                    text: '　出場　',
+                    isPushed: QrReadPageBtnKind.syutuzyou == selectedBtn,
+                    btnColors: exitEnabled &&
+                            QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                        ? orengeGradient
+                        : grayGradient,
+                  ),
+
+
+
+
+
+
+
+
+                  TransitionButton(
+                    onPressed: () {
+                      if (enterEnabled &&
+                          QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                        btnNotifier.changePage(QrReadPageBtnKind.nyuuzyou);
+                      }
+                    },
+                    text: '　入場　',
+                    isPushed: QrReadPageBtnKind.nyuuzyou == selectedBtn,
+                    btnColors: enterEnabled &&
+                            QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                        ? orengeGradient
+                        : grayGradient,
+                  ),
+
+
+
+                    onPressed: () {
+                      if (!adjustEnabled ||
+                          QrReadPageBtnKind.zyouhoHyouzi != selectedBtn) return;
+                      //patternA
+                      judgeRouteBtnNotifier.updateItem(1, true, 13, 11, 0);
+
