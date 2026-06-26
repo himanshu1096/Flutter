@@ -1,0 +1,29 @@
+/// QRチケット番号フォーマット
+/// 22桁: JJJJJJ JJJJ JJJJ JJJJ JJJJ
+/// それ以外: そのまま表示
+String _formatQrNumber(String raw) {
+  final cleaned = raw.replaceAll(' ', '');
+  if (cleaned.length != 22) return cleaned;
+  return '${cleaned.substring(0, 6)} '
+      '${cleaned.substring(6, 10)} '
+      '${cleaned.substring(10, 14)} '
+      '${cleaned.substring(14, 18)} '
+      '${cleaned.substring(18, 22)}';
+}
+
+
+
+    final qrTicketNo = _formatQrNumber(ref.watch(qrTicketNoProvider));
+
+
+
+    final qrTicketNo = _formatQrNumber(ref.watch(qrTicketNoProvider));
+
+
+
+    final displayData = ref.watch(displayDataNotifierProvider);
+    final mapper = displayData != null ? DisplayDataMapper(displayData) : null;
+    String getValue(CardInfoEnum field) => mapper?.getValue(field) ?? field.value;
+
+    List<(String, String)> getTupleList(List<CardInfoEnum> cardInfoList) =>
+        cardInfoList.map((c) => (c.name, getValue(c))).toList();
