@@ -1,0 +1,60 @@
+/// グローバルNavigatorKey — TCP通知からのナビゲーション用
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+
+final routConfig = GoRouter(
+  navigatorKey: navigatorKey,
+  routes: [
+
+
+      // 本体制御異常通知 (0xFA81) Server → Flutter
+      case CommandId.systemErrorNotify:
+        AppLogger().error(_tag, '0xFA81 本体制御異常通知 受信');
+        _showSystemErrorDialog();
+        break;
+
+
+
+      // 業務強制取消通知 (0xFB81) Server → Flutter
+      case CommandId.forceCancelNotify:
+        AppLogger().warn(_tag, '0xFB81 業務強制取消通知 受信');
+        _navigateToQrReading();
+        break;
+
+
+
+  /// 0xFA81 — 本体制御異常ダイアログ表示
+  void _showSystemErrorDialog() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('本体制御異常'),
+        content: const Text('本体制御で異常が発生しました'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('確認'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 0xFB81 — QR読取ページへ強制遷移
+  void _navigateToQrReading() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    // 全ダイアログを閉じてからQR読取ページへ
+    navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    context.goNamed(Pages.main.name);
+  }
+
+
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../rout_config.dart';
+
