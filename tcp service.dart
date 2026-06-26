@@ -2,21 +2,18 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
-
-import '../config/app_config.dart';
+import 'package:qr_multidemo/app_config.dart';
+import '../config/tcp_config.dart';
 import '../model/init_data.dart';
 import '../model/login_response.dart';
+import '../model/display_data.dart';
 import '../model/qr_server_response.dart';
 import 'app_logger.dart';
+import 'csv_service.dart';
 import 'packet_codec.dart';
 
 /// TCP接続状態
-enum TcpConnectionState {
-  disconnected,
-  connecting,
-  connected,
-  error,
-}
+enum TcpConnectionState { disconnected, connecting, connected, error }
 
 /// 受信Isolateへの設定データ
 class _ReceiveIsolateConfig {
@@ -30,12 +27,12 @@ class _ReceiveIsolateConfig {
 }
 
 /// TCPサービス
-/// 
+///
 /// 通信構成:
 ///   受信: nsscreen が ServerSocket で port 21002 をLISTEN
 ///         → メインモジュールが接続してきてコマンドを送信
 ///         → 専用Isolateで常時受信
-///   
+///
 ///   送信: nsscreen が Socket.connect() で port 21001 に接続
 ///         → メインモジュールへコマンドを送信
 class TcpService {
@@ -88,34 +85,47 @@ class TcpService {
   // QRサーバ照会レスポンス Completer
   Completer<QrServerResponse>? _qrCompleter;
 
+  // 表示データ Completer (0x1281)
+  Completer<DisplayData>? _displayDataCompleter;
+
+  // 最後のQRデータ (0x1201再送用)
+  int _lastDesignation = 1;
+  List<int>? _lastRawData;
+  String? _lastQrNumber;
+
   /// TCP通信開始
   /// 1. 受信ServerSocketをport 21002でLISTEN開始（専用Isolate）
   /// 2. 送信Socketをport 21001に接続
   Future<void> start() async {
-    _setState(TcpConnectionState.connecting);
-    AppLogger().info(_tag, 'TCP通信開始');
+    AppLogger().info(_tag, 'TCP開始');
 
-    try {
-      // ── Step 1: 受信Isolate起動（先にLISTENING状態にする）──
-      await _startReceiveIsolate();
+    // Step 1: port 21002 でLISTEN開始
+    await _startReceiveIsolate();
 
-      // ── Step 2: 送信Socket接続 ────────────────────────────
-      await _connectSendSocket();
+    // Step 2: port 21001 へ接続（バックグラウンドでリトライ）
+    _connectSendSocketWithRetry();
 
-      _setState(TcpConnectionState.connected);
-      AppLogger().info(_tag, 'TCP通信準備完了');
-      AppLogger().info(_tag, '0x0A81 (画面制御初期化要求) 待機中...');
-    } catch (e) {
-      _setState(TcpConnectionState.error);
-      AppLogger().error(_tag, 'TCP通信開始失敗', e);
-      rethrow;
+    _setState(TcpConnectionState.connected);
+  }
+
+  /// 送信Socket接続 — 5秒間隔でリトライ
+  Future<void> _connectSendSocketWithRetry() async {
+    while (true) {
+      try {
+        await _connectSendSocket();
+        AppLogger().info(_tag, '送信Socket接続成功');
+        return;
+      } catch (e) {
+        AppLogger().warn(_tag, '送信Socket接続待機中... 5Ms後リトライ');
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
     }
   }
 
   /// 受信Isolate起動
   /// port 21002 で ServerSocket をLISTEN
   Future<void> _startReceiveIsolate() async {
-    AppLogger().info(_tag, '受信Isolate起動: port $_receivePort');
+    // AppLogger().info(_tag, '受信Isolate起動: port $_receivePort');
 
     _fromIsolatePort = ReceivePort();
 
@@ -125,10 +135,7 @@ class TcpService {
     );
 
     // Isolate起動
-    _receiveIsolate = await Isolate.spawn(
-      _receiveIsolateEntry,
-      config,
-    );
+    _receiveIsolate = await Isolate.spawn(_receiveIsolateEntry, config);
 
     // Isolateからのメッセージを受信
     _fromIsolatePort!.listen((message) {
@@ -137,7 +144,7 @@ class TcpService {
         _handleReceivedBytes(message);
       } else if (message is String) {
         // ログメッセージ
-        AppLogger().info('ReceiveIsolate', message);
+        //  AppLogger().info('ReceiveIsolate', message);
       }
     });
 
@@ -146,9 +153,7 @@ class TcpService {
 
   /// 受信Isolateエントリーポイント
   /// メインIsolateとは別スレッドで動作
-  static Future<void> _receiveIsolateEntry(
-    _ReceiveIsolateConfig config,
-  ) async {
+  static Future<void> _receiveIsolateEntry(_ReceiveIsolateConfig config) async {
     final sendPort = config.mainSendPort;
 
     try {
@@ -168,8 +173,12 @@ class TcpService {
 
         // 受信ループ — 常時受信
         await for (final data in socket) {
+          // 受信生データをhexでログ出力
+          final hexStr = data
+              .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+              .join(' ');
+          sendPort.send('受信生データ (${data.length}bytes): $hexStr');
           buffer.addAll(data);
-
           // バッファからパケットを取り出す
           while (buffer.length >= 6) {
             final jsonLength = TcpPacket.getJsonLength(buffer);
@@ -228,7 +237,6 @@ class TcpService {
     _packetController.add(packet);
 
     switch (packet.commandId) {
-
       // 画面制御初期化要求 (0x0A81) Server → Flutter
       case CommandId.initRequest:
         AppLogger().info(_tag, '0x0A81 画面制御初期化要求 受信');
@@ -239,6 +247,7 @@ class TcpService {
             _tag,
             '初期化データ解析完了: 駅名=${initData.stationName}, 通信確認=${initData.connectionTestResult}',
           );
+          setTcpStationName(initData.stationName);
           if (!_initCompleter.isCompleted) {
             _initCompleter.complete(initData);
           }
@@ -262,6 +271,21 @@ class TcpService {
           AppLogger().error(_tag, '0x1181 JSONパースエラー', e);
           _qrCompleter?.completeError(e);
           _qrCompleter = null;
+        }
+        break;
+
+      // 表示データ応答 (0x1281) Server → Flutter
+      case CommandId.displayDataResponse:
+        AppLogger().info(_tag, '0x1281 表示データ応答 受信');
+        try {
+          final displayData = DisplayData.fromJson(packet.json);
+          AppLogger().info(_tag, '表示データ解析完了: QRNUMBER=${displayData.qrNumber}');
+          _displayDataCompleter?.complete(displayData);
+          _displayDataCompleter = null;
+        } catch (e) {
+          AppLogger().error(_tag, '0x1281 JSONパースエラー', e);
+          _displayDataCompleter?.completeError(e);
+          _displayDataCompleter = null;
         }
         break;
 
@@ -302,10 +326,7 @@ class TcpService {
         break;
 
       default:
-        AppLogger().warn(
-          _tag,
-          '未処理コマンド受信: $cmdHex',
-        );
+        AppLogger().warn(_tag, '未処理コマンド受信: $cmdHex');
         break;
     }
   }
@@ -347,10 +368,7 @@ class TcpService {
     Uint8List? rawData,
     String? qrNumber,
   }) async {
-    AppLogger().info(
-      _tag,
-      '0x1101 QRサーバ照会要求 送信: QRDESIGNATION=$designation',
-    );
+    AppLogger().info(_tag, '0x1101 QRサーバ照会要求 送信: QRDESIGNATION=$designation');
 
     final Map<String, dynamic> json = {'QRDESIGNATION': designation};
 
@@ -358,10 +376,24 @@ class TcpService {
       // バイナリデータを符号なし整数配列として送信 (0-255)
       // Uint8List の値は既に符号なし (0-255) なので toList() でそのまま使用可能
       json['QRRAWDATA'] = rawData.toList();
+      final hexStr = rawData
+          .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+          .join(' ');
       AppLogger().info(_tag, 'QRRAWDATAバイト数: ${rawData.length}');
+      AppLogger().info(_tag, 'QRRAWDATA hex: $hexStr');
     } else if (designation == 2 && qrNumber != null) {
       json['QRNUMBER'] = qrNumber;
       AppLogger().info(_tag, 'QRNUMBER: $qrNumber');
+    }
+
+    // 0x1201再送用に保存
+    _lastDesignation = designation;
+    if (designation == 1 && rawData != null) {
+      _lastRawData = rawData.toList();
+      _lastQrNumber = null;
+    } else if (designation == 2 && qrNumber != null) {
+      _lastQrNumber = qrNumber;
+      _lastRawData = null;
     }
 
     _qrCompleter = Completer<QrServerResponse>();
@@ -373,6 +405,31 @@ class TcpService {
         AppLogger().error(_tag, 'QR照会応答タイムアウト (180秒)');
         _qrCompleter = null;
         throw TimeoutException('QR照会応答タイムアウト');
+      },
+    );
+  }
+
+  /// 表示データ要求送信 (0x1201) Flutter → Server
+  /// 0x1101と同じQRデータを再送
+  Future<DisplayData> sendDisplayDataRequest() async {
+    AppLogger().info(_tag, '0x1201 表示データ要求 送信');
+
+    final Map<String, dynamic> json = {'QRDESIGNATION': _lastDesignation};
+    if (_lastDesignation == 1 && _lastRawData != null) {
+      json['QRRAWDATA'] = _lastRawData;
+    } else if (_lastDesignation == 2 && _lastQrNumber != null) {
+      json['QRNUMBER'] = _lastQrNumber;
+    }
+
+    _displayDataCompleter = Completer<DisplayData>();
+    await sendPacket(commandId: CommandId.displayDataRequest, json: json);
+
+    return _displayDataCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '表示データ応答タイムアウト (180秒)');
+        _displayDataCompleter = null;
+        throw TimeoutException('表示データ応答タイムアウト');
       },
     );
   }

@@ -1,24 +1,23 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:qr_multidemo/my_home_page.dart';
 import 'package:qr_multidemo/provider/provider.dart';
 import 'package:qr_multidemo/software_keyboard.dart';
-
+import 'package:go_router/go_router.dart';
 import '../app_color.dart';
 import '../pop_out_button.dart';
 import '../process_completed.dart';
 import '../scanner.dart';
 import '../secondary_tab_content_core.dart';
-import '../service/app_logger.dart';
-import '../service/tcp_service.dart';
 import '../to_print.dart';
 import '../utility/confirm_dialog.dart';
 import 'secondary_tab_content_unselected.dart';
 import 'secondary_tab_menu.dart';
+import '../rout_config.dart';
+import '../pop_out_button.dart';
 
 class QrProcessMenu extends ConsumerStatefulWidget {
   const QrProcessMenu({super.key});
@@ -37,33 +36,16 @@ class QrProcessMenuState extends ConsumerState<QrProcessMenu> {
     // 終了タブに渡す前に値が消えないようにこのWidgetでも監視
     final _ = ref.watch(toPrintProvider);
 
-    /// 移動時に何を印刷するか渡す
-    // void gotoCompletedPrintTab(PrintSample printSample) {
-    //   ref.read(toPrintProvider.notifier).changeSample(printSample);
-    //   tabKey.currentState?.gotoCompletePrintTab();
-    // }
-
     // 現在のQR読取ページの種類
-    // final currentPageKind = ref.watch(qrReadPageSelectedBtnProvider);
     return SecondaryTabMenuForQrProcess(
       key: tabKey,
       tabs: [],
-      // tabs: [Tab(text: 'ステータス変更'), Tab(text: '自動精算出場')],
-      tabViews: [
-        // Center(child: SecondaryTabContent1(onPressedButton: gotoCompleteTab)),
-        // Center(
-        //   child: SecondaryTabContent2(
-        //     onPressedButton: () {
-        //       gotoCompletedPrintTab(PrintSample.receipt);
-        //     },
-        //   ),
-        // ),
-      ],
+      tabViews: [],
       defaultQr: _QrReading(
         gotoQrState: (bool allEnabled) {
           tabKey.currentState?.gotoStateQrTab(allEnabled: allEnabled);
         },
-      ), // _QrReading
+      ),
       stateQR: SecondaryTabContentUnselected(
         onComplete: (QrReadPageBtnKind currentPageKind) {
           if (currentPageKind == QrReadPageBtnKind.seisanSyori) {
@@ -72,10 +54,10 @@ class QrProcessMenuState extends ConsumerState<QrProcessMenu> {
             tabKey.currentState?.gotoCompleteTab();
           }
         },
-      ), // SecondaryTabContentUnselected
+      ),
       complete: ProcessCompleted(),
       completePrint: ProcessCompletedPrint(),
-    ); // SecondaryTabMenuForQrProcess
+    );
   }
 
   void executeCancel() {
@@ -89,8 +71,8 @@ class QrProcessMenuState extends ConsumerState<QrProcessMenu> {
 
 class _QrReading extends HookConsumerWidget {
   /// ステータス画面に移動
-  ///
   /// [allEnabled]がtrueなら全てのメニューが活性
+
   final void Function(bool allEnabled) gotoQrState;
 
   const _QrReading({required this.gotoQrState});
@@ -99,68 +81,44 @@ class _QrReading extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final disableQrReferenceButton = useState(false);
     final qrNoTextFieldController = useTextEditingController();
-
     final contents = Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           ActiveLargeButton(
-            text: 'QR読取　',
+            text: 'QR読取  ',
             onPressed: () async {
               // 別タブに遷移した時、キーボードをしまう
               FocusManager.instance.primaryFocus?.unfocus();
-              final qrData = await Navigator.of(context).push<Uint8List>(
-                MaterialPageRoute(builder: (context) => const ScannerWidget()),
-              );
+              final qrData = await context.pushNamed<String>(Pages.QRscan.name);
+              MaterialPageRoute(builder: (context) => const ScannerWidget());
 
-              if (qrData != null && context.mounted) {
-                // 照会中ダイアログ表示
-                showCustomAlertDialog(context: context, text: '照会中');
-                try {
-                  AppLogger().info('QrReading', 'QRデータ送信: ${qrData.length}bytes');
-                  // 0x1101 送信 — バイナリデータとして送信
-                  final response = await TcpService().sendQrServerRequest(
-                    designation: 1,
-                    rawData: qrData,
-                  );
-                  if (context.mounted) Navigator.of(context).pop();
-                  if (response.result) {
-                    AppLogger().info('QrReading', 'QR照会成功');
-                    ref.read(qrTicketNoProvider.notifier).reset();
-                    gotoQrState.call(true);
-                  } else {
-                    AppLogger().warn(
-                      'QrReading',
-                      'QR照会失敗: ERRCODE=${response.errCode}',
-                    );
-                    if (context.mounted) {
-                      showCustomAlertDialog(
-                        context: context,
-                        text: 'QR照会失敗\nエラーコード: ${response.errCode}',
-                      );
-                    }
-                  }
-                } catch (e) {
-                  if (context.mounted) Navigator.of(context).pop();
-                  AppLogger().error('QrReading', 'QR照会エラー', e);
-                  if (context.mounted) {
-                    showCustomAlertDialog(
-                      context: context,
-                      text: '通信エラー: $e',
-                    );
-                  }
+              if (qrData case final qrStr?) {
+                // 照会中ダイアログを表示する
+                if (context.mounted) {
+                  showCustomAlertDialog(context: context, text: '照会中');
                 }
+                // ダイアログを非表示にする
+                await Future.delayed(Duration(seconds: 3), () {
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                });
+                // QRチケット番号をリセットする
+                ref.read(qrTicketNoProvider.notifier).reset();
+                // これ以外のQRコードなら全て操作可能
+                gotoQrState.call(qrStr != 'ID=525');
               }
             },
-          ), // ActiveLargeButton
+          ),
           SizedBox(height: 50),
           Padding(
             padding: const EdgeInsets.only(bottom: 10.0),
             child: Text(
               'QRが読み取れない場合はQRチケット番号を入力してください',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 34.0),
-            ), // Text
-          ), // Padding
+            ),
+          ),
           Container(
             width: MediaQuery.of(context).size.width,
             height: 270,
@@ -177,158 +135,165 @@ class _QrReading extends HookConsumerWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 28.0,
-                        ), // TextStyle
-                      ), // Text
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                      SizedBox(
-                        width: 550,
-                        child: TextFieldShadow(
-                          topStops: [0.0, 0.15],
-                          leftStops: [0.0, 0.013],
-                          child: TextField(
-                            controller: qrNoTextFieldController,
-                            keyboardType: TextInputType.text,
-                            // autocorrect: false,
-                            enableSuggestions: false,
-                            showCursor: false,
-                            mouseCursor: SystemMouseCursors.click,
-                            autofocus: false,
-                            readOnly: true,
-                            enableInteractiveSelection: false,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                RegExp(r'[A-Z0-9]'),
-                              ), // FilteringTextInputFormatter.allow
-                              LengthLimitingTextInputFormatter(22),
-                            ],
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(),
-                              fillColor: Colors.white,
-                              filled: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 15.0,
-                                // vertical: 5.0,
-                              ), // EdgeInsets.symmetric
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Colors.black),
-                              ), // OutlineInputBorder
-                            ), // InputDecoration
-                            cursorHeight: 32.0,
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ), // TextStyle
-                            onTap: () async {
-                              final result = await showDialog<String?>(
-                                context: context,
-                                builder:
-                                    (context) => SoftwareKeyboard(
-                                      keyboardUsage: KeyboardUsage.qrTicketNo,
-                                      initialText: qrNoTextFieldController.text,
-                                    ), // SoftwareKeyboard
-                              );
-                              if (result != null) {
-                                qrNoTextFieldController.text = result;
-                                if (result.length >= 12) {
-                                  // QRチケット番号を保存する
-                                  ref
-                                      .read(qrTicketNoProvider.notifier)
-                                      .changeNo(result);
-                                  disableQrReferenceButton.value = true;
-                                } else {
-                                  disableQrReferenceButton.value = false;
-                                }
-                              }
-                            },
-                            // onChange: (text) {
-                            //   if (text.length >= 12) {
-                            //     disableQrReferenceButton.value = true;
-                            //   } else {
-                            //     disableQrReferenceButton.value = false;
-                            //   }
-                            // },
-                          ), // TextField
-                        ), // TextFieldShadow
-                      ), // SizedBox
-                      SizedBox(width: 12),
-                      SizedBox(
-                        height: 65,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: orengeGradient,
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton.icon(
-                            icon: Icon(
-                              Icons.dialpad_rounded,
-                              size: 32,
-                              color: Colors.white,
-                            ),
-                            label: Text(
-                              '番号入力',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              minimumSize: Size(160, 65),
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            onPressed: () async {
-                              final result = await showDialog<String?>(
-                                context: context,
-                                builder:
-                                    (context) => SoftwareKeyboard(
-                                      keyboardUsage: KeyboardUsage.qrTicketNo,
-                                      initialText:
-                                          qrNoTextFieldController.text,
-                                    ),
-                              );
-                              if (result != null) {
-                                qrNoTextFieldController.text = result;
-                                if (result.length >= 12) {
-                                  ref
-                                      .read(qrTicketNoProvider.notifier)
-                                      .changeNo(result);
-                                  disableQrReferenceButton.value = true;
-                                } else {
-                                  disableQrReferenceButton.value = false;
-                                }
-                              }
-                            },
-                          ),
                         ),
-                      ), // SizedBox button
-                        ], // Row children
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 670,
+                            child: TextFieldShadow(
+                              topStops: [0.0, 0.15],
+                              leftStops: [0.0, 0.013],
+                              child: TextField(
+                                controller: qrNoTextFieldController,
+                                keyboardType: TextInputType.text,
+                                // autocorrect: false,
+                                enableSuggestions: false,
+                                showCursor: false,
+                                mouseCursor: SystemMouseCursors.click,
+                                autofocus: false,
+                                readOnly: true,
+                                enableInteractiveSelection: false,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'[A-Z0-9]'),
+                                  ),
+                                  LengthLimitingTextInputFormatter(22),
+                                ],
+                                decoration: InputDecoration(
+                                  hintText: 'タップして入力...',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 24,
+                                  ),
+                                  border: OutlineInputBorder(),
+                                  fillColor: Colors.white,
+                                  filled: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 15.0,
+                                    // vertical: 5.0,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderSide: BorderSide(color: Colors.black),
+                                  ),
+                                ),
+                                cursorHeight: 32.0,
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                onTap: () async {
+                                  final result = await showDialog<String?>(
+                                    barrierDismissible: false,
+                                    context: context,
+                                    builder:
+                                        (context) => SoftwareKeyboard(
+                                          keyboardUsage:
+                                              KeyboardUsage.qrTicketNo,
+                                          initialText:
+                                              qrNoTextFieldController.text,
+                                        ),
+                                  );
+                                  if (result != null) {
+                                    qrNoTextFieldController.text = result;
+                                    if (result.length >= 12) {
+                                      // QRチケット番号を保存する
+                                      ref
+                                          .read(qrTicketNoProvider.notifier)
+                                          .changeNo(result);
+                                      disableQrReferenceButton.value = true;
+                                    } else {
+                                      disableQrReferenceButton.value = false;
+                                    }
+                                  }
+                                },
+                                // onChanged: (text) {
+                                //   if (text.length >= 12) {
+                                //     disableQrReferenceButton.value = true;
+                                //   } else {
+                                //     disableQrReferenceButton.value = false;
+                                //   }
+                                // },
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          SizedBox(
+                            height: 50,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: orengeGradient,
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton.icon(
+                                icon: Icon(
+                                  Icons.dialpad_rounded,
+                                  size: 32,
+                                  color: Colors.black,
+                                ),
+                                label: Text(
+                                  '番号入力',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  minimumSize: Size(160, 65),
+                                  padding: EdgeInsets.symmetric(horizontal: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  final result = await showDialog<String?>(
+                                    barrierDismissible: false,
+                                    context: context,
+                                    builder:
+                                        (context) => SoftwareKeyboard(
+                                          keyboardUsage:
+                                              KeyboardUsage.qrTicketNo,
+                                          initialText:
+                                              qrNoTextFieldController.text,
+                                        ),
+                                  );
+                                  if (result != null) {
+                                    qrNoTextFieldController.text = result;
+                                    if (result.length >= 12) {
+                                      ref
+                                          .read(qrTicketNoProvider.notifier)
+                                          .changeNo(result);
+                                      disableQrReferenceButton.value = true;
+                                    } else {
+                                      disableQrReferenceButton.value = false;
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ), // ActiveLargeButton
+                        ],
                       ), // Row
                       SizedBox(height: 25),
                     ],
-                  ), // Column
-                  // Column
-                  // Center
-                  // Container
+                  ),
                   // ActiveLargeButton(
-                  //   text: 'QR照会　',
+                  //   text: 'QR照会    ',
                   //   onPressed: () async {
                   //     // 別タブに遷移した時、キーボードをしまう
                   //     FocusManager.instance.primaryFocus?.unfocus();
@@ -338,54 +303,57 @@ class _QrReading extends HookConsumerWidget {
                   // ),
                   disableQrReferenceButton.value
                       ? ActiveLargeButton(
-                        text: 'QR照会　',
+                        text: 'QR照会  ',
                         onPressed: () async {
+                          // 別タブに遷移した時、キーボードをしまう
                           FocusManager.instance.primaryFocus?.unfocus();
+
+                          // 照会中ダイアログを表示する
                           showCustomAlertDialog(context: context, text: '照会中');
-                          try {
-                            final ticketNo = ref.read(qrTicketNoProvider);
-                            AppLogger().info('QrReading', 'QR番号照会送信: $ticketNo');
-                            // 0x1101 送信 — チケット番号として送信
-                            final response = await TcpService().sendQrServerRequest(
-                              designation: 2,
-                              qrNumber: ticketNo,
-                            );
-                            if (context.mounted) Navigator.of(context).pop();
-                            if (response.result) {
-                              AppLogger().info('QrReading', 'QR照会成功');
-                              gotoQrState.call(true);
-                            } else {
-                              AppLogger().warn(
-                                'QrReading',
-                                'QR照会失敗: ERRCODE=${response.errCode}',
-                              );
-                              if (context.mounted) {
-                                showCustomAlertDialog(
-                                  context: context,
-                                  text: 'QR照会失敗\nエラーコード: ${response.errCode}',
-                                );
-                              }
-                            }
-                          } catch (e) {
-                            if (context.mounted) Navigator.of(context).pop();
-                            AppLogger().error('QrReading', 'QR照会エラー', e);
+                          // ダイアログを非表示にする
+                          await Future.delayed(Duration(seconds: 3), () {
                             if (context.mounted) {
-                              showCustomAlertDialog(
+                              Navigator.of(context).pop();
+                            }
+                          });
+
+                          // とりあえず、照会は失敗しないものとする
+                          if (ref.watch(qrTicketNoProvider) ==
+                              '000000 0000 0000 0000 0000') {
+                            // 照会失敗ダイアログ
+                            if (context.mounted) {
+                              await showDialog(
                                 context: context,
-                                text: '通信エラー: $e',
+                                barrierDismissible: false,
+                                builder: (context) {
+                                  return CustomConfirmDialog(
+                                    text: "照会に失敗しました",
+                                    trueBtnText: "確認",
+                                    hasFalseBtn: false,
+                                  );
+                                },
                               );
                             }
+                          } else {
+                            // これ以外のQRコードなら全て操作可能
+                            // ref
+                            //     .read(qrReadPageCreatedProvider.notifier)
+                            //     .set(true);
+                            // ref
+                            //     .read(qrReadPageCreatedProvider.notifier)
+                            //     .set(true);
+                            gotoQrState.call(true);
                           }
                         },
-                      ) // ActiveLargeButton
-                      : InactiveLargeButton(text: 'QR照会'),
-                ], // <Widget>[]
-              ), // Column
+                      )
+                      : InactiveLargeButton(text: 'QR照会    '),
+                ],
+              ),
             ),
           ),
         ],
-      ), // Center
-    ); // Center
+      ),
+    );
 
     // 上下中央ぞろえにする
     return LayoutBuilder(
@@ -397,9 +365,9 @@ class _QrReading extends HookConsumerWidget {
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: contents,
-            ), // ConstrainedBox
-          ), // SingleChildScrollView
-    ); // LayoutBuilder
+            ),
+          ),
+    );
   }
 }
 
@@ -428,12 +396,17 @@ class ActiveLargeButton extends StatelessWidget {
     required this.text,
     required this.onPressed,
     this.btnBaseColor = orengeGradient,
+    this.btnFontSize = 30.0, // ✅ NEW
+    this.btnIconSize = 24.0, // ✅ NEW
+    this.btnPadding = const EdgeInsets.only(right: 24.0),
     super.key,
   });
-
+  final List<Color> btnBaseColor;
   final String text;
   final VoidCallback onPressed;
-  final List<Color> btnBaseColor;
+  final double btnFontSize;
+  final double btnIconSize;
+  final EdgeInsets btnPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -443,25 +416,28 @@ class ActiveLargeButton extends StatelessWidget {
         foregroundColor: Colors.black,
         onPressed: onPressed,
         child: Padding(
-          padding: const EdgeInsets.only(right: 24.0),
+          padding: btnPadding,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
                 text,
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 30.0),
-              ), // Text
-              FaIcon(
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: btnIconSize,
+                ),
+              ),
+              Icon(
                 FontAwesomeIcons.chevronRight,
                 color: Colors.black,
-                size: 24,
-              ), // Icon
+                size: btnIconSize,
+              ),
             ],
-          ), // Row
-        ), // Padding
-      ), // PopOutButton
-    ); // SizedButton
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -476,11 +452,11 @@ class InactiveLargeButton extends StatelessWidget {
     return SizedButton(
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xfffc8c8c),
+          backgroundColor: Color(0xffc8c8c8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ), // RoundedRectangleBorder
-          overlayColor: Color(0xfffc8c8c),
+          ),
+          overlayColor: Color(0xffc8c8c8),
         ),
         onPressed: () {},
         child: Padding(
@@ -494,17 +470,17 @@ class InactiveLargeButton extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   fontSize: 26,
                   color: Color(0xff969696),
-                ), // TextStyle
-              ), // Text
-              FaIcon(
+                ),
+              ),
+              Icon(
                 FontAwesomeIcons.chevronRight,
                 color: Color(0xff969696),
                 size: 20,
-              ), // Icon
+              ),
             ],
-          ), // Row
-        ), // Padding
-      ), // ElevatedButton
-    ); // SizedButton
+          ),
+        ),
+      ),
+    );
   }
 }
