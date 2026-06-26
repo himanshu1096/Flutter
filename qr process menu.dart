@@ -3,21 +3,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:qr_multidemo/my_home_page.dart';
 import 'package:qr_multidemo/provider/provider.dart';
 import 'package:qr_multidemo/software_keyboard.dart';
 import 'package:go_router/go_router.dart';
 import '../app_color.dart';
 import '../pop_out_button.dart';
 import '../process_completed.dart';
-import '../scanner.dart';
 import '../secondary_tab_content_core.dart';
 import '../to_print.dart';
 import '../utility/confirm_dialog.dart';
 import 'secondary_tab_content_unselected.dart';
 import 'secondary_tab_menu.dart';
 import '../rout_config.dart';
-import '../pop_out_button.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'dart:typed_data';
+import '../provider/display_data_provider.dart';
 
 class QrProcessMenu extends ConsumerStatefulWidget {
   const QrProcessMenu({super.key});
@@ -90,24 +91,80 @@ class _QrReading extends HookConsumerWidget {
             onPressed: () async {
               // 別タブに遷移した時、キーボードをしまう
               FocusManager.instance.primaryFocus?.unfocus();
-              final qrData = await context.pushNamed<String>(Pages.QRscan.name);
-              MaterialPageRoute(builder: (context) => const ScannerWidget());
+              final qrData = await context.pushNamed<Uint8List>(
+                Pages.QRscan.name,
+              );
 
-              if (qrData case final qrStr?) {
-                // 照会中ダイアログを表示する
-                if (context.mounted) {
-                  showCustomAlertDialog(context: context, text: '照会中');
-                }
-                // ダイアログを非表示にする
-                await Future.delayed(Duration(seconds: 3), () {
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
+              if (qrData != null && context.mounted) {
+                showCustomAlertDialog(context: context, text: '照会中');
+                try {
+                  AppLogger().info(
+                    'QrReading',
+                    'QRデータ送信: ${qrData.length}bytes',
+                  );
+                  final response = await TcpService().sendQrServerRequest(
+                    designation: 1,
+                    rawData: qrData,
+                  );
+                  if (context.mounted) Navigator.of(context).pop();
+                  if (response.result) {
+                    AppLogger().info('QrReading', 'QR照会成功 → 0x1201送信');
+                    // 0x1201 表示データ要求 自動送信
+                    final displayData = await TcpService().sendDisplayDataRequest();
+                    if (context.mounted) Navigator.of(context).pop();
+                    if (displayData.result) {
+                      AppLogger().info('QrReading', '表示データ取得成功');
+                      ref.read(displayDataNotifierProvider.notifier).set(displayData);
+                      ref.read(qrTicketNoProvider.notifier).reset();
+                      gotoQrState.call(true);
+                    } else {
+                      AppLogger().warn('QrReading', '表示データ取得失敗');
+                      if (context.mounted) {
+                        await showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => CustomConfirmDialog(
+                            text: '表示データの取得に失敗しました',
+                            trueBtnText: '確認',
+                            hasFalseBtn: false,
+                          ),
+                        );
+                      }
+                    }
+                  } else {
+                    AppLogger().warn(
+                      'QrReading',
+                      'QR照会失敗: \${response.errCode}',
+                    );
+                    if (context.mounted) {
+                      await showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder:
+                            (context) => CustomConfirmDialog(
+                              text: 'QR照会に失敗しました\nエラーコード: \${response.errCode}',
+                              trueBtnText: '確認',
+                              hasFalseBtn: false,
+                            ),
+                      );
+                    }
                   }
-                });
-                // QRチケット番号をリセットする
-                ref.read(qrTicketNoProvider.notifier).reset();
-                // これ以外のQRコードなら全て操作可能
-                gotoQrState.call(qrStr != 'ID=525');
+                } catch (e) {
+                  if (context.mounted) Navigator.of(context).pop();
+                  AppLogger().error('QrReading', 'QR照会エラー', e);
+                  if (context.mounted) {
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder:
+                          (context) => CustomConfirmDialog(
+                            text: '通信エラーが発生しました',
+                            trueBtnText: '確認',
+                            hasFalseBtn: false,
+                          ),
+                    );
+                  }
+                }
               }
             },
           ),
@@ -159,7 +216,7 @@ class _QrReading extends HookConsumerWidget {
                                   FilteringTextInputFormatter.allow(
                                     RegExp(r'[A-Z0-9]'),
                                   ),
-                                  LengthLimitingTextInputFormatter(22),
+                                  //   LengthLimitingTextInputFormatter(22),
                                 ],
                                 decoration: InputDecoration(
                                   hintText: 'タップして入力...',
@@ -197,11 +254,11 @@ class _QrReading extends HookConsumerWidget {
                                   );
                                   if (result != null) {
                                     qrNoTextFieldController.text = result;
-                                    if (result.length >= 12) {
+                                    if (result.length >= 1) {
                                       // QRチケット番号を保存する
                                       ref
                                           .read(qrTicketNoProvider.notifier)
-                                          .changeNo(result);
+                                          .changeNo(result.replaceAll(' ', ''));
                                       disableQrReferenceButton.value = true;
                                     } else {
                                       disableQrReferenceButton.value = false;
@@ -274,10 +331,10 @@ class _QrReading extends HookConsumerWidget {
                                   );
                                   if (result != null) {
                                     qrNoTextFieldController.text = result;
-                                    if (result.length >= 12) {
+                                    if (result.length >= 1) {
                                       ref
                                           .read(qrTicketNoProvider.notifier)
-                                          .changeNo(result);
+                                          .changeNo(result.replaceAll(' ', ''));
                                       disableQrReferenceButton.value = true;
                                     } else {
                                       disableQrReferenceButton.value = false;
@@ -310,39 +367,69 @@ class _QrReading extends HookConsumerWidget {
 
                           // 照会中ダイアログを表示する
                           showCustomAlertDialog(context: context, text: '照会中');
-                          // ダイアログを非表示にする
-                          await Future.delayed(Duration(seconds: 3), () {
-                            if (context.mounted) {
-                              Navigator.of(context).pop();
+                          try {
+                            final ticketNo = ref.read(qrTicketNoProvider);
+                            AppLogger().info('QrReading', 'QR番号照会: $ticketNo');
+                            final response = await TcpService()
+                                .sendQrServerRequest(
+                                  designation: 2,
+                                  qrNumber: ticketNo,
+                                );
+                            if (context.mounted) Navigator.of(context).pop();
+                            if (response.result) {
+                              AppLogger().info('QrReading', 'QR照会成功 → 0x1201送信');
+                              final displayData = await TcpService().sendDisplayDataRequest();
+                              if (context.mounted) Navigator.of(context).pop();
+                              if (displayData.result) {
+                                AppLogger().info('QrReading', '表示データ取得成功');
+                                ref.read(displayDataNotifierProvider.notifier).set(displayData);
+                                gotoQrState.call(true);
+                              } else {
+                                AppLogger().warn('QrReading', '表示データ取得失敗');
+                                if (context.mounted) {
+                                  await showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (context) => CustomConfirmDialog(
+                                      text: '表示データの取得に失敗しました',
+                                      trueBtnText: '確認',
+                                      hasFalseBtn: false,
+                                    ),
+                                  );
+                                }
+                              }
+                            } else {
+                              AppLogger().warn(
+                                'QrReading',
+                                'QR照会失敗: \${response.errCode}',
+                              );
+                              if (context.mounted) {
+                                await showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => CustomConfirmDialog(
+                                    text: 'QR照会に失敗しました\nエラーコード: \${response.errCode}',
+                                    trueBtnText: '確認',
+                                    hasFalseBtn: false,
+                                  ),
+                                );
+                              }
                             }
-                          });
-
-                          // とりあえず、照会は失敗しないものとする
-                          if (ref.watch(qrTicketNoProvider) ==
-                              '000000 0000 0000 0000 0000') {
-                            // 照会失敗ダイアログ
+                          } catch (e) {
+                            if (context.mounted) Navigator.of(context).pop();
+                            AppLogger().error('QrReading', 'QR照会エラー', e);
                             if (context.mounted) {
                               await showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (context) {
-                                  return CustomConfirmDialog(
-                                    text: "照会に失敗しました",
-                                    trueBtnText: "確認",
-                                    hasFalseBtn: false,
-                                  );
-                                },
+                                builder:
+                                    (context) => CustomConfirmDialog(
+                                      text: '通信エラーが発生しました',
+                                      trueBtnText: '確認',
+                                      hasFalseBtn: false,
+                                    ),
                               );
                             }
-                          } else {
-                            // これ以外のQRコードなら全て操作可能
-                            // ref
-                            //     .read(qrReadPageCreatedProvider.notifier)
-                            //     .set(true);
-                            // ref
-                            //     .read(qrReadPageCreatedProvider.notifier)
-                            //     .set(true);
-                            gotoQrState.call(true);
                           }
                         },
                       )
