@@ -1,0 +1,159 @@
+/// 接続状態アイコンプロバイダー (0xF181)
+@Riverpod(keepAlive: true)
+class ConnectionStatus extends _$ConnectionStatus {
+  @override
+  Map<String, int> build() => {
+    'TOTALSERVER': 1,  // 初期値: 接続
+    'QRMODULE': 1,
+    'PRINTER': 1,
+  };
+
+  void update(String unit, int status) {
+    state = {...state, unit: status};
+  }
+}
+
+
+  // 接続状態マップ { "TOTALSERVER": 1, "QRMODULE": 1, "PRINTER": 1 }
+  final Map<String, int> _connectionStatus = {
+    'TOTALSERVER': 1,
+    'QRMODULE': 1,
+    'PRINTER': 1,
+  };
+
+  // 接続状態変化通知用コールバック
+  void Function(String unit, int status)? onConnectionStatusChanged;
+
+
+
+      case CommandId.connectionStatusNotify:
+        AppLogger().info(_tag, '0xF181 接続状態変化通知 受信');
+        try {
+          final data = packet.json['DATA'] as Map<String, dynamic>? ?? {};
+          final unit = data['UNIT'] as String? ?? '';
+          final status = data['STATUS'] as int? ?? -1;
+          AppLogger().info(_tag, '接続状態: UNIT=$unit STATUS=$status');
+          _connectionStatus[unit] = status;
+          onConnectionStatusChanged?.call(unit, status);
+        } catch (e) {
+          AppLogger().error(_tag, '0xF181 パースエラー', e);
+        }
+        break;
+
+
+
+  /// 接続状態取得
+  int getConnectionStatus(String unit) => _connectionStatus[unit] ?? -1;
+
+
+
+
+/// 接続状態プロバイダー (0xF181)
+/// TOTALSERVER / QRMODULE / PRINTER → 1:接続 -1:未接続
+@Riverpod(keepAlive: true)
+class ConnectionStatus extends _$ConnectionStatus {
+  @override
+  Map<String, int> build() {
+    // TcpServiceのコールバックを設定
+    TcpService().onConnectionStatusChanged = (unit, status) {
+      state = {...state, unit: status};
+    };
+    return {
+      'TOTALSERVER': 1,
+      'QRMODULE': 1,
+      'PRINTER': 1,
+    };
+  }
+
+  void update(String unit, int status) {
+    state = {...state, unit: status};
+  }
+}
+
+
+
+
+
+
+class ConnectionIcons extends ConsumerWidget {
+  /// 画面右上の機器接続アイコン達
+  const ConnectionIcons({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(connectionStatusProvider);
+
+    // 1=緑(正常) -1=赤(異常)
+    Color iconColor(String unit) =>
+        status[unit] == 1 ? Colors.green : Colors.red;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: SizedBox(
+        height: kToolbarHeight,
+        child: Row(
+          children: [
+            // データ集計機接続状態 (TOTALSERVER)
+            FramedIcon(
+              borderColor: iconColor('TOTALSERVER'),
+              icon: Image.asset(
+                Assets.icon.dbWord.keyName,
+                width: 24,
+                height: 24,
+              ),
+            ),
+            // QRサーバ接続状態 (QRMODULE)
+            FramedIcon(
+              borderColor: iconColor('QRMODULE'),
+              icon: Image.asset(
+                Assets.icon.qRWord.keyName,
+                width: 24,
+                height: 24,
+              ),
+            ),
+            // プリンタ状態 (PRINTER)
+            FramedIcon(
+              borderColor: iconColor('PRINTER'),
+              icon: Icon(Icons.print),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+class FramedIcon extends StatelessWidget {
+  /// アイコン
+  final Widget icon;
+
+  /// 枠の色 (デフォルト: 緑)
+  final Color borderColor;
+
+  /// 枠付きアイコン
+  const FramedIcon({
+    super.key,
+    required this.icon,
+    this.borderColor = Colors.green,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(color: Colors.white, blurRadius: 3, spreadRadius: 3),
+          BoxShadow(color: borderColor, blurRadius: 3, spreadRadius: 3),
+        ],
+      ),
+      child: icon,
+    );
+  }
+}
+
