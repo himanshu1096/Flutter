@@ -1,0 +1,38 @@
+    // 表示データ取得
+    final displayData = ref.watch(displayDataNotifierProvider);
+    final mapper = displayData != null ? DisplayDataMapper(displayData) : null;
+
+    // CardInfoEnumの値を取得するヘルパー
+    String getValue(CardInfoEnum field) => mapper?.getValue(field) ?? '';
+
+    // 選択中のページ
+    final pageKind = ref.watch(qrReadPageSelectedBtnProvider);
+
+
+
+    return ListView(
+      shrinkWrap: true,
+      children: [
+        CardInfoBlock(
+            title: 'カード乗車券情報',
+            content: _cardInfoContent(
+              context,
+              cardInfo: cardTicketInfo,
+              fontColor: fontColor,
+            ),
+
+
+
+  Widget _cardInfoContent(
+    BuildContext context, {
+    required List<CardInfoEnum> cardInfo,
+    required Color fontColor,
+    required String Function(CardInfoEnum) getValue,}) {
+
+
+                child: _InfoRow(
+                  leftTitle: c.name,
+                  leftValue: getValue(c),
+
+
+
