@@ -452,6 +452,54 @@ class TcpService {
     );
   }
 
+  /// 業務選択通知送信 (0xAA01) Flutter → Server
+  /// レスポンスなし (fire and forget)
+  Future<void> sendBusinessSelect(int business) async {
+    AppLogger().info(_tag, '0xAA01 業務選択通知 送信: BUSINESS=$business');
+    await sendPacket(
+      commandId: CommandId.businessSelect,
+      json: {'BUSINESS': business},
+    );
+  }
+
+  /// 業務処理実行要求送信 Flutter → Server
+  /// 入場(0x2101) / 出場(0x2201) / 精算(0x2301) / 廃券(0x2401) / 発駅キャンセル(0x2501)
+  Future<ProcessResponse> sendProcessRequest({
+    required int commandId,
+    required String qrNumber,
+  }) async {
+    final cmdHex = '0x${commandId.toRadixString(16).toUpperCase()}';
+    AppLogger().info(_tag, '$cmdHex 業務処理実行要求 送信: QRNUMBER=$qrNumber');
+    _processCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: commandId,
+      json: {'QRNUMBER': qrNumber},
+    );
+    return _processCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '$cmdHex タイムアウト');
+        _processCompleter = null;
+        throw TimeoutException('$cmdHex タイムアウト');
+      },
+    );
+  }
+
+  /// 業務取消要求送信 (0xB101) Flutter → Server
+  Future<ProcessResponse> sendCancel() async {
+    AppLogger().info(_tag, '0xB101 業務取消要求 送信');
+    _cancelCompleter = Completer<ProcessResponse>();
+    await sendPacket(commandId: CommandId.cancelRequest, json: {});
+    return _cancelCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xB101 タイムアウト');
+        _cancelCompleter = null;
+        throw TimeoutException('業務取消タイムアウト');
+      },
+    );
+  }
+
   /// 表示データ要求送信 (0x1201) Flutter → Server
   /// 0x1101と同じQRデータを再送
   Future<DisplayData> sendDisplayDataRequest() async {
