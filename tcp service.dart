@@ -6,11 +6,12 @@ import 'package:qr_multidemo/app_config.dart';
 import '../config/tcp_config.dart';
 import '../model/init_data.dart';
 import '../model/login_response.dart';
-import '../model/display_data.dart';
 import '../model/qr_server_response.dart';
 import 'app_logger.dart';
-import 'csv_service.dart';
 import 'packet_codec.dart';
+import 'csv_service.dart';
+import '../model/display_data.dart';
+import '../model/process_response.dart';
 
 /// TCP接続状態
 enum TcpConnectionState { disconnected, connecting, connected, error }
@@ -304,6 +305,42 @@ class TcpService {
           AppLogger().error(_tag, '0xA181 JSONパースエラー', e);
           _loginCompleter?.completeError(e);
           _loginCompleter = null;
+        }
+        break;
+
+      // 入場処理実行要求応答 (0x2181)
+      case CommandId.enterResponse:
+      // 出場処理実行要求応答 (0x2281)
+      case CommandId.exitResponse:
+      // 精算処理実行要求応答 (0x2381)
+      case CommandId.adjustResponse:
+      // 廃券処理実行要求応答 (0x2481)
+      case CommandId.cancelTicketResponse:
+      // 発駅キャンセル実行要求応答 (0x2581)
+      case CommandId.enterCancelResponse:
+        AppLogger().info(_tag, '業務処理応答 受信: $cmdHex');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          _processCompleter?.complete(response);
+          _processCompleter = null;
+        } catch (e) {
+          AppLogger().error(_tag, '業務処理応答 パースエラー', e);
+          _processCompleter?.completeError(e);
+          _processCompleter = null;
+        }
+        break;
+
+      // 業務取消要求応答 (0xB181)
+      case CommandId.cancelResponse:
+        AppLogger().info(_tag, '0xB181 業務取消応答 受信');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          _cancelCompleter?.complete(response);
+          _cancelCompleter = null;
+        } catch (e) {
+          AppLogger().error(_tag, '0xB181 パースエラー', e);
+          _cancelCompleter?.completeError(e);
+          _cancelCompleter = null;
         }
         break;
 
