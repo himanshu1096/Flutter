@@ -1,0 +1,32 @@
+                    onPressed: () async {
+                      if (!adjustEnabled ||
+                          QrReadPageBtnKind.zyouhoHyouzi != selectedBtn) return;
+                      await TcpService().sendBusinessSelect(12);
+
+                      // ROUTECAND から経路候補を設定
+                      final displayData = ref.read(displayDataNotifierProvider);
+                      final cands = displayData?.routeCandidates ?? [];
+
+                      // judgeRouteListProvider に経路候補を設定
+                      // TODO: ROUTECAND値の意味が確定したら
+                      // infopattern/routepattern/companypatternを正しく設定する
+                      for (int i = 0; i < 6; i++) {
+                        final candValue = i < cands.length ? cands[i] : null;
+                        judgeRouteBtnNotifier.updateItem(
+                          i + 1,
+                          candValue != null, // buttonvisible
+                          0,                 // infopattern (TODO)
+                          candValue ?? 0,    // routepattern (ROUTECAND値)
+                          0,                 // companypattern (TODO)
+                        );
+                      }
+
+                      if (cands.length > 1) {
+                        // 経路選択画面へ
+                        btnNotifier.changePage(QrReadPageBtnKind.seisanSyoriRoute);
+                      } else {
+                        // 経路選択不要 → 直接精算処理へ
+                        judgeRouteBtnIdNotifier.set(1);
+                        btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                      }
+                    },
