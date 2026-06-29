@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import '../app_theme.dart';
-import '../gen/assets.gen.dart';
-import '../provider/provider.dart';
+import 'package:qr_multidemo/config/tcp_config.dart';
 import '../rout_config.dart';
 import '../service/app_logger.dart';
 import '../service/tcp_service.dart';
 import '../software_keyboard.dart';
+import '../utility/confirm_dialog.dart';
 
 /// フォントサイズ
 const double _fontSize = 36.0;
@@ -39,10 +37,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   /// 初期化完了通知送信 (0x0A01)
   Future<void> _sendInitComplete() async {
     try {
+      // await Future.delayed(
+      //   Duration(milliseconds: TcpConfig().initCompleteDelayMs),
+      // );
       await TcpService().sendInitComplete(result: true);
       AppLogger().info('LoginPage', '初期化完了通知送信完了 (0x0A01)');
     } catch (e) {
       AppLogger().error('LoginPage', '初期化完了通知送信エラー', e);
+    }
+  }
+
+  /// 業務終了処理
+  /// 1. 内部クリーンアップ
+  /// 2. 0x0F01送信 (クリーンアップ失敗でも必ず送信)
+  Future<void> _sendAppExit() async {
+    try {
+      await TcpService().cleanup();
+    } catch (e) {
+      AppLogger().error('LoginPage', 'クリーンアップエラー', e);
+    } finally {
+      try {
+        await TcpService().sendAppExit();
+        AppLogger().info('LoginPage', '0x0F01送信完了');
+      } catch (e) {
+        AppLogger().error('LoginPage', '0x0F01送信エラー', e);
+      }
     }
   }
 
@@ -51,12 +70,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          Align(alignment: AlignmentGeometry.topLeft, child: _Logo()),
+          // Align(alignment: AlignmentGeometry.topLeft, child: _Logo()),
           Align(alignment: AlignmentGeometry.center, child: _LogInBox()),
-          Align(
-            alignment: AlignmentGeometry.bottomCenter,
-            child: _ThemeChangeButtons(),
-          ), // Align
+          // Align(
+          //   alignment: AlignmentGeometry.bottomCenter,
+          //   // child: _ThemeChangeButtons(),
+          // ), // Align
         ],
       ), // Stack
     ); // Scaffold
@@ -66,17 +85,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 // ─────────────────────────────────────────────────────────
 // _Logo
 // ─────────────────────────────────────────────────────────
-class _Logo extends StatelessWidget {
-  const _Logo();
+// class _Logo extends StatelessWidget {
+//   const _Logo();
 
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Image.asset(Assets.icon.logoTobu.keyName, scale: 0.5),
-    ); // ClipRRect
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return ClipRRect(
+//       borderRadius: BorderRadius.circular(16),
+//       child: Image.asset(Assets.icon.logoTobu.keyName, scale: 0.5),
+//     ); // ClipRRect
+//   }
+// }
 
 // ─────────────────────────────────────────────────────────
 // _LogInBox
@@ -129,7 +148,10 @@ class _LogInBoxState extends ConsumerState<_LogInBox> {
         AppLogger().info('LoginPage', 'AUTHORITY=99 保守員権限 → ログインページに留まる');
       } else {
         // AUTHORITY = 0 → 認証失敗ダイアログ
-        AppLogger().warn('LoginPage', 'AUTHORITY=0 認証失敗: ERRCODE=${response.errCode}');
+        AppLogger().warn(
+          'LoginPage',
+          'AUTHORITY=0 認証失敗: ERRCODE=${response.errCode}',
+        );
         await _showAuthErrorDialog(response.errCode);
       }
     } catch (e) {
@@ -142,20 +164,17 @@ class _LogInBoxState extends ConsumerState<_LogInBox> {
   }
 
   /// 認証失敗ダイアログ
+
   Future<void> _showAuthErrorDialog(int errCode) async {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('認証失敗'),
-        content: Text('エラーコード: $errCode'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+      builder:
+          (context) => CustomConfirmDialog(
+            text: 'パスワードが違います',
+            trueBtnText: '確認',
+            hasFalseBtn: false,
           ),
-        ],
-      ),
     );
   }
 
@@ -164,17 +183,31 @@ class _LogInBoxState extends ConsumerState<_LogInBox> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('エラー'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+      builder:
+          (context) => CustomConfirmDialog(
+            text: message,
+            trueBtnText: '確認',
+            hasFalseBtn: false,
           ),
-        ],
-      ),
     );
+  }
+
+  /// 業務終了処理
+  /// 1. 内部クリーンアップ
+  /// 2. 0x0F01送信 (クリーンアップ失敗でも必ず送信)
+  Future<void> _sendAppExit() async {
+    try {
+      await TcpService().cleanup();
+    } catch (e) {
+      AppLogger().error('LoginPage', 'クリーンアップエラー', e);
+    } finally {
+      try {
+        await TcpService().sendAppExit();
+        AppLogger().info('LoginPage', '0x0F01送信完了');
+      } catch (e) {
+        AppLogger().error('LoginPage', '0x0F01送信エラー', e);
+      }
+    }
   }
 
   @override
@@ -223,21 +256,34 @@ class _LogInBoxState extends ConsumerState<_LogInBox> {
                       _inputtedId.value && _inputtedPw.value && !_isLoading
                           ? _onLoginPressed
                           : null,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text('ログイン', style: _styleOnlySize),
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                          : Text('ログイン', style: _styleOnlySize),
                 ), // FilledButton
               ), // Expanded
               Expanded(
                 child: FilledButton.tonal(
-                  onPressed: () {},
+                  onPressed: () async {
+                    final confirm = await showDialog<bool?>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => CustomConfirmDialog(
+                        text: '業務を終了します',
+                        trueBtnText: '実行',
+                      ),
+                    );
+                    if (confirm == true) {
+                      await _sendAppExit();
+                    }
+                  },
                   child: Text('業務終了', style: _styleOnlySize),
                 ), // FilledButton.tonal
               ), // Expanded
@@ -286,6 +332,24 @@ class _TextBoxViewState extends State<_TextBoxView> {
 
   void _rebuild() => setState(() {});
 
+  /// 業務終了処理
+  /// 1. 内部クリーンアップ
+  /// 2. 0x0F01送信 (クリーンアップ失敗でも必ず送信)
+  Future<void> _sendAppExit() async {
+    try {
+      await TcpService().cleanup();
+    } catch (e) {
+      AppLogger().error('LoginPage', 'クリーンアップエラー', e);
+    } finally {
+      try {
+        await TcpService().sendAppExit();
+        AppLogger().info('LoginPage', '0x0F01送信完了');
+      } catch (e) {
+        AppLogger().error('LoginPage', '0x0F01送信エラー', e);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hintColor = Theme.of(context).hintColor;
@@ -294,10 +358,11 @@ class _TextBoxViewState extends State<_TextBoxView> {
         final input = await showDialog<String?>(
           context: context,
           barrierDismissible: false,
-          builder: (context) => SoftwareKeyboard(
-            keyboardUsage: widget.keyboardUsage,
-            initialText: _input.value ?? '',
-          ), // SoftwareKeyboard
+          builder:
+              (context) => SoftwareKeyboard(
+                keyboardUsage: widget.keyboardUsage,
+                initialText: _input.value ?? '',
+              ), // SoftwareKeyboard
         );
         _input.value = input;
         widget.onChanged(input);
@@ -316,24 +381,25 @@ class _TextBoxViewState extends State<_TextBoxView> {
             ), // BoxShadow
           ],
         ), // BoxDecoration
-        child: (_input.value == null || _input.value!.isEmpty)
-            ? Row(
-                spacing: 8,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(widget.iconData, size: _fontSize, color: hintColor),
-                  Text(
-                    widget.viewText,
-                    style: _styleOnlySize.copyWith(color: hintColor),
-                  ), // Text
-                ],
-              ) // Row
-            : Text(
-                widget.keyboardUsage == KeyboardUsage.password
-                    ? '*' * _input.value!.length
-                    : _input.value!,
-                style: _styleOnlySize,
-              ), // Text
+        child:
+            (_input.value == null || _input.value!.isEmpty)
+                ? Row(
+                  spacing: 8,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(widget.iconData, size: _fontSize, color: hintColor),
+                    Text(
+                      widget.viewText,
+                      style: _styleOnlySize.copyWith(color: hintColor),
+                    ), // Text
+                  ],
+                ) // Row
+                : Text(
+                  widget.keyboardUsage == KeyboardUsage.password
+                      ? '*' * _input.value!.length
+                      : _input.value!,
+                  style: _styleOnlySize,
+                ), // Text
       ), // Container
     ); // InkWell
   }
@@ -342,30 +408,3 @@ class _TextBoxViewState extends State<_TextBoxView> {
 // ─────────────────────────────────────────────────────────
 // _ThemeChangeButtons
 // ─────────────────────────────────────────────────────────
-class _ThemeChangeButtons extends ConsumerWidget {
-  const _ThemeChangeButtons();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 48,
-        children: [
-          for (var color in ThemeColors.values)
-            ElevatedButton(
-              style: ButtonStyle(
-                backgroundColor: WidgetStatePropertyAll(color.scheme.primary),
-                foregroundColor: WidgetStatePropertyAll(color.scheme.onPrimary),
-              ), // ButtonStyle
-              onPressed: () {
-                ref.read(currentThemeProvider.notifier).set(color.theme);
-              },
-              child: Text(color.name, style: _styleOnlySize),
-            ), // ElevatedButton
-        ],
-      ), // Row
-    ); // Padding
-  }
-}

@@ -570,6 +570,31 @@ class TcpService {
     AppLogger().info(_tag, 'TCP通信停止完了');
   }
 
+  /// アプリケーション終了要求送信 (0x0F01)
+  /// レスポンスなし
+  Future<void> sendAppExit() async {
+    AppLogger().info(_tag, '0x0F01 アプリケーション終了要求 送信');
+    await sendPacket(
+      commandId: CommandId.appExitRequest,
+      json: {},
+    );
+  }
+
+  /// 内部クリーンアップ
+  /// アプリ終了前に呼ぶ — Completerをクリアしてリソース解放
+  /// TCP socketはOSシャットダウン時に自動クローズされるため
+  /// 明示的なclose処理は不要 (チーム方針)
+  Future<void> cleanup() async {
+    AppLogger().info(_tag, '内部クリーンアップ開始');
+    _loginCompleter = null;
+    _qrCompleter = null;
+    _displayDataCompleter = null;
+    _processCompleter = null;
+    _cancelCompleter = null;
+    AppLogger().info(_tag, '内部クリーンアップ完了');
+    await AppLogger().dispose();
+  }
+
   /// リソース解放
   void dispose() {
     _receiveIsolate?.kill(priority: Isolate.immediate);
