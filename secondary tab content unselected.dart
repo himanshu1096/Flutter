@@ -7,6 +7,11 @@ import 'package:qr_multidemo/secondary_tab_content_core.dart';
 import 'package:intl/intl.dart';
 
 import '../app_icon.dart';
+import '../model/process_response.dart';
+import '../provider/display_data_provider.dart';
+import '../service/app_logger.dart';
+import '../service/packet_codec.dart';
+import '../service/tcp_service.dart';
 import '../utility/confirm_dialog.dart';
 import '../utility/constant.dart';
 import 'secondary_tab_process_information.dart';
