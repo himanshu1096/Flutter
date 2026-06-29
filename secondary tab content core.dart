@@ -8,11 +8,21 @@ import 'package:qr_multidemo/utility/confirm_dialog.dart';
 import 'package:qr_multidemo/utility/constant.dart';
 
 import 'app_color.dart';
+import 'model/display_data_mapper.dart';
 import 'pop_out_button.dart';
+import 'provider/display_data_provider.dart';
 import 'provider/provider.dart';
 import 'qr_process/qr_process_menu.dart';
 
 const Color backGroundColor = Color(0xFFF4F4F4);
+
+/// QRチケット番号フォーマット
+/// 20文字後にスペースを挿入して表示用に変換
+String _formatQrNumber(String raw) {
+  final cleaned = raw.replaceAll(' ', '');
+  if (cleaned.length <= 20) return cleaned;
+  return '\${cleaned.substring(0, 20)} \${cleaned.substring(20)}';
+}
 const Color titleColor = Color(0xFF233B77);
 const double fontSize = 28;
 const TextStyle titleTextStyle = TextStyle(
@@ -43,31 +53,32 @@ const TextStyle titleTextStyle = TextStyle(
 // }
 
 enum CardInfoEnum {
-  qrYukoMukoStatus('QR有効/無効ステータス', ''),
-  qrHakkouStatus('QR発行ステータス', ''),
-  siyouStatus('使用ステータス', ''),
-  nyuusyutuzyouStatus('入出場ステータス', ''),
-  baitaiSyubetu('媒体種別', ''),
-  yukoKaisibi('有効開始日', ''),
-  yukoSyuryoubi('有効終了日', ''),
-  hatueki('発駅', ''),
+  qrYukoMukoStatus('QR有効/無効ステータス', '有効(自動処理不可)'),
+  qrHakkouStatus('QR発行ステータス', 'QRチケット破棄済'),
+  siyouStatus('使用ステータス', '未使用'),
+  nyuusyutuzyouStatus('入出場ステータス', '未使用'),
+  baitaiSyubetu('媒体種別', '普通券（QR）'),
+  yukoKaisibi('有効開始日', '06/01'),
+  yukoSyuryoubi('有効終了日', '06/30'),
+  hatueki('発駅', '朝霞'),
   tyakueki('着駅', ''),
-  hatuekiKusu('発駅区数', ''),
-  renrakueki('連絡駅', ''),
-  renrakuekiKusu('連絡駅区数', ''),
-  zyosyaeki('乗車駅', '', anotherName: '乗降駅'),
-  nyusyutuzyoBit('入出場状態', '', anotherName: '入出場状態'),
-  zyosyaTukihi('乗車月日', ''),
-  zyosyaZikoku('乗車時刻', ''),
+  hatuekiKusu('発駅区数', '16'),
+  renrakueki('連絡駅', '和光市'),
+  renrakuekiKusu('連絡駅区数', '18'),
+  zyosyaeki('乗車駅', '朝霞', anotherName: '乗降駅'),
+  nyusyutuzyoBit('入出場状態', '入場', anotherName: '入出場状態'),
+  // nyusyutuzyoBit('入出場ビット', '1', anotherName: '入出場状態'),
+  zyosyaTukihi('乗車月日', '06/30'),
+  zyosyaZikoku('乗車時刻', '10:00'),
   keiyu1('経由１', ''),
   keiyu2('経由２', ''),
   keiyu3('経由３', ''),
   keiyu4('経由４', ''),
-  kensyu('券種', ''),
-  kensyu2('券種２', ''),
-  kensyu2Detail1('券種２の詳細１', ''),
-  kensyu2Detail2('券種２の詳細２', ''),
-  huricode('フリーコード(※)', ''),
+  kensyu('券種', '0'),
+  kensyu2('券種２', '2C'),
+  kensyu2Detail1('券種２の詳細１', '併割あり'),
+  kensyu2Detail2('券種２の詳細２', '高保磁あり、連絡あり'),
+  huricode('フリーコード(※)', '日光・鬼怒川Ｆ'),
   empty('', '');
 
   final String name;
@@ -171,8 +182,10 @@ class ZyouhoHyouziFooter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // QRチケット番号
-    final qrTicketNo = ref.watch(qrTicketNoProvider);
+    // QRチケット番号 (displayDataから取得、なければproviderから)
+    final displayData = ref.watch(displayDataNotifierProvider);
+    final rawQrNo = displayData?.qrNumber ?? ref.watch(qrTicketNoProvider);
+    final qrTicketNo = _formatQrNumber(rawQrNo);
 
     final TextStyle btnTextStyle = TextStyle(fontSize: fontSize);
     return Padding(
@@ -381,20 +394,23 @@ class _DetailInfoDialogContent extends ConsumerWidget {
     final TextStyle textStyle = TextStyle(
       fontSize: 27,
       color: Layouts.dialogFontColor,
-      // color: Theme.of(context).colorScheme.onPrimaryContainer,
     );
-    // QRチケット番号
-    final qrTicketNo = ref.watch(qrTicketNoProvider);
+
+    // 表示データ取得 → マッパー生成
+    final displayData = ref.watch(displayDataNotifierProvider);
+    final mapper = displayData != null ? DisplayDataMapper(displayData) : null;
+    String getValue(CardInfoEnum field) => mapper?.getValue(field) ?? '';
+
+    // QRチケット番号 (20文字後スペース)
+    final rawQrNo = displayData?.qrNumber ?? ref.watch(qrTicketNoProvider);
+    final qrTicketNo = _formatQrNumber(rawQrNo);
 
     List<(String, String)> getTupleList(List<CardInfoEnum> cardInfoList) =>
-        cardInfoList.map((c) => c.getTuple()).toList();
+        cardInfoList.map((c) => (c.name, getValue(c))).toList();
 
     final info1 = <(String, String)>[
       ('QRチケット番号', qrTicketNo),
-      (
-        CardInfoEnum.qrYukoMukoStatus.name,
-        (CardInfoEnum.qrYukoMukoStatus.value),
-      ),
+      (CardInfoEnum.qrYukoMukoStatus.name, getValue(CardInfoEnum.qrYukoMukoStatus)),
       ...getTupleList([
         CardInfoEnum.qrHakkouStatus,
         CardInfoEnum.siyouStatus,
@@ -419,11 +435,8 @@ class _DetailInfoDialogContent extends ConsumerWidget {
         CardInfoEnum.empty,
         CardInfoEnum.nyuusyutuzyouStatus,
       ]),
-      (CardInfoEnum.zyosyaeki.getAnotherName(), CardInfoEnum.zyosyaeki.value),
-      (
-        CardInfoEnum.nyusyutuzyoBit.getAnotherName(),
-        CardInfoEnum.nyusyutuzyoBit.value,
-      ),
+      (CardInfoEnum.zyosyaeki.getAnotherName(), getValue(CardInfoEnum.zyosyaeki)),
+      (CardInfoEnum.nyusyutuzyoBit.getAnotherName(), getValue(CardInfoEnum.nyusyutuzyoBit)),
       ...getTupleList([
         CardInfoEnum.zyosyaTukihi,
         CardInfoEnum.zyosyaZikoku,
