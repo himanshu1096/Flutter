@@ -89,6 +89,12 @@ class TcpService {
   // 表示データ Completer (0x1281)
   Completer<DisplayData>? _displayDataCompleter;
 
+  // 業務処理レスポンス Completer
+  Completer<ProcessResponse>? _processCompleter;
+
+  // 業務取消レスポンス Completer
+  Completer<ProcessResponse>? _cancelCompleter;
+
   // 最後のQRデータ (0x1201再送用)
   int _lastDesignation = 1;
   List<int>? _lastRawData;
