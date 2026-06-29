@@ -672,7 +672,9 @@ class QrTicketNoWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final qrTicketNo = ref.watch(qrTicketNoProvider);
+    final displayData = ref.watch(displayDataNotifierProvider);
+    final rawQrNo = displayData?.qrNumber ?? ref.watch(qrTicketNoProvider);
+    final qrTicketNo = _formatQrNumber(rawQrNo);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
