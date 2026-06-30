@@ -1,0 +1,5 @@
+feat: ログオフ・取消・印刷のTCP通信実装
+
+- ログオフ: 0xA201/0xA281実装、成功時にLOGINID保存とデータクリア
+- 取消: 0xB101送信後にdisplayData/qrTicketNoをクリア
+- 印刷: ローカル印刷からTCP通信(0xC101/0xC181)に変更
