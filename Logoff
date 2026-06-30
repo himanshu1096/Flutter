@@ -1,0 +1,155 @@
+  // 業務取消レスポンス Completer
+  Completer<ProcessResponse>? _cancelCompleter;
+
+  // ログオフレスポンス Completer
+  Completer<ProcessResponse>? _logoffCompleter;
+
+  // ログインID保存（ログオフ用）
+  String? _loginId;
+
+
+  Future<LoginResponse> sendLoginRequest({
+    required String id,
+    required String password,
+  }) async {
+    AppLogger().info(_tag, '0xA101 ログイン要求 送信: ID=$id');
+    _loginCompleter = Completer<LoginResponse>();
+    await sendPacket(
+      commandId: CommandId.loginRequest,
+      json: {'LOGINID': id, 'LOGINPASSWORD': password},
+    );
+    final response = await _loginCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, 'ログイン応答タイムアウト (180秒)');
+        throw TimeoutException('ログイン応答タイムアウト');
+      },
+    );
+    if (response.isNormalUser) {
+      _loginId = id;
+    }
+    return response;
+  }
+
+  /// ログオフ要求送信 (0xA201) Flutter → Server
+  Future<ProcessResponse> sendLogoff() async {
+    final id = _loginId ?? '';
+    AppLogger().info(_tag, '0xA201 ログオフ要求 送信: LOGINID=$id');
+    _logoffCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: CommandId.logoffRequest,
+      json: {'LOGINID': id},
+    );
+    return _logoffCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xA201 タイムアウト');
+        _logoffCompleter = null;
+        throw TimeoutException('ログオフタイムアウト');
+      },
+    );
+  }
+
+
+
+      case CommandId.logoffResponse:
+        AppLogger().info(_tag, '0xA281 ログオフ応答 受信');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          _logoffCompleter?.complete(response);
+          _logoffCompleter = null;
+        } catch (e) {
+          AppLogger().error(_tag, '0xA281 パースエラー', e);
+          _logoffCompleter?.completeError(e);
+          _logoffCompleter = null;
+        }
+        break;
+
+
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+import '../provider/display_data_provider.dart';
+import '../provider/provider.dart';
+import '../rout_config.dart';
+import '../service/app_logger.dart';
+import '../service/tcp_service.dart';
+import '../utility/confirm_dialog.dart';
+import '../qr_process/qr_process_menu.dart';
+import 'related_process_common.dart';
+import 'close_tally.dart';
+
+class LogOffScreen extends ConsumerWidget {
+  /// ログオフ画面
+  const LogOffScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PaddingForContent(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ログオフ処理を実施します。',
+              style: TextStyle(fontSize: 50.0, fontWeight: FontWeight.w500),
+            ),
+            ActiveLargeButton(
+              text: "実行    ",
+              onPressed: () async {
+                if (await showDialog<bool?>(
+                      context: context,
+                      builder: (context) => ConfirmDialog(porpose: 'ログオフ'),
+                    )
+                    case final isExecute? when isExecute && context.mounted) {
+                  showCustomAlertDialog(context: context, text: '処理中');
+                  try {
+                    final response = await TcpService().sendLogoff();
+                    if (context.mounted) Navigator.of(context).pop();
+                    if (response.result) {
+                      ref.read(displayDataNotifierProvider.notifier).clear();
+                      ref.read(qrTicketNoProvider.notifier).reset();
+                      if (context.mounted) {
+                        context.goNamed(Pages.login.name);
+                      }
+                    } else {
+                      if (context.mounted) {
+                        await showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => CustomConfirmDialog(
+                            text: 'ログオフに失敗しました',
+                            trueBtnText: '確認',
+                            hasFalseBtn: false,
+                          ),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    if (context.mounted) Navigator.of(context).pop();
+                    AppLogger().error('LogOff', 'ログオフエラー', e);
+                    if (context.mounted) {
+                      await showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => CustomConfirmDialog(
+                          text: '通信エラーが発生しました',
+                          trueBtnText: '確認',
+                          hasFalseBtn: false,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
