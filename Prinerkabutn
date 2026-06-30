@@ -1,0 +1,32 @@
+onPressed: () async {
+  showCustomAlertDialog(context: context, text: '印刷中');
+  try {
+    final response = await TcpService().sendPrintQrInfo(qrTicketNo.replaceAll(' ', ''));
+    if (context.mounted) Navigator.of(context).pop();
+    if (context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => CustomConfirmDialog(
+          text: response.result ? '印刷が完了しました' : '印刷に失敗しました',
+          trueBtnText: '確認',
+          hasFalseBtn: false,
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) Navigator.of(context).pop();
+    AppLogger().error('Print', '印刷エラー', e);
+    if (context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => CustomConfirmDialog(
+          text: '通信エラーが発生しました',
+          trueBtnText: '確認',
+          hasFalseBtn: false,
+        ),
+      );
+    }
+  }
+},
