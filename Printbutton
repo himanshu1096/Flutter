@@ -1,0 +1,77 @@
+static const int printQrInfoRequest = 0xC101;
+static const int printQrInfoResponse = 0xC181;
+
+
+case CommandId.printQrInfoResponse:
+  AppLogger().info(_tag, '0xC181 QR券情報ジャーナル印字応答 受信');
+  try {
+    final response = ProcessResponse.fromJson(packet.json);
+    _printCompleter?.complete(response);
+    _printCompleter = null;
+  } catch (e) {
+    AppLogger().error(_tag, '0xC181 パースエラー', e);
+    _printCompleter?.completeError(e);
+    _printCompleter = null;
+  }
+  break;
+
+
+Completer<ProcessResponse>? _printCompleter;
+
+/// QR券情報ジャーナル印字要求送信 (0xC101)
+Future<ProcessResponse> sendPrintQrInfo(String qrNumber) async {
+  AppLogger().info(_tag, '0xC101 QR券情報ジャーナル印字要求 送信');
+  _printCompleter = Completer<ProcessResponse>();
+  await sendPacket(
+    commandId: CommandId.printQrInfoRequest,
+    json: {'QRNUMBER': qrNumber},
+  );
+  return _printCompleter!.future.timeout(
+    const Duration(seconds: 30),
+    onTimeout: () {
+      AppLogger().error(_tag, '0xC101 タイムアウト');
+      _printCompleter = null;
+      throw TimeoutException('印刷タイムアウト');
+    },
+  );
+}
+
+
+
+                onPressed: () async {
+                  showCustomAlertDialog(context: context, text: '印刷中');
+                  try {
+                    final response = await TcpService().sendPrintQrInfo(qrTicketNo.replaceAll(' ', ''));
+                    if (context.mounted) Navigator.of(context).pop();
+                    if (!response.result && context.mounted) {
+                      await showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => CustomConfirmDialog(
+                          text: '印刷に失敗しました\nエラーコード: ${response.errCode}',
+                          trueBtnText: '確認',
+                          hasFalseBtn: false,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) Navigator.of(context).pop();
+                    AppLogger().error('Print', '印刷エラー', e);
+                    if (context.mounted) {
+                      await showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => CustomConfirmDialog(
+                          text: '通信エラーが発生しました',
+                          trueBtnText: '確認',
+                          hasFalseBtn: false,
+                        ),
+                      );
+                    }
+                  }
+                },
+
+
+import 'service/app_logger.dart';
+import 'service/tcp_service.dart';
+
