@@ -1,0 +1,15 @@
+      final lines = await file.readAsLines();
+      for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        final parts = line.split(',');
+        AppLogger().info(_tag, 'LINE: $line');
+        AppLogger().info(_tag, 'PARTS COUNT: ${parts.length}');
+        AppLogger().info(_tag, 'PARTS: $parts');
+        if (parts.length < 4) continue;
+        final fieldName = parts[1].trim();
+        final code = int.tryParse(parts[2].trim());
+        final value = parts[3].trim();
+        AppLogger().info(_tag, 'FIELD: $fieldName CODE: $code VALUE: $value');
+        if (code == null) continue;
+        _cache.putIfAbsent(fieldName, () => {})[code] = value;
+      }
