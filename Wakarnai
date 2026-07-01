@@ -1,0 +1,19 @@
+    return SecondayTabMenuBtn(
+      tabController: tabController,
+      tabNames: tabNames,
+      tabViews: tabViews,
+      onTap: (index) async {
+        // タブインデックスに応じて0xAA01送信
+        final business = switch (index) {
+          1 => 50, // 締切
+          2 => 52, // 締切速報
+          3 => 51, // 締切再出力
+          4 => 53, // 接客履歴
+          _ => null,
+        };
+        if (business != null) {
+          AppLogger().info('RelatedProcess', '0xAA01 BUSINESS=$business');
+          await TcpService().sendBusinessSelect(business);
+        }
+      },
+    );
