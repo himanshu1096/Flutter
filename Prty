@@ -1,0 +1,112 @@
+  static const int printQrInfoRequest = 0xC101;
+  static const int printQrInfoResponse = 0xC181;
+  static const int printReceiptRequest = 0xC201;
+  static const int printReceiptResponse = 0xC281;
+
+
+
+  // 印刷レスポンス Completer
+  Completer<ProcessResponse>? _printCompleter;
+
+
+
+
+      // QR券情報ジャーナル印字要求応答 (0xC181)
+      case CommandId.printQrInfoResponse:
+      // 領収書印字要求応答 (0xC281)
+      case CommandId.printReceiptResponse:
+        AppLogger().info(_tag, '印字応答 受信: $cmdHex');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          _printCompleter?.complete(response);
+          _printCompleter = null;
+        } catch (e) {
+          AppLogger().error(_tag, '印字応答 パースエラー', e);
+          _printCompleter?.completeError(e);
+          _printCompleter = null;
+        }
+        break;
+
+
+
+e  /// QR券情報ジャーナル印字要求送信 (0xC101)
+  Future<ProcessResponse> sendPrintQrInfo(String qrNumber) async {
+    AppLogger().info(_tag, '0xC101 QR券情報ジャーナル印字要求 送信');
+    _printCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: CommandId.printQrInfoRequest,
+      json: {'QRNUMBER': qrNumber},
+    );
+    return _printCompleter!.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC101 タイムアウト');
+        _printCompleter = null;
+        throw TimeoutException('印刷タイムアウト');
+      },
+    );
+  }
+
+  /// 領収書印字要求送信 (0xC201)
+  Future<ProcessResponse> sendPrintReceipt() async {
+    AppLogger().info(_tag, '0xC201 領収書印字要求 送信');
+    _printCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: CommandId.printReceiptRequest,
+      json: {'ISSUECOUNT': 1},
+    );
+    return _printCompleter!.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC201 タイムアウト');
+        _printCompleter = null;
+        throw TimeoutException('領収書印刷タイムアウト');
+      },
+    );
+  }
+
+
+
+
+
+
+          onCompleteButtonPressed: () async {
+            showCustomAlertDialog(context: context, text: '印刷中');
+            try {
+              final response = await TcpService().sendPrintReceipt();
+              if (context.mounted) Navigator.of(context).pop();
+              if (context.mounted) {
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => CustomConfirmDialog(
+                    text: response.result
+                        ? '印刷が完了しました'
+                        : '印刷に失敗しました',
+                    trueBtnText: '確認',
+                    hasFalseBtn: false,
+                  ),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) Navigator.of(context).pop();
+              AppLogger().error('ProcessCompletedPrint', '領収書印刷エラー', e);
+              if (context.mounted) {
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => CustomConfirmDialog(
+                    text: '通信エラーが発生しました',
+                    trueBtnText: '確認',
+                    hasFalseBtn: false,
+                  ),
+                );
+              }
+            }
+          },
+
+
+
+import 'service/app_logger.dart';
+import 'service/tcp_service.dart';
+import 'utility/confirm_dialog.dart';
