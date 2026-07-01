@@ -1,0 +1,19 @@
+      case CardInfoEnum.hatuekiKusu:
+        return data.startZone != null ? '${data.startZone}区' : '';
+
+
+      case CardInfoEnum.renrakuekiKusu:
+        return data.transferZone != null ? '${data.transferZone}区' : '';
+
+            // フリーコードは値がある時のみ表示
+            if (item == CardInfoEnum.huricode && value.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            // フリーコード → 赤色表示
+            final valueColor = item == CardInfoEnum.huricode
+                ? Colors.red
+                : null;
+
+            return SizedBox(
+              width: maxWidth,
