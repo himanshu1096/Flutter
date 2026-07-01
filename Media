@@ -1,0 +1,17 @@
+                title == 'カード乗車券情報' &&
+                        (mediaType == 31 || mediaType == 32) &&
+                        getValue(CardInfoEnum.huricode).isNotEmpty
+                    ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 0.0),
+                        child: SizedBox(
+                          height: 30,
+                          child: Text(
+                            "(※)フリーコードは改札機での判定に必要な情報のため、実際のフリー区間は企画券の券面を確認すること",
+                            style: textStyleL,
+                          ),
+                        ),
+                      ),
+                    )
+                    : SizedBox(height: 0),
