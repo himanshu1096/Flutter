@@ -1,0 +1,48 @@
+        CardInfoBlock(
+            title: 'カード乗車券情報',
+            content: _cardInfoContent(
+              context,
+              cardInfo: cardTicketInfo,
+              fontColor: fontColor,
+              getValue: getValue,
+            ),
+            showFreeCodeMessage: (mediaType == 31 || mediaType == 32) &&
+                getValue(CardInfoEnum.huricode).isNotEmpty,
+
+
+class CardInfoBlock extends StatelessWidget {
+  const CardInfoBlock({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.icon,
+    required this.fontColor,
+    required this.cardBackgroundColor,
+    required this.cardOutlineColor,
+    this.showFreeCodeMessage = false,
+  });
+
+  final String title;
+  final Widget content;
+  final Widget icon;
+  final Color fontColor;
+  final Color cardBackgroundColor;
+  final Color cardOutlineColor;
+  final bool showFreeCodeMessage;
+
+                showFreeCodeMessage
+                    ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 0.0),
+                        child: SizedBox(
+                          height: 30,
+                          child: Text(
+                            "(※)フリーコードは改札機での判定に必要な情報のため、実際のフリー区間は企画券の券面を確認すること",
+                            style: textStyleL,
+                          ),
+                        ),
+                      ),
+                    )
+                    : SizedBox(height: 0),
+
