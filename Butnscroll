@@ -1,0 +1,56 @@
+                buttonDist,
+                const SizedBox(width: 390),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () {
+                    QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                        ? btnNotifier.changePage(
+                          QrReadPageBtnKind.zyouhoHyouzi,
+                        )
+                        : Null;
+                  },
+                  text: '情報表示',
+                  isPushed: QrReadPageBtnKind.zyouhoHyouzi == selectedBtn,
+                  btnColors:
+                      QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                          ? orengeGradient
+                          : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (haisaEnabled &&
+                        QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                      await TcpService().sendBusinessSelect(13);
+                      btnNotifier.changePage(QrReadPageBtnKind.haikenSyori);
+                    }
+                  },
+                  text: '廃券処理',
+                  isPushed: QrReadPageBtnKind.haikenSyori == selectedBtn,
+                  btnColors:
+                      haisaEnabled &&
+                              QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                          ? orengeGradient
+                          : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (enterCancelEnabled &&
+                        QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                      await TcpService().sendBusinessSelect(14);
+                      btnNotifier.changePage(QrReadPageBtnKind.hatuekiCancel);
+                    }
+                  },
+                  text: '発駅キャンセル',
+                  isPushed: QrReadPageBtnKind.hatuekiCancel == selectedBtn,
+                  btnColors:
+                      enterCancelEnabled &&
+                              QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                          ? orengeGradient
+                          : grayGradient,
+                  fontSize: 22.0,
+                ),
+              ],
+            ),
+          ),
