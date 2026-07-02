@@ -1,0 +1,21 @@
+import 'dart:convert';
+
+      final bytes = await file.readAsBytes();
+      final decoded = japanese.decodeShiftJis(bytes);
+      final lines = decoded.split('\n');
+
+
+dependencies:
+  charset_converter: ^2.1.1
+
+
+
+import 'dart:io';
+import 'package:charset_converter/charset_converter.dart';
+import 'app_logger.dart';
+
+
+      final bytes = await file.readAsBytes();
+      final decoded = await CharsetConverter.decode('Shift_JIS', bytes);
+      final lines = decoded.split('\n');
+
