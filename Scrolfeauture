@@ -1,0 +1,160 @@
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      TransitionButton(
+                        onPressed: () async {
+                          if (enterEnabled &&
+                              QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                            await TcpService().sendBusinessSelect(10);
+                            btnNotifier.changePage(QrReadPageBtnKind.nyuuzyou);
+                          }
+                        },
+                        text: '　入場　',
+                        isPushed: QrReadPageBtnKind.nyuuzyou == selectedBtn,
+                        btnColors:
+                            enterEnabled &&
+                                    QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                                ? orengeGradient
+                                : grayGradient,
+                      ),
+                      buttonDist,
+                      TransitionButton(
+                        onPressed: () async {
+                          if (exitEnabled &&
+                              QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                            await TcpService().sendBusinessSelect(11);
+                            btnNotifier.changePage(QrReadPageBtnKind.syutuzyou);
+                          }
+                        },
+                        text: '　出場　',
+                        isPushed: QrReadPageBtnKind.syutuzyou == selectedBtn,
+                        btnColors:
+                            exitEnabled &&
+                                    QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                                ? orengeGradient
+                                : grayGradient,
+                      ),
+                      buttonDist,
+                      TransitionButton(
+                        onPressed: () async {
+                          if (!adjustEnabled ||
+                              QrReadPageBtnKind.zyouhoHyouzi != selectedBtn)
+                            return;
+                          await TcpService().sendBusinessSelect(12);
+
+                          // ROUTECAND から経路候補を設定
+                          final displayData = ref.read(displayDataNotifierProvider);
+                          final cands = displayData?.routeCandidates ?? [];
+
+                          for (int i = 0; i < 6; i++) {
+                            final candValue = i < cands.length ? cands[i] : null;
+                            judgeRouteBtnNotifier.updateItem(
+                              i + 1,
+                              candValue != null,
+                              0,
+                              candValue ?? 0,
+                              0,
+                            );
+                          }
+
+                          if (cands.length > 1) {
+                            btnNotifier.changePage(
+                              QrReadPageBtnKind.seisanSyoriRoute,
+                            );
+                          } else {
+                            judgeRouteBtnIdNotifier.set(1);
+                            btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                          }
+                        },
+                        text: '精算処理',
+                        isPushed:
+                            (QrReadPageBtnKind.seisanSyori == selectedBtn ||
+                                QrReadPageBtnKind.seisanSyoriRoute == selectedBtn),
+                        btnColors:
+                            adjustEnabled &&
+                                    QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                                ? orengeGradient
+                                : grayGradient,
+                      ),
+                      buttonDist,
+                      const SizedBox(width: 390),
+                      buttonDist,
+                      TransitionButton(
+                        onPressed: () {
+                          QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                              ? btnNotifier.changePage(
+                                QrReadPageBtnKind.zyouhoHyouzi,
+                              )
+                              : Null;
+                        },
+                        text: '情報表示',
+                        isPushed: QrReadPageBtnKind.zyouhoHyouzi == selectedBtn,
+                        btnColors:
+                            QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                                ? orengeGradient
+                                : grayGradient,
+                      ),
+                      buttonDist,
+                      TransitionButton(
+                        onPressed: () async {
+                          if (haisaEnabled &&
+                              QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                            await TcpService().sendBusinessSelect(13);
+                            btnNotifier.changePage(QrReadPageBtnKind.haikenSyori);
+                          }
+                        },
+                        text: '廃券処理',
+                        isPushed: QrReadPageBtnKind.haikenSyori == selectedBtn,
+                        btnColors:
+                            haisaEnabled &&
+                                    QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                                ? orengeGradient
+                                : grayGradient,
+                      ),
+                      buttonDist,
+                      TransitionButton(
+                        onPressed: () async {
+                          if (enterCancelEnabled &&
+                              QrReadPageBtnKind.zyouhoHyouzi == selectedBtn) {
+                            await TcpService().sendBusinessSelect(14);
+                            btnNotifier.changePage(QrReadPageBtnKind.hatuekiCancel);
+                          }
+                        },
+                        text: '発駅キャンセル',
+                        isPushed: QrReadPageBtnKind.hatuekiCancel == selectedBtn,
+                        btnColors:
+                            enterCancelEnabled &&
+                                    QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                                ? orengeGradient
+                                : grayGradient,
+                        fontSize: 22.0,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // スクロール矢印
+              GestureDetector(
+                onTap: () {
+                  scrollController.animateTo(
+                    scrollController.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 20,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ],
+          ),
