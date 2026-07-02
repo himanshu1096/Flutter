@@ -1,0 +1,10 @@
+feat: データ表示・CSV改善
+
+- CSVをShift-JIS対応、4列フォーマット(QRINFO,FIELDNAME,CODE,VALUE)に変更
+- CSVパスをapp_config.jsonから設定可能に変更
+- TcpConfig読み込み後にCSV読み込むよう順序修正
+- コード値更新（QRVALIDSTATUS/USESTATUS/GATESTATUS/MEDIATYPE）
+- 発駅区数・連絡区数に「区」サフィックス追加
+- フリーコード表示を企画券かつ値がある時のみに変更
+- QR番号フォーマットを22文字後スペースに変更
+- my_home_page displayDataクリア処理バグ修正
