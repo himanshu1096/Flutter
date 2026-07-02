@@ -1,0 +1,19 @@
+      final bytes = await file.readAsBytes();
+      AppLogger().info(_tag, 'ファイルバイト数: ${bytes.length}');
+      final decoded = await CharsetConverter.decode('Shift_JIS', bytes);
+      AppLogger().info(_tag, 'デコード完了 文字数: ${decoded.length}');
+      AppLogger().info(_tag, '最初の100文字: ${decoded.substring(0, decoded.length > 100 ? 100 : decoded.length)}');
+      final lines = decoded.split('\n');
+      AppLogger().info(_tag, '行数: ${lines.length}');
+      for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        final parts = line.split(',');
+        AppLogger().info(_tag, 'LINE: $line PARTS: ${parts.length}');
+        if (parts.length < 4) continue;
+        final fieldName = parts[1].trim();
+        final code = int.tryParse(parts[2].trim());
+        final value = parts[3].trim();
+        AppLogger().info(_tag, 'FIELD=$fieldName CODE=$code VALUE=$value');
+        if (code == null) continue;
+        _cache.putIfAbsent(fieldName, () => {})[code] = value;
+      }
