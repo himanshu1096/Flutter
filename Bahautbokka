@@ -1,0 +1,31 @@
+class HomeTabData extends InheritedWidget {
+  const HomeTabData({
+    super.key,
+    required this.goFirstTab,
+    required this.goFirstTabDirect,
+    required super.child,
+  });
+
+  /// 最初のタブを表示する (取消確認ダイアログあり、0xB101送信あり)
+  final VoidCallback goFirstTab;
+
+  /// 処理完了後の直接遷移 (取消確認ダイアログなし、0xB101送信なし)
+  final VoidCallback goFirstTabDirect;
+
+  /// 処理完了後のQR読取ページへの直接遷移
+  void _goFirstTabDirect() {
+    ref.read(displayDataNotifierProvider.notifier).clear();
+    ref.read(qrTicketNoProvider.notifier).reset();
+    if (_tabController.index != 0) {
+      _tabController.index = 0;
+    }
+    qrProcessMenu.currentState?.executeCancel();
+  }
+
+
+
+
+      goFirstTab: _goFirstTab,
+      goFirstTabDirect: _goFirstTabDirect,
+
+
