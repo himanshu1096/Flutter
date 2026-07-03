@@ -1,0 +1,244 @@
+                  buttonDist,
+                  TransitionButton(
+                    onPressed: () async {
+                      if (!adjustEnabled ||
+                          QrReadPageBtnKind.zyouhoHyouzi != selectedBtn)
+                        return;
+                      await TcpService().sendBusinessSelect(12);
+
+                      // ROUTECAND から経路候補を設定
+                      final displayData = ref.read(displayDataNotifierProvider);
+                      final cands = displayData?.routeCandidates ?? [];
+
+                      // judgeRouteListProvider に経路候補を設定
+                      // TODO: ROUTECAND値の意味が確定したら
+                      // infopattern/routepattern/companypatternを正しく設定する
+                      for (int i = 0; i < 6; i++) {
+                        final candValue = i < cands.length ? cands[i] : null;
+                        judgeRouteBtnNotifier.updateItem(
+                          i + 1,
+                          candValue != null, // buttonvisible
+                          0, // infopattern (TODO)
+                          candValue ?? 0, // routepattern (ROUTECAND値)
+                          0, // companypattern (TODO)
+                        );
+                      }
+
+                      if (cands.length > 1) {
+                        // 経路選択画面へ
+                        btnNotifier.changePage(
+                          QrReadPageBtnKind.seisanSyoriRoute,
+                        );
+                      } else {
+                        // 経路選択不要 → 直接精算処理へ
+                        // 経路なし → KEIRO=0 で0x1301送信
+                        judgeRouteBtnIdNotifier.set(1);
+                        btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                      }
+                    },
+                    // onPressed: () async {
+                    //   if (!adjustEnabled ||
+                    //       QrReadPageBtnKind.zyouhoHyouzi != selectedBtn)
+                    //     return;
+                    //      await TcpService().sendBusinessSelect(12);
+
+                    //   //patternA
+                    //   judgeRouteBtnNotifier.updateItem(1, true, 13, 11, 0);
+                    //   judgeRouteBtnNotifier.updateItem(2, true, 14, 12, 0);
+
+                    //   //patternB
+
+                    //   // judgeRouteBtnNotifier.updateItem(1, true, 11, 0, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(2, true, 22, 21, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(3, true, 12, 0, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(4, true, 24, 21, 0);
+
+                    //   // //patternC
+                    //   // judgeRouteBtnNotifier.updateItem(1, true, 31, 31, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(2, true, 31, 32, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(3, true, 32, 33, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(4, true, 32, 34, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(5, true, 33, 35, 0);
+                    //   // judgeRouteBtnNotifier.updateItem(6, true, 33, 36, 0);
+
+                    //   if (judgeRouteBtnNotifier.countVisibleButtons() <= 1) {
+                    //     judgeRouteBtnIdNotifier.set(1);
+                    //     QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                    //         ? btnNotifier.changePage(
+                    //           QrReadPageBtnKind.seisanSyori,
+                    //         )
+                    //         : Null;
+                    //   } else {
+                    //     QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                    //         ? btnNotifier.changePage(
+                    //           QrReadPageBtnKind.seisanSyoriRoute,
+                    //         )
+                    //         : Null;
+                    //   }
+                    // },
+                    text: '精算処理',
+                    isPushed:
+                        (QrReadPageBtnKind.seisanSyori == selectedBtn ||
+                            QrReadPageBtnKind.seisanSyoriRoute == selectedBtn),
+                    btnColors:
+                        adjustEnabled &&
+                                QrReadPageBtnKind.zyouhoHyouzi == selectedBtn
+                            ? orengeGradient
+                            : grayGradient,
+                  ),
+
+
+  static const int fareJudgeRequest = 0x1301;
+  static const int fareJudgeResponse = 0x1381;
+
+
+/// 精算金額プロバイダー (0x1381)
+@Riverpod(keepAlive: true)
+class FareAmount extends _$FareAmount {
+  @override
+  int? build() => null;
+
+  void set(int amount) => state = amount;
+  void clear() => state = null;
+}
+
+
+  // 再精算判定レスポンス Completer
+  Completer<int>? _fareCompleter;
+
+
+
+      // 再精算判定要求応答 (0x1381)
+      case CommandId.fareJudgeResponse:
+        AppLogger().info(_tag, '0x1381 再精算判定応答 受信');
+        try {
+          final data = packet.json['DATA'] as Map<String, dynamic>? ?? {};
+          final amount = data['AMOUNT'] as int? ?? 0;
+          AppLogger().info(_tag, '精算金額: $amount');
+          _fareCompleter?.complete(amount);
+          _fareCompleter = null;
+        } catch (e) {
+          AppLogger().error(_tag, '0x1381 パースエラー', e);
+          _fareCompleter?.completeError(e);
+          _fareCompleter = null;
+        }
+        break;
+
+
+  /// 再精算判定要求送信 (0x1301) Flutter → Server
+  Future<int> sendFareJudge(int keiro) async {
+    AppLogger().info(_tag, '0x1301 再精算判定要求 送信: KEIRO=$keiro');
+    _fareCompleter = Completer<int>();
+    await sendPacket(
+      commandId: CommandId.fareJudgeRequest,
+      json: {'KEIRO': keiro},
+    );
+    return _fareCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x1301 タイムアウト');
+        _fareCompleter = null;
+        throw TimeoutException('再精算判定タイムアウト');
+      },
+    );
+  }
+
+
+
+                                    onPressed: () async {
+                                      judgeRouteBtnIdNotifier.set(
+                                        judgeRouteBtnList[i].id,
+                                      );
+                                      await _sendFareJudgeAndNavigate(
+                                        context,
+                                        ref,
+                                        judgeRouteBtnList[i].routepattern,
+                                      );
+                                    },
+
+
+                                    onPressed: () async {
+                                      judgeRouteBtnIdNotifier.set(
+                                        judgeRouteBtnList[i + 1].id,
+                                      );
+                                      await _sendFareJudgeAndNavigate(
+                                        context,
+                                        ref,
+                                        judgeRouteBtnList[i + 1].routepattern,
+                                      );
+                                    },
+
+
+
+                                  onPressed: () async {
+                                    judgeRouteBtnIdNotifier.set(
+                                      judgeRouteBtnList[i].id,
+                                    );
+                                    await _sendFareJudgeAndNavigate(
+                                      context,
+                                      ref,
+                                      judgeRouteBtnList[i].routepattern,
+                                    );
+                                  },
+
+
+/// 0x1301送信 → 0x1381受信 → 精算処理画面へ遷移
+Future<void> _sendFareJudgeAndNavigate(
+  BuildContext context,
+  WidgetRef ref,
+  int keiro,
+) async {
+  showCustomAlertDialog(context: context, text: '処理中');
+  try {
+    final amount = await TcpService().sendFareJudge(keiro);
+    ref.read(fareAmountProvider.notifier).set(amount);
+    if (context.mounted) Navigator.of(context).pop();
+    if (context.mounted) {
+      ref
+          .read(qrReadPageSelectedBtnProvider.notifier)
+          .changePage(QrReadPageBtnKind.seisanSyori);
+    }
+  } catch (e) {
+    if (context.mounted) Navigator.of(context).pop();
+    AppLogger().error('SeisanSyoriRoute', '再精算判定エラー', e);
+    if (context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => CustomConfirmDialog(
+          text: '通信エラーが発生しました',
+          trueBtnText: '確認',
+          hasFalseBtn: false,
+        ),
+      );
+    }
+  }
+}
+
+
+
+import '../service/app_logger.dart';
+import '../service/tcp_service.dart';
+import '../utility/confirm_dialog.dart';
+import '../provider/provider.dart';
+
+
+
+    final fareAmount = ref.watch(fareAmountProvider);
+
+
+
+                    Text(
+                      fareAmount != null
+                          ? formatter.format(fareAmount)
+                          : '---',
+                      style: TextStyle(
+                        fontSize: 45.0,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+
+
+
+    ref.read(fareAmountProvider.notifier).clear();
+
