@@ -1,0 +1,19 @@
+    if (!(isCancel ?? false)) return;
+
+    // QRデータが存在する場合のみ 0xB101 送信
+    final displayData = ref.read(displayDataNotifierProvider);
+    if (displayData != null) {
+      try {
+        if (mounted) showCustomAlertDialog(context: context, text: '処理中');
+        await TcpService().sendCancel();
+        AppLogger().info('MyHomePage', '取消送信完了');
+        if (mounted) Navigator.of(context).pop();
+      } catch (e) {
+        if (mounted) Navigator.of(context).pop();
+        AppLogger().error('MyHomePage', '取消エラー', e);
+      }
+    }
+
+    // QR読取ページへ戻る
+    ref.read(displayDataNotifierProvider.notifier).clear();
+    ref.read(qrTicketNoProvider.notifier).reset();
