@@ -1,0 +1,51 @@
+import 'package:camera/camera.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// カメラ設定管理
+class CameraConfig {
+  static final CameraConfig _instance = CameraConfig._internal();
+  factory CameraConfig() => _instance;
+  CameraConfig._internal();
+
+  static const String _key = 'camera_direction';
+  CameraLensDirection _direction = CameraLensDirection.back;
+
+  CameraLensDirection get direction => _direction;
+
+  /// アプリ起動時に読み込む
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_key) ?? 'back';
+    _direction = saved == 'front'
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+  }
+
+  /// カメラ切り替え時に保存
+  Future<void> save(CameraLensDirection direction) async {
+    _direction = direction;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _key,
+      direction == CameraLensDirection.front ? 'front' : 'back',
+    );
+  }
+}
+
+
+
+  // カメラ方向を復元
+  await CameraConfig().load();
+  AppLogger().info('Main', 'カメラ方向復元: ${CameraConfig().direction}');
+
+
+  CameraLensDirection build() => CameraConfig().direction;
+
+
+                final currentDirection = await _controller.switchCamera();
+                ref
+                    .read(currentCameraLensProvider.notifier)
+                    .change(currentDirection);
+                // カメラ方向を保存
+                await CameraConfig().save(currentDirection);
+
