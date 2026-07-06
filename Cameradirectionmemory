@@ -1,0 +1,39 @@
+dependencies:
+  shared_preferences: ^2.2.0
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+
+              onPressed: () async {
+                // カメラ切り替え
+                final currentDirection = await _controller.switchCamera();
+                // 切り替え後のカメラ方向を記録
+                ref
+                    .read(currentCameraLensProvider.notifier)
+                    .change(currentDirection);
+                // SharedPreferencesに保存（アプリ再起動後も復元）
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString(
+                  'camera_direction',
+                  currentDirection == CameraLensDirection.front ? 'front' : 'back',
+                );
+              },
+
+
+  // カメラ方向を復元
+  final prefs = await SharedPreferences.getInstance();
+  final savedDirection = prefs.getString('camera_direction') ?? 'back';
+  AppLogger().info('Main', 'カメラ方向復元: $savedDirection');
+
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        currentCameraLensProvider.overrideWith(
+          () => CurrentCameraLens()
+            ..state = savedDirection == 'front'
+                ? CameraLensDirection.front
+                : CameraLensDirection.back,
+        ),
+      ],
+      child:
