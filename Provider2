@@ -1,0 +1,26 @@
+@Riverpod(keepAlive: true)
+class CurrentCameraLens extends _$CurrentCameraLens {
+  @override
+  CameraLensDirection build() => CameraLensDirection.back;
+
+  void change(CameraLensDirection direction) {
+    state = direction;
+  }
+
+  Future<void> loadSaved() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('camera_direction') ?? 'back';
+    state = saved == 'front'
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+  }
+
+  Future<void> saveAndChange(CameraLensDirection direction) async {
+    state = direction;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'camera_direction',
+      direction == CameraLensDirection.front ? 'front' : 'back',
+    );
+  }
+}
