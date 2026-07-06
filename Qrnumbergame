@@ -1,0 +1,32 @@
+String _formatQrNumber(String raw) {
+  final cleaned = raw.replaceAll(' ', '');
+  if (cleaned.length < 22) return cleaned;
+  // 22文字以上 → 6,4,4,4,4パターン
+  final pattern = [6, 4, 4, 4, 4];
+  int start = 0;
+  final parts = <String>[];
+  for (var p in pattern) {
+    if (start >= cleaned.length) break;
+    final end = (start + p <= cleaned.length) ? start + p : cleaned.length;
+    parts.add(cleaned.substring(start, end));
+    start = end;
+  }
+  return parts.join(' ');
+}
+
+
+  String insertSpacesEveryFourChars(String input) {
+    final raw = input.replaceAll(' ', '');
+    if (raw.length < 22) return raw;
+    // 22文字以上 → 6,4,4,4,4パターン
+    final pattern = [6, 4, 4, 4, 4];
+    int start = 0;
+    final parts = <String>[];
+    for (var p in pattern) {
+      if (start >= raw.length) break;
+      final end = (start + p <= raw.length) ? start + p : raw.length;
+      parts.add(raw.substring(start, end));
+      start = end;
+    }
+    return parts.join(' ');
+  }
