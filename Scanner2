@@ -1,0 +1,128 @@
+import 'dart:typed_data';
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_color.dart';
+import 'camera_scanner.dart';
+import 'provider/provider.dart';
+import 'pop_out_button.dart';
+
+/// ボタンのテキスト・スタイル
+const TextStyle _btnTextStyle = TextStyle(
+  fontSize: 20,
+  fontWeight: FontWeight.w700,
+);
+
+class ScannerWidget extends ConsumerStatefulWidget {
+  /// QRコード読み取りのカメラ画面
+  const ScannerWidget({super.key});
+
+  @override
+  ConsumerState<ScannerWidget> createState() => _ScannerWidgetState();
+}
+
+class _ScannerWidgetState extends ConsumerState<ScannerWidget> {
+  /// カメラ画面のコントローラ
+  final CameraScannerController _controller = CameraScannerController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCameraDirection();
+  }
+
+  /// SharedPreferencesからカメラ方向を読み込む
+  Future<void> _loadCameraDirection() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('camera_direction') ?? 'back';
+    final direction = saved == 'front'
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+    if (mounted) {
+      ref.read(currentCameraLensProvider.notifier).change(direction);
+    }
+  }
+
+  /// SharedPreferencesにカメラ方向を保存する
+  Future<void> _saveCameraDirection(CameraLensDirection direction) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'camera_direction',
+      direction == CameraLensDirection.front ? 'front' : 'back',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // カメラの方向
+    final cameraDirection = ref.watch(currentCameraLensProvider);
+    debugPrint('Camera Direction:$cameraDirection');
+
+    return Scaffold(
+      appBar: AppBar(
+        leadingWidth: 120,
+        foregroundColor: Colors.white,
+        backgroundColor: AppColor.indigo.no700,
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            Transform.scale(
+              scale: 1.3,
+              child: PopOutButton(
+                backgroundColors: [AppColor.blue.no50, AppColor.blue.no100],
+                foregroundColor: AppColor.indigo.no700,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Row(
+                  children: [
+                    SizedBox(width: 5),
+                    Icon(Icons.arrow_back, size: _btnTextStyle.fontSize),
+                    SizedBox(width: 5),
+                    Text('もどる', style: _btnTextStyle),
+                    SizedBox(width: 5),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 30),
+            Expanded(child: Text('QRコードを読み取ってください')),
+          ],
+        ),
+      ), // AppBar
+      backgroundColor: Colors.black,
+      body: CameraScanner(
+        controller: _controller,
+        lensDirection: cameraDirection,
+        onDetected: (rawBytes) {
+          Navigator.of(context).pop(rawBytes);
+        },
+      ), // CameraScanner
+      floatingActionButton: FutureBuilder(
+        future: _controller.canSwitchCamera,
+        builder: (context, snapshot) {
+          if (snapshot.hasData && (snapshot.data ?? false)) {
+            return FloatingActionButton.large(
+              backgroundColor: AppColor.indigo.no700,
+              foregroundColor: Colors.white,
+              onPressed: () async {
+                // カメラ切り替え
+                final currentDirection = await _controller.switchCamera();
+                // プロバイダーに記録
+                ref
+                    .read(currentCameraLensProvider.notifier)
+                    .change(currentDirection);
+                // SharedPreferencesに保存
+                await _saveCameraDirection(currentDirection);
+              },
+              child: Icon(Icons.cameraswitch_outlined),
+            ); // FloatingActionButton.large
+          }
+          return SizedBox.shrink();
+        },
+      ), // FutureBuilder
+    ); // Scaffold
+  }
+}
