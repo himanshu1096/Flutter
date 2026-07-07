@@ -1,0 +1,241 @@
+  /// ズームレベル (1.0 = 等倍, 最大 3.0)
+  double _zoomLevel = 1.0;
+  double _baseZoomLevel = 1.0;
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    if (_controller case final controller?) {
+      return GestureDetector(
+        // ピンチジェスチャーでズーム
+        onScaleStart: (details) {
+          _baseZoomLevel = _zoomLevel;
+        },
+        onScaleUpdate: (details) {
+          setState(() {
+            _zoomLevel = (_baseZoomLevel * details.scale).clamp(1.0, 3.0);
+          });
+        },
+        child: Stack(
+          children: [
+            // カメラのプレビュー表示（ズーム適用）
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final height = width / controller.value.aspectRatio;
+                return Center(
+                  child: ClipRect(
+                    child: Transform.scale(
+                      scale: _zoomLevel,
+                      child: Container(
+                        width: width,
+                        height: height,
+                        alignment: Alignment.center,
+                        child: Transform.flip(
+                          flipX: true,
+                          child: CameraPreview(controller),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // ガイドボックスオーバーレイ
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final screenWidth = constraints.maxWidth;
+                  final screenHeight = constraints.maxHeight;
+                  // ガイドボックス: 幅60% 高さ40%
+                  final boxWidth = screenWidth * 0.6;
+                  final boxHeight = screenHeight * 0.4;
+                  final left = (screenWidth - boxWidth) / 2;
+                  final top = (screenHeight - boxHeight) / 2;
+
+                  return CustomPaint(
+                    painter: _ScanOverlayPainter(
+                      scanRect: Rect.fromLTWH(left, top, boxWidth, boxHeight),
+                    ),
+                    child: Stack(
+                      children: [
+                        // ガイドテキスト
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: top + boxHeight + 16,
+                          child: Text(
+                            'QRコードをここに合わせてください',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        // ズームレベル表示
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: top - 36,
+                          child: Text(
+                            '${_zoomLevel.toStringAsFixed(1)}x',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // QRコード、カメラ状態などを表示
+            if (widget.displayResult)
+              ValueListenableBuilder(
+                valueListenable: _qrText,
+                builder: (context, value, child) {
+                  return value.isNotEmpty
+                      ? Positioned(
+                        bottom: 20,
+                        left: 20,
+                        right: 20,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            color: Colors.black54,
+                          ),
+                          child: Text(
+                            _qrText.value,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      )
+                      : const SizedBox.shrink();
+                },
+              ),
+
+            // カメラ停止中に暗幕をかける
+            ValueListenableBuilder(
+              valueListenable: _isDetecting,
+              builder: (context, isDetecting, child) {
+                return isDetecting
+                    ? SizedBox.shrink()
+                    : Positioned.fill(
+                        child: Container(color: Colors.black87),
+                      );
+              },
+            ),
+          ],
+        ),
+      );
+    } else {
+      return const Center(child: CircularProgressIndicator());
+    }
+  }
+
+
+/// スキャンガイドボックスオーバーレイ
+class _ScanOverlayPainter extends CustomPainter {
+  final Rect scanRect;
+
+  _ScanOverlayPainter({required this.scanRect});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black54;
+
+    // 暗いオーバーレイ（スキャンエリア外）
+    canvas.drawPath(
+      Path.combine(
+        PathOperation.difference,
+        Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
+        Path()
+          ..addRRect(
+            RRect.fromRectAndRadius(scanRect, const Radius.circular(12)),
+          ),
+      ),
+      paint,
+    );
+
+    // スキャンエリアの枠線
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(scanRect, const Radius.circular(12)),
+      borderPaint,
+    );
+
+    // コーナーマーカー
+    final cornerPaint = Paint()
+      ..color = Colors.green
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+
+    const cornerLength = 24.0;
+
+    // 左上
+    canvas.drawLine(
+      Offset(scanRect.left, scanRect.top + cornerLength),
+      Offset(scanRect.left, scanRect.top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scanRect.left, scanRect.top),
+      Offset(scanRect.left + cornerLength, scanRect.top),
+      cornerPaint,
+    );
+
+    // 右上
+    canvas.drawLine(
+      Offset(scanRect.right - cornerLength, scanRect.top),
+      Offset(scanRect.right, scanRect.top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scanRect.right, scanRect.top),
+      Offset(scanRect.right, scanRect.top + cornerLength),
+      cornerPaint,
+    );
+
+    // 左下
+    canvas.drawLine(
+      Offset(scanRect.left, scanRect.bottom - cornerLength),
+      Offset(scanRect.left, scanRect.bottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scanRect.left, scanRect.bottom),
+      Offset(scanRect.left + cornerLength, scanRect.bottom),
+      cornerPaint,
+    );
+
+    // 右下
+    canvas.drawLine(
+      Offset(scanRect.right - cornerLength, scanRect.bottom),
+      Offset(scanRect.right, scanRect.bottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scanRect.right, scanRect.bottom),
+      Offset(scanRect.right, scanRect.bottom - cornerLength),
+      cornerPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScanOverlayPainter oldDelegate) =>
+      oldDelegate.scanRect != scanRect;
+}
+
