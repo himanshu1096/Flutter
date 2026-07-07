@@ -1,0 +1,37 @@
+  Future<void> _initializeCamera() async {
+    await setCameraDescriptions();
+
+    // 既存コントローラの方向と要求方向が違う場合は破棄して再初期化
+    if (_controller != null) {
+      if (_controller!.description.lensDirection == widget.lensDirection) {
+        // 同じ方向 → スキップ
+        return;
+      } else {
+        // 違う方向 → 破棄して再初期化
+        _isDetecting.value = false;
+        await _controller!.dispose();
+        _controller = null;
+      }
+    }
+
+    // 起動するカメラを選択する
+    final camera = _cameras.firstWhere(
+      (x) => x.lensDirection == widget.lensDirection,
+      orElse: () => _cameras.first,
+    );
+
+    // コントローラ作成
+    _controller = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    // 初期化
+    await _controller!.initialize();
+
+    setState(() {
+      // 検知ループ開始
+      _startDetectionLoop();
+    });
+  }
