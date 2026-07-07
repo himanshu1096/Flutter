@@ -1,0 +1,115 @@
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_color.dart';
+import 'camera_scanner.dart';
+import 'provider/provider.dart';
+import 'pop_out_button.dart';
+
+/// ボタンのテキスト・スタイル
+const TextStyle _btnTextStyle = TextStyle(
+  fontSize: 20,
+  fontWeight: FontWeight.w700,
+);
+
+class ScannerWidget extends ConsumerStatefulWidget {
+  /// QRコード読み取りのカメラ画面
+  const ScannerWidget({super.key});
+
+  @override
+  ConsumerState<ScannerWidget> createState() => _ScannerWidgetState();
+}
+
+class _ScannerWidgetState extends ConsumerState<ScannerWidget> {
+  /// カメラ画面のコントローラ
+  final CameraScannerController _controller = CameraScannerController();
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// SharedPreferencesにカメラ方向を保存する
+  Future<void> _saveCameraDirection(CameraLensDirection direction) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'camera_direction',
+      direction == CameraLensDirection.front ? 'front' : 'back',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cameraDirection = ref.watch(currentCameraLensProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        leadingWidth: 120,
+        foregroundColor: Colors.white,
+        backgroundColor: AppColor.indigo.no700,
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            Transform.scale(
+              scale: 1.3,
+              child: PopOutButton(
+                backgroundColors: [AppColor.blue.no50, AppColor.blue.no100],
+                foregroundColor: AppColor.indigo.no700,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Row(
+                  children: [
+                    SizedBox(width: 5),
+                    Icon(Icons.arrow_back, size: _btnTextStyle.fontSize),
+                    SizedBox(width: 5),
+                    Text('もどる', style: _btnTextStyle),
+                    SizedBox(width: 5),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 30),
+            Expanded(child: Text('QRコードを読み取ってください')),
+          ],
+        ),
+      ),
+      backgroundColor: Colors.black,
+      body: CameraScanner(
+        controller: _controller,
+        lensDirection: cameraDirection,
+        onDetected: (rawBytes) {
+          Navigator.of(context).pop(rawBytes);
+        },
+      ),
+      floatingActionButton: FutureBuilder(
+        future: _controller.canSwitchCamera,
+        builder: (context, snapshot) {
+          if (snapshot.hasData && (snapshot.data ?? false)) {
+            return FloatingActionButton.large(
+              backgroundColor: AppColor.indigo.no700,
+              foregroundColor: Colors.white,
+              onPressed: () async {
+                final currentDirection = await _controller.switchCamera();
+                ref
+                    .read(currentCameraLensProvider.notifier)
+                    .change(currentDirection);
+                await _saveCameraDirection(currentDirection);
+              },
+              child: Icon(Icons.cameraswitch_outlined),
+            );
+          }
+          return SizedBox.shrink();
+        },
+      ),
+    );
+  }
+}
