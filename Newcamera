@@ -1,0 +1,130 @@
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
+/// QRコード検知時の処理
+/// rawBytes: バイナリQRデータ (Uint8List)
+typedef DetectCallback = void Function(Uint8List rawBytes);
+
+/// カメラのレンズ方向
+/// camera packageとの互換性維持のため定義
+enum CameraLensDirection { front, back, external }
+
+/// カメラ画面のコントローラ
+class CameraScannerController {
+  MobileScannerController? _mobileScannerController;
+
+  /// MobileScannerControllerを取得
+  MobileScannerController getOrCreate(CameraLensDirection lensDirection) {
+    _mobileScannerController ??= MobileScannerController(
+      facing: lensDirection == CameraLensDirection.front
+          ? CameraFacing.front
+          : CameraFacing.back,
+    );
+    return _mobileScannerController!;
+  }
+
+  /// カメラの変更が可能か
+  Future<bool> get canSwitchCamera async => true;
+
+  /// カメラを変更する
+  Future<CameraLensDirection> switchCamera({
+    CameraLensDirection? direction,
+  }) async {
+    await _mobileScannerController?.switchCamera();
+    final facing = _mobileScannerController?.facing;
+    return facing == CameraFacing.front
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+  }
+
+  void dispose() {
+    _mobileScannerController?.dispose();
+    _mobileScannerController = null;
+  }
+}
+
+class CameraScanner extends StatefulWidget {
+  /// カメラ画面
+  const CameraScanner({
+    super.key,
+    this.controller,
+    this.onDetected,
+    this.lensDirection = CameraLensDirection.back,
+    this.displayResult = false,
+  });
+
+  final CameraScannerController? controller;
+  final CameraLensDirection lensDirection;
+  final DetectCallback? onDetected;
+  final bool displayResult;
+
+  @override
+  State<CameraScanner> createState() => _CameraScannerState();
+}
+
+class _CameraScannerState extends State<CameraScanner> {
+  late MobileScannerController _scannerController;
+  bool _hasDetected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initController();
+  }
+
+  void _initController() {
+    _scannerController = widget.controller?.getOrCreate(
+          widget.lensDirection,
+        ) ??
+        MobileScannerController(
+          facing: widget.lensDirection == CameraLensDirection.front
+              ? CameraFacing.front
+              : CameraFacing.back,
+        );
+    _hasDetected = false;
+  }
+
+  @override
+  void didUpdateWidget(covariant CameraScanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lensDirection != widget.lensDirection) {
+      // レンズ方向変更 → コントローラ再作成
+      if (widget.controller == null) {
+        _scannerController.dispose();
+      }
+      widget.controller?.dispose();
+      _initController();
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.controller == null) {
+      _scannerController.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MobileScanner(
+      controller: _scannerController,
+      onDetect: (capture) {
+        if (_hasDetected) return;
+        for (final barcode in capture.barcodes) {
+          final rawBytes = barcode.rawBytes;
+          if (rawBytes != null && rawBytes.isNotEmpty) {
+            _hasDetected = true;
+            widget.onDetected?.call(Uint8List.fromList(rawBytes));
+            return;
+          }
+        }
+      },
+    );
+  }
+}
+
+/// main.dartとの互換性維持
+Future<void> setCameraDescriptions() async {}
