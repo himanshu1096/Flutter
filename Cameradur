@@ -1,0 +1,18 @@
+              // カメラ方向を事前に読み込む（スキャナー開く前に設定）
+              final prefs = await SharedPreferences.getInstance();
+              final saved = prefs.getString('camera_direction') ?? 'back';
+              ref.read(currentCameraLensProvider.notifier).change(
+                saved == 'front'
+                    ? CameraLensDirection.front
+                    : CameraLensDirection.back,
+              );
+              final qrData = await context.pushNamed<Uint8List>(
+                Pages.QRscan.name,
+              );
+
+
+
+  @override
+  void initState() {
+    super.initState();
+  }
