@@ -1,0 +1,28 @@
+  @override
+  void didUpdateWidget(covariant CameraScanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // レンズ方向が変わったらカメラを再初期化
+    if (oldWidget.lensDirection != widget.lensDirection) {
+      _controller?.dispose();
+      _controller = null;
+      _initializeCamera();
+    }
+  }
+
+  @override
+  void didPush() {
+
+
+
+
+
+
+      body: CameraScanner(
+        key: ValueKey(cameraDirection),
+        controller: _controller,
+        lensDirection: cameraDirection,
+        onDetected: (rawBytes) {
+          Navigator.of(context).pop(rawBytes);
+        },
+      ),
+
