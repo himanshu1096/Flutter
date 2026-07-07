@@ -1,0 +1,46 @@
+    GoRoute(
+      path: '/${Pages.main}',
+      name: Pages.main.name,
+      pageBuilder: (context, state) {
+        // FB81強制遷移の場合は短いアニメーション
+        final forced = state.uri.queryParameters['forced'] == 'true';
+        return forced
+            ? _customFastTransitionPage(
+                key: state.pageKey,
+                nextPage: const MyHomePage(),
+              )
+            : mainTransitionBuilder(context, state);
+      },
+
+
+CustomTransitionPage<dynamic> _customFastTransitionPage({
+  required LocalKey key,
+  required Widget nextPage,
+}) {
+  return CustomTransitionPage(
+    key: key,
+    child: nextPage,
+    transitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(opacity: animation, child: child);
+    },
+  );
+}
+
+
+  void _navigateToQrReading() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    // データクリア
+    final container = ProviderScope.containerOf(context);
+    container.read(displayDataProvider.notifier).clear();
+    container.read(qrTicketNoProvider.notifier).reset();
+    container.read(fareAmountProvider.notifier).clear();
+
+    // 高速アニメーションでメイン画面へ遷移
+    context.go('/${Pages.main}?forced=true');
+  }
+
+
+
