@@ -1,0 +1,54 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'package:qr_multidemo/service/sound_service.dart';
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'app_color.dart';
+import 'my_home_page.dart';
+import 'pop_out_button.dart';
+import 'utility/confirm_dialog.dart';
+import 'provider/provider.dart';
+
+class ProcessCompleted extends StatefulWidget {
+  const ProcessCompleted({super.key, this.onCompleteButtonPressed});
+
+  /// 完了ボタン押下時に実行する処理
+  final Future<void> Function()? onCompleteButtonPressed;
+
+  @override
+  State<ProcessCompleted> createState() => _ProcessCompletedState();
+}
+
+class _ProcessCompletedState extends State<ProcessCompleted> {
+  @override
+  void initState() {
+    super.initState();
+    // 処理完了音を再生
+    SoundService().playComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProcessCompleteBase(
+      onCompleteButtonPressed: widget.onCompleteButtonPressed,
+    );
+  }
+}
+
+class ProcessCompletedPrint extends StatelessWidget {
+  const ProcessCompletedPrint({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        return _ProcessCompleteBase(
+          completeButtonLabel: '領収書発行 ',
+          onCompleteButtonPressed: () async {
+            // 印刷中ダイアログを表示する
+            showCustomAlertDialog(context: context, text: '印刷中');
+            try {
+              final response = await TcpService().sendP
