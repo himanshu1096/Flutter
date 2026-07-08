@@ -1,0 +1,316 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'package:qr_multidemo/service/sound_service.dart';
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'app_color.dart';
+import 'my_home_page.dart';
+import 'pop_out_button.dart';
+import 'utility/confirm_dialog.dart';
+import 'provider/provider.dart';
+
+class ProcessCompleted extends StatefulWidget {
+  const ProcessCompleted({super.key, this.onCompleteButtonPressed});
+
+  /// 完了ボタン押下時に実行する処理
+  final Future<void> Function()? onCompleteButtonPressed;
+
+  @override
+  State<ProcessCompleted> createState() => _ProcessCompletedState();
+}
+
+class _ProcessCompletedState extends State<ProcessCompleted> {
+  @override
+  void initState() {
+    super.initState();
+    // 処理完了音を再生
+    SoundService().playComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProcessCompleteBase(
+      onCompleteButtonPressed: widget.onCompleteButtonPressed,
+    );
+  }
+}
+
+class ProcessCompletedPrint extends StatelessWidget {
+  const ProcessCompletedPrint({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        return _ProcessCompleteBase(
+          completeButtonLabel: '領収書発行 ',
+          onCompleteButtonPressed: () async {
+            // 印刷中ダイアログを表示する
+            showCustomAlertDialog(context: context, text: '印刷中');
+            try {
+              final response = await TcpService().sendPrintReceipt();
+              if (context.mounted) Navigator.of(context).pop();
+              if (context.mounted) {
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder:
+                      (context) => CustomConfirmDialog(
+                        text: response.result ? '印刷が完了しました' : '印刷に失敗しました',
+                        trueBtnText: '確認',
+                        hasFalseBtn: false,
+                      ),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) Navigator.of(context).pop();
+              AppLogger().error('ProcessCompletedPrint', '領収書印刷エラー', e);
+              if (context.mounted) {
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder:
+                      (context) => CustomConfirmDialog(
+                        text: '通信エラーが発生しました',
+                        trueBtnText: '確認',
+                        hasFalseBtn: false,
+                      ),
+                );
+              }
+            }
+            // 確認後 → 情報表示ページへ戻る
+            if (context.mounted) {
+              HomeTabData.of(context).goFirstTabDirect();
+            }
+          },
+          displayFinishButton: true,
+          move: false,
+        );
+      },
+    );
+  }
+}
+
+class ProcessFailed extends StatelessWidget {
+  const ProcessFailed({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProcessCompleteBase(
+      message: "処理に失敗しました。",
+      completeButtonLabel: "",
+      displayFinishButton: true,
+    );
+  }
+}
+
+class _ProcessCompleteBase extends StatelessWidget {
+  const _ProcessCompleteBase({
+    this.message = '処理が完了しました。',
+    this.completeButtonLabel = '確認   ',
+    this.onCompleteButtonPressed,
+    this.displayFinishButton = false,
+    this.move = true,
+  });
+
+  final String message;
+  final String completeButtonLabel;
+  final Future<void> Function()? onCompleteButtonPressed;
+  final bool displayFinishButton;
+  final bool move;
+
+  @override
+  Widget build(BuildContext context) {
+    final formatter = NumberFormat('#,###');
+
+    return Consumer(
+      builder: (context, ref, child) {
+        ref.watch(printerCreatedProvider);
+
+        return Stack(
+          children: [
+            if (displayFinishButton)
+              Positioned(
+                top: 20,
+                left: 12,
+                height: 160,
+                width: 1100,
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        SizedBox(height: 80),
+                        SizedBox(
+                          height: 80,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '精 算 金 額 : ',
+                              style: TextStyle(
+                                fontSize: 45.0,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20.0),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.red,
+                                width: 4.0,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                formatter.format(
+                                  ref.watch(fareAmountProvider) ?? 0,
+                                ),
+                                style: TextStyle(
+                                  fontSize: 45.0,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(width: 10.0),
+                              Text(
+                                '円',
+                                style: TextStyle(
+                                  fontSize: 45.0,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width,
+                height: 250,
+                color: Color(0xffffecce),
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      message,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 34,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (completeButtonLabel.isNotEmpty) ...[
+                      SizedBox(height: 50),
+                      ProcessCompletedButton(
+                        icon: FontAwesomeIcons.check,
+                        backgroundColors:
+                            ref.read(printerCreatedProvider)
+                                ? completedGradient
+                                : grayGradient,
+                        onPressed:
+                            ref.read(printerCreatedProvider)
+                                ? onCompleteButtonPressed
+                                : null,
+                        text: completeButtonLabel,
+                        move: move,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (displayFinishButton)
+              Positioned(
+                bottom: 20,
+                right: 12,
+                child: ProcessCompletedButton(
+                  icon: FontAwesomeIcons.xmark,
+                  backgroundColors: [Color(0xff566779), Color(0xff485462)],
+                  text: '終了   ',
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class ProcessCompletedButton extends StatelessWidget {
+  const ProcessCompletedButton({
+    super.key,
+    this.onPressed,
+    required this.backgroundColors,
+    required this.text,
+    required this.icon,
+    this.move = true,
+  });
+
+  final List<Color> backgroundColors;
+  final Future<void> Function()? onPressed;
+  final String text;
+  final IconData icon;
+  final bool move;
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        return Container(
+          height: 55.0,
+          width: 225.0,
+          padding: const EdgeInsets.only(right: 18),
+          child: PopOutButton(
+            backgroundColors: backgroundColors,
+            onPressed: () async {
+              // 処理の指定があれば完了を待つ
+              await onPressed?.call();
+              // 最初のタブを表示する
+              move ? HomeTabData.of(context).goFirstTabDirect() : null;
+              ref.read(printerCreatedProvider.notifier).set(false);
+            },
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 18),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    radius: 14,
+                    child: Icon(icon, color: backgroundColors[0], size: 20),
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
