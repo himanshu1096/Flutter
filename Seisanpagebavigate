@@ -1,0 +1,41 @@
+            try {
+              final response = await TcpService().sendPrintReceipt();
+              if (context.mounted) Navigator.of(context).pop();
+              if (response.result) {
+                // 成功 → 精算処理カード情報ページへ戻る
+                if (context.mounted) {
+                  ref.read(qrReadPageSelectedBtnProvider.notifier)
+                      .changePage(QrReadPageBtnKind.seisanSyori);
+                }
+              } else {
+                // 失敗 → ダイアログ表示 → 同じページに留まる
+                if (context.mounted) {
+                  await showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder:
+                        (context) => CustomConfirmDialog(
+                          text: '印刷に失敗しました',
+                          trueBtnText: '確認',
+                          hasFalseBtn: false,
+                        ),
+                  );
+                }
+              }
+            } catch (e) {
+              if (context.mounted) Navigator.of(context).pop();
+              AppLogger().error('ProcessCompletedPrint', '領収書印刷エラー', e);
+              // エラー → ダイアログ表示 → 同じページに留まる
+              if (context.mounted) {
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder:
+                      (context) => CustomConfirmDialog(
+                        text: '通信エラーが発生しました',
+                        trueBtnText: '確認',
+                        hasFalseBtn: false,
+                      ),
+                );
+              }
+            }
