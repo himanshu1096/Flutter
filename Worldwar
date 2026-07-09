@@ -1,0 +1,27 @@
+  void _navigateToQrReading() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    // データクリア
+    final container = ProviderScope.containerOf(context);
+    container.read(displayDataProvider.notifier).clear();
+    container.read(qrTicketNoProvider.notifier).reset();
+    container.read(fareAmountProvider.notifier).clear();
+    container.read(qrReadPageSelectedBtnProvider.notifier)
+        .changePage(QrReadPageBtnKind.zyouhoHyouzi);
+
+    // 全ダイアログを閉じる
+    navigatorKey.currentState?.popUntil((route) => route.isFirst);
+
+    // 現在のルートを確認
+    final currentLocation =
+        routConfig.routerDelegate.currentConfiguration.uri.toString();
+
+    if (currentLocation.startsWith('/${Pages.main}')) {
+      // 既にメイン画面 → 内側タブをリセットするだけ
+      QrProcessMenuState.tabKey.currentState?.gotoDefaultTab();
+    } else {
+      // ログイン画面など他の画面 → メイン画面へ遷移
+      routConfig.go('/${Pages.main}?forced=true');
+    }
+  }
