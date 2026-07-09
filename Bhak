@@ -1,0 +1,21 @@
+  Map<String, int> build() {
+    // TcpServiceのコールバックを設定 (build完了後に登録)
+    Future.microtask(() {
+      TcpService().onConnectionStatusChanged = (unit, status) {
+        state = {...state, unit: status};
+      };
+    });
+    return {'TOTALSERVER': -1, 'QRMODULE': -1, 'PRINTER': -1};
+  }
+
+
+    return Container(
+      margin: EdgeInsets.all(3),
+      padding: EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor, width: 3),
+      ),
+      child: icon,
+    );
