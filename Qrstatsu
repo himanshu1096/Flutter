@@ -1,0 +1,34 @@
+  // 接続状態変化通知用コールバック
+  void Function(String unit, int status)? _onConnectionStatusChanged;
+
+  set onConnectionStatusChanged(void Function(String, int)? callback) {
+    _onConnectionStatusChanged = callback;
+    // コールバック登録時に現在の状態を再送信 (タイミング問題対策)
+    if (callback != null) {
+      _connectionStatus.forEach((unit, status) {
+        callback(unit, status);
+      });
+    }
+  }
+
+  void Function(String, int)? get onConnectionStatusChanged =>
+      _onConnectionStatusChanged;
+
+
+
+          _updateConnectionStatus('QRMODULE', initData.connectionTestResult ? 1 : -1);
+          _updateConnectionStatus('PRINTER', initData.printConnResult ? 1 : -1);
+
+
+
+
+
+        _updateConnectionStatus('TOTALSERVER', 1);
+
+
+
+  void _updateConnectionStatus(String unit, int status) {
+    _connectionStatus[unit] = status;
+    _onConnectionStatusChanged?.call(unit, status);
+  }
+
