@@ -1,0 +1,132 @@
+@riverpod
+class QrButtonView extends _$QrButtonView {
+  @override
+  bool build() => false; // false=View1, true=View2
+
+  void toggle(bool value) => state = value;
+}
+
+
+class _SecondaryTabContentTop extends ConsumerWidget {
+  const _SecondaryTabContentTop({required this.onComplete});
+
+  final void Function(QrReadPageBtnKind pageKind) onComplete;
+  static const buttonDist = SizedBox(width: 60);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showSecondView = ref.watch(qrButtonViewProvider);
+    final selectedBtn = ref.watch(qrReadPageSelectedBtnProvider);
+    final btnNotifier = ref.read(qrReadPageSelectedBtnProvider.notifier);
+    final judgeRouteBtnNotifier = ref.read(judgeRouteListProvider.notifier);
+    final judgeRouteBtnIdNotifier = ref.read(judgeRouteIdProvider.notifier);
+
+
+                TransitionButton(
+                  onPressed: () =>
+                      ref.read(qrButtonViewProvider.notifier).toggle(true),
+                  text: '前  ＞',
+                  isPushed: false,
+                  btnColors: grayGradient,
+                ),
+
+
+
+                TransitionButton(
+                  onPressed: () =>
+                      ref.read(qrButtonViewProvider.notifier).toggle(false),
+                  text: '＜  後ろ',
+                  isPushed: false,
+                  btnColors: grayGradient,
+                ),
+
+
+                TransitionButton(
+                  onPressed: () async {
+                    if (!adjustEnabled) return;
+                    await TcpService().sendBusinessSelect(12);
+
+                    final displayData = ref.read(displayDataProvider);
+                    final cands = displayData?.routeCandidates ?? [];
+
+                    for (int i = 0; i < 6; i++) {
+                      final candValue = i < cands.length ? cands[i] : null;
+                      judgeRouteBtnNotifier.updateItem(
+                        i + 1,
+                        candValue != null,
+                        0,
+                        candValue ?? 0,
+                        0,
+                      );
+                    }
+
+                    if (cands.length > 1) {
+                      btnNotifier.changePage(
+                        QrReadPageBtnKind.seisanSyoriRoute,
+                      );
+                    } else {
+                      // 経路選択不要 → 直接精算処理へ
+                      // 経路なし → KEIRO=0 で0x1301送信
+                      judgeRouteBtnIdNotifier.set(0);
+                      // if (context.mounted) {
+                      //   showCustomAlertDialog(context: context, text: '処理中');
+                      //   try {
+                      //     final amount = await TcpService().sendFareJudge(0);
+                      //     ref.read(fareAmountProvider.notifier).set(amount);
+                      //     if (context.mounted) Navigator.of(context).pop();
+                      //     if (context.mounted) {
+                      //       btnNotifier.changePage(
+                      //         QrReadPageBtnKind.seisanSyori,
+                      //       );
+                      //     }
+                      //   } catch (e) {
+                      //     if (context.mounted) Navigator.of(context).pop();
+                      //     AppLogger().error('SeisanSyoriRoute', '再精算判定エラー', e);
+                      //     if (context.mounted) {
+                      //       await showDialog(
+                      //         context: context,
+                      //         barrierDismissible: false,
+                      //         builder:
+                      //             (context) => CustomConfirmDialog(
+                      //               text: '通信エラーが発生しました',
+                      //               trueBtnText: '確認',
+                      //               hasFalseBtn: false,
+                      //             ),
+                      //       );
+                      //     }
+                      //   }
+                      // }
+                      btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                    }
+                  },
+                  // onPressed: () async {
+                  //   if (!adjustEnabled) return;
+                  //   await TcpService().sendBusinessSelect(12);
+                  //   //patternA
+                  //   judgeRouteBtnNotifier.updateItem(1, true, 13, 11, 0);
+                  //   judgeRouteBtnNotifier.updateItem(2, true, 14, 12, 0);
+                  //   //patternB
+                  //   // judgeRouteBtnNotifier.updateItem(1, true, 11, 0, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(2, true, 22, 21, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(3, true, 12, 0, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(4, true, 24, 21, 0);
+                  //   // //patternC
+                  //   // judgeRouteBtnNotifier.updateItem(1, true, 31, 31, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(2, true, 31, 32, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(3, true, 32, 33, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(4, true, 32, 34, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(5, true, 33, 35, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(6, true, 33, 36, 0);
+                  //   if (judgeRouteBtnNotifier.countVisibleButtons() <= 1) {
+                  //     judgeRouteBtnIdNotifier.set(1);
+                  //     btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                  //   } else {
+                  //     btnNotifier.changePage(QrReadPageBtnKind.seisanSyoriRoute);
+                  //   }
+                  // },
+                  text: '精算処理',
+                  isPushed:
+                      (QrReadPageBtnKind.seisanSyori == selectedBtn ||
+                          QrReadPageBtnKind.seisanSyoriRoute == selectedBtn),
+                  btnColors: adjustEnabled ? orengeGradient : grayGradient,
+                ),
