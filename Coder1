@@ -1,0 +1,33 @@
+// BEFORE
+Future<void> _connectSendSocketWithRetry() async {
+  while (true) {
+    try {
+      await _connectSendSocket();
+      AppLogger().info(_tag, '送信Socket接続成功');
+      return;
+    } catch (e) {
+      AppLogger().warn(_tag, '送信Socket接続待機中... 5Ms後リトライ');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+}
+
+// AFTER
+static const int _connectMaxRetries = 120; // 500ms × 120 = 60秒
+Future<void> _connectSendSocketWithRetry() async {
+  int retryCount = 0;
+  while (retryCount < _connectMaxRetries) {
+    try {
+      await _connectSendSocket();
+      AppLogger().info(_tag, '送信Socket接続成功');
+      return;
+    } catch (e) {
+      retryCount++;
+      AppLogger().warn(_tag, '送信Socket接続待機中... 500ms後リトライ ($retryCount/$_connectMaxRetries)');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+  AppLogger().error(_tag, '送信Socket接続失敗: リトライ上限 ($_connectMaxRetries回) 超過');
+  _setState(TcpConnectionState.error);
+  throw Exception('送信Socket接続失敗: タイムアウト');
+}
