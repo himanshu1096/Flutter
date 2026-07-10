@@ -1,0 +1,137 @@
+class _SecondaryTabContentTop extends HookConsumerWidget {
+  const _SecondaryTabContentTop({required this.onComplete});
+
+  final void Function(QrReadPageBtnKind pageKind) onComplete;
+  static const buttonDist = SizedBox(width: 40);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showSecondView = useState(false); // false=View1, true=View2
+    final selectedBtn = ref.watch(qrReadPageSelectedBtnProvider);
+
+
+
+          Row(
+            children: [
+              if (!showSecondView.value) ...[
+                // View 1: 精算処理 → 入場 → 出場 → 情報表示 → 前
+                TransitionButton(
+                  onPressed: () async {
+                    if (!adjustEnabled) return;
+                    await TcpService().sendBusinessSelect(12);
+                    final displayData = ref.read(displayDataProvider);
+                    final cands = displayData?.routeCandidates ?? [];
+                    for (int i = 0; i < 6; i++) {
+                      final candValue = i < cands.length ? cands[i] : null;
+                      judgeRouteBtnNotifier.updateItem(
+                        i + 1,
+                        candValue != null,
+                        0,
+                        candValue ?? 0,
+                        0,
+                      );
+                    }
+                    if (cands.length > 1) {
+                      btnNotifier.changePage(
+                        QrReadPageBtnKind.seisanSyoriRoute,
+                      );
+                    } else {
+                      judgeRouteBtnIdNotifier.set(0);
+                      btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                    }
+                  },
+                  text: '精算処理',
+                  isPushed:
+                      (QrReadPageBtnKind.seisanSyori == selectedBtn ||
+                          QrReadPageBtnKind.seisanSyoriRoute == selectedBtn),
+                  btnColors: adjustEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (enterEnabled) {
+                      await TcpService().sendBusinessSelect(10);
+                      btnNotifier.changePage(QrReadPageBtnKind.nyuuzyou);
+                    }
+                  },
+                  text: '　入場　',
+                  isPushed: QrReadPageBtnKind.nyuuzyou == selectedBtn,
+                  btnColors: enterEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (exitEnabled) {
+                      await TcpService().sendBusinessSelect(11);
+                      btnNotifier.changePage(QrReadPageBtnKind.syutuzyou);
+                    }
+                  },
+                  text: '　出場　',
+                  isPushed: QrReadPageBtnKind.syutuzyou == selectedBtn,
+                  btnColors: exitEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () {
+                    btnNotifier.changePage(QrReadPageBtnKind.zyouhoHyouzi);
+                  },
+                  text: '情報表示',
+                  isPushed: QrReadPageBtnKind.zyouhoHyouzi == selectedBtn,
+                  btnColors: orengeGradient,
+                ),
+                const Spacer(),
+                // 前 > ボタン
+                TransitionButton(
+                  onPressed: () => showSecondView.value = true,
+                  text: '前  ＞',
+                  isPushed: false,
+                  btnColors: grayGradient,
+                ),
+              ],
+
+              if (showSecondView.value) ...[
+                // View 2: < 後ろ → 廃券処理 → 発駅キャンセル → 情報表示
+                TransitionButton(
+                  onPressed: () => showSecondView.value = false,
+                  text: '＜  後ろ',
+                  isPushed: false,
+                  btnColors: grayGradient,
+                ),
+                const Spacer(),
+                TransitionButton(
+                  onPressed: () async {
+                    if (haisaEnabled) {
+                      await TcpService().sendBusinessSelect(13);
+                      btnNotifier.changePage(QrReadPageBtnKind.haikenSyori);
+                    }
+                  },
+                  text: '廃券処理',
+                  isPushed: QrReadPageBtnKind.haikenSyori == selectedBtn,
+                  btnColors: haisaEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (enterCancelEnabled) {
+                      await TcpService().sendBusinessSelect(14);
+                      btnNotifier.changePage(QrReadPageBtnKind.hatuekiCancel);
+                    }
+                  },
+                  text: '発駅キャンセル',
+                  isPushed: QrReadPageBtnKind.hatuekiCancel == selectedBtn,
+                  btnColors:
+                      enterCancelEnabled ? orengeGradient : grayGradient,
+                  fontSize: 22.0,
+                ),
+                const Spacer(),
+                TransitionButton(
+                  onPressed: () {
+                    btnNotifier.changePage(QrReadPageBtnKind.zyouhoHyouzi);
+                  },
+                  text: '情報表示',
+                  isPushed: QrReadPageBtnKind.zyouhoHyouzi == selectedBtn,
+                  btnColors: orengeGradient,
+                ),
+              ],
+            ],
+          ),
