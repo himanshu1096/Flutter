@@ -1,0 +1,113 @@
+// INSERT after line 278, before line 280
+class _CardInfoContent extends StatelessWidget {
+  const _CardInfoContent({
+    required this.cardInfo,
+    required this.fontColor,
+    required this.getValue,
+  });
+
+  final List<CardInfoEnum> cardInfo;
+  final Color fontColor;
+  final String Function(CardInfoEnum) getValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final bool singleColumn = w < 600.0;
+        final double maxWidth = singleColumn ? w : w / 2;
+        final maxWidth2 = maxWidth * 0.5;
+
+        return Wrap(
+          runSpacing: 6.0,
+          children: cardInfo.map((item) {
+            final value = getValue(item);
+
+            // 媒体種別 → 全幅表示（右列なし）
+            // if (item == CardInfoEnum.baitaiSyubetu) {
+            //   return SizedBox(
+            //     width: w,
+            //     child: Text(
+            //       value,
+            //       style: TextStyle(
+            //         fontSize: fontSize + 2,
+            //         fontWeight: FontWeight.bold,
+            //         color: fontColor,
+            //       ),
+            //     ),
+            //   );
+            // }
+
+            // フリーコード → 赤色表示
+            // フリーコードは値がある時のみ表示
+            if (item == CardInfoEnum.huricode && value.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            // フリーコード → 赤色表示
+            final valueColor = null;
+
+            return SizedBox(
+              width: maxWidth,
+              child: value.isNotEmpty
+                  ? Row(
+                      children: [
+                        SizedBox(
+                          width: maxWidth2,
+                          child: Text(
+                            item.name,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              color: fontColor,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: maxWidth2,
+                          child: RichText(
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            text: TextSpan(
+                              style: DefaultTextStyle.of(context).style,
+                              children: [
+                                const TextSpan(
+                                  text: ' : ',
+                                  style: TextStyle(fontSize: fontSize),
+                                ),
+                                TextSpan(
+                                  text: value,
+                                  style: TextStyle(
+                                    fontSize: fontSize,
+                                    fontWeight: FontWeight.w500,
+                                    color: valueColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        SizedBox(
+                          width: maxWidth2 * 2,
+                          child: Text(
+                            item.name,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              color: fontColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
