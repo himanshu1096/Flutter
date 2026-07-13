@@ -1,0 +1,224 @@
+class _SecondaryTabContentTop extends ConsumerWidget {
+  const _SecondaryTabContentTop({required this.onComplete});
+
+  final void Function(QrReadPageBtnKind pageKind) onComplete;
+  static const buttonDist = SizedBox(width: 40);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showSecondView = ref.watch(qrButtonViewProvider);
+    final selectedBtn = ref.watch(qrReadPageSelectedBtnProvider);
+    final btnNotifier = ref.read(qrReadPageSelectedBtnProvider.notifier);
+    final judgeRouteBtnNotifier = ref.read(judgeRouteListProvider.notifier);
+    final judgeRouteBtnIdNotifier = ref.read(judgeRouteIdProvider.notifier);
+    final displayData = ref.watch(displayDataProvider);
+
+    // 0x1281のボタン制御フラグ
+    final enterEnabled = displayData?.enterBtnEnabled ?? false;
+    final exitEnabled = displayData?.exitBtnEnabled ?? false;
+    final adjustEnabled = displayData?.adjustBtnEnabled ?? false;
+    final haisaEnabled = displayData?.haisaCancelBtnEnabled ?? false;
+    final enterCancelEnabled = displayData?.enterCancelBtnEnabled ?? false;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              if (!showSecondView) ...[
+                // View 1: 精算処理 → 入場 → 出場 → 情報表示 → 次ページへ
+                TransitionButton(
+                  onPressed: () async {
+                    if (!adjustEnabled) return;
+                    await TcpService().sendBusinessSelect(12);
+                    final displayData = ref.read(displayDataProvider);
+                    final cands = displayData?.routeCandidates ?? [];
+                    for (int i = 0; i < 6; i++) {
+                      final candValue = i < cands.length ? cands[i] : null;
+                      judgeRouteBtnNotifier.updateItem(
+                        i + 1,
+                        candValue != null,
+                        0,
+                        candValue ?? 0,
+                        0,
+                      );
+                    }
+                    if (cands.length > 1) {
+                      btnNotifier.changePage(
+                        QrReadPageBtnKind.seisanSyoriRoute,
+                      );
+                    } else {
+                      // 経路選択不要 → 直接精算処理へ
+                      // 経路なし → KEIRO=0 で0x1301送信
+                      judgeRouteBtnIdNotifier.set(0);
+                      // if (context.mounted) {
+                      //   showCustomAlertDialog(context: context, text: '処理中');
+                      //   try {
+                      //     final amount = await TcpService().sendFareJudge(0);
+                      //     ref.read(fareAmountProvider.notifier).set(amount);
+                      //     if (context.mounted) Navigator.of(context).pop();
+                      //     if (context.mounted) {
+                      //       btnNotifier.changePage(
+                      //         QrReadPageBtnKind.seisanSyori,
+                      //       );
+                      //     }
+                      //   } catch (e) {
+                      //     if (context.mounted) Navigator.of(context).pop();
+                      //     AppLogger().error('SeisanSyoriRoute', '再精算判定エラー', e);
+                      //     if (context.mounted) {
+                      //       await showDialog(
+                      //         context: context,
+                      //         barrierDismissible: false,
+                      //         builder:
+                      //             (context) => CustomConfirmDialog(
+                      //               text: '通信エラーが発生しました',
+                      //               trueBtnText: '確認',
+                      //               hasFalseBtn: false,
+                      //             ),
+                      //       );
+                      //     }
+                      //   }
+                      // }
+                      btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                    }
+                  },
+                  // onPressed: () async {
+                  //   if (!adjustEnabled) return;
+                  //   await TcpService().sendBusinessSelect(12);
+                  //   //patternA
+                  //   judgeRouteBtnNotifier.updateItem(1, true, 13, 11, 0);
+                  //   judgeRouteBtnNotifier.updateItem(2, true, 14, 12, 0);
+                  //   //patternB
+                  //   // judgeRouteBtnNotifier.updateItem(1, true, 11, 0, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(2, true, 22, 21, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(3, true, 12, 0, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(4, true, 24, 21, 0);
+                  //   // //patternC
+                  //   // judgeRouteBtnNotifier.updateItem(1, true, 31, 31, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(2, true, 31, 32, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(3, true, 32, 33, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(4, true, 32, 34, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(5, true, 33, 35, 0);
+                  //   // judgeRouteBtnNotifier.updateItem(6, true, 33, 36, 0);
+                  //   if (judgeRouteBtnNotifier.countVisibleButtons() <= 1) {
+                  //     judgeRouteBtnIdNotifier.set(1);
+                  //     btnNotifier.changePage(QrReadPageBtnKind.seisanSyori);
+                  //   } else {
+                  //     btnNotifier.changePage(QrReadPageBtnKind.seisanSyoriRoute);
+                  //   }
+                  // },
+                  text: '精算処理',
+                  isPushed:
+                      (QrReadPageBtnKind.seisanSyori == selectedBtn ||
+                          QrReadPageBtnKind.seisanSyoriRoute == selectedBtn),
+                  btnColors: adjustEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (enterEnabled) {
+                      await TcpService().sendBusinessSelect(10);
+                      btnNotifier.changePage(QrReadPageBtnKind.nyuuzyou);
+                    }
+                  },
+                  text: '　入場　',
+                  isPushed: QrReadPageBtnKind.nyuuzyou == selectedBtn,
+                  btnColors: enterEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (exitEnabled) {
+                      await TcpService().sendBusinessSelect(11);
+                      btnNotifier.changePage(QrReadPageBtnKind.syutuzyou);
+                    }
+                  },
+                  text: '　出場　',
+                  isPushed: QrReadPageBtnKind.syutuzyou == selectedBtn,
+                  btnColors: exitEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () {
+                    btnNotifier.changePage(QrReadPageBtnKind.zyouhoHyouzi);
+                  },
+                  text: '情報表示',
+                  isPushed: QrReadPageBtnKind.zyouhoHyouzi == selectedBtn,
+                  btnColors: orengeGradient,
+                ),
+                const Spacer(),
+                // 次ページへ ボタン
+                TransitionButton(
+                  onPressed:
+                      () => ref.read(qrButtonViewProvider.notifier).toggle(true),
+                  text: '次ページへ ',
+                  isPushed: false,
+                  btnColors: gray1,
+                ),
+              ],
+
+              if (showSecondView) ...[
+                // View 2: 前ページへ → 廃券処理 → 発駅キャンセル → 情報表示
+                TransitionButton(
+                  onPressed:
+                      () =>
+                          ref.read(qrButtonViewProvider.notifier).toggle(false),
+                  text: '前ページへ',
+                  isPushed: false,
+                  btnColors: gray1,
+                ),
+                const Spacer(),
+                TransitionButton(
+                  onPressed: () async {
+                    if (haisaEnabled) {
+                      await TcpService().sendBusinessSelect(13);
+                      btnNotifier.changePage(QrReadPageBtnKind.haikenSyori);
+                    }
+                  },
+                  text: '廃券処理',
+                  isPushed: QrReadPageBtnKind.haikenSyori == selectedBtn,
+                  btnColors: haisaEnabled ? orengeGradient : grayGradient,
+                ),
+                buttonDist,
+                TransitionButton(
+                  onPressed: () async {
+                    if (enterCancelEnabled) {
+                      await TcpService().sendBusinessSelect(14);
+                      btnNotifier.changePage(QrReadPageBtnKind.hatuekiCancel);
+                    }
+                  },
+                  text: '発駅キャンセル',
+                  isPushed: QrReadPageBtnKind.hatuekiCancel == selectedBtn,
+                  btnColors: enterCancelEnabled ? orengeGradient : grayGradient,
+                  fontSize: 22.0,
+                ),
+                const Spacer(),
+                TransitionButton(
+                  onPressed: () {
+                    btnNotifier.changePage(QrReadPageBtnKind.zyouhoHyouzi);
+                  },
+                  text: '情報表示',
+                  isPushed: QrReadPageBtnKind.zyouhoHyouzi == selectedBtn,
+                  btnColors: orengeGradient,
+                ),
+              ],
+            ],
+          ),
+          if (selectedBtn != QrReadPageBtnKind.seisanSyoriRoute)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(top: 15),
+                child: ClipRect(child: CardInfoContents()),
+              ),
+            ),
+
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20.0, top: 0.0),
+            child: SecondaryTabContent(onComplete: onComplete),
+          ),
+        ],
+      ),
+    );
+  }
+}
