@@ -1,0 +1,30 @@
+// ADD at top of file
+enum _RelatedProcessTab {
+  unselected,   // 0
+  closeTally,   // 1
+  closeQuick,   // 2
+  closeTallyRe, // 3
+  history,      // 4
+  empty,        // 5
+  logoff,       // 6
+}
+
+
+
+// BEFORE
+final business = switch (index) {
+  1 => 50,
+  2 => 52,
+  3 => 51,
+  4 => 53,
+  _ => null,
+};
+
+// AFTER
+final business = switch (_RelatedProcessTab.values[index]) {
+  _RelatedProcessTab.closeTally  => 50,
+  _RelatedProcessTab.closeQuick  => 52,
+  _RelatedProcessTab.closeTallyRe => 51,
+  _RelatedProcessTab.history     => 53,
+  _ => null,
+};
