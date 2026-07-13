@@ -1,0 +1,41 @@
+// BEFORE
+final List<CardInfoEnum> cardTicketInfo;
+if (mediaType == 11 || mediaType == 12) {
+  cardTicketInfo = [ ... ];
+} else if (mediaType == 21 || mediaType == 22) {
+  cardTicketInfo = [ ... ];
+} else if (mediaType == 31 || mediaType == 32) {
+  cardTicketInfo = [ ... ];
+} else {
+  cardTicketInfo = [];
+}
+
+// AFTER
+final List<CardInfoEnum> cardTicketInfo = switch (mediaType) {
+  11 || 12 => [
+    CardInfoEnum.baitaiSyubetu,
+    CardInfoEnum.yukoSyuryoubi,
+    CardInfoEnum.hatueki,
+    CardInfoEnum.hatuekiKusu,
+    CardInfoEnum.renrakueki,
+    CardInfoEnum.renrakuekiKusu,
+  ]
+  21 || 22 => [
+    CardInfoEnum.baitaiSyubetu,
+    CardInfoEnum.yukoSyuryoubi,
+    CardInfoEnum.hatueki,
+    CardInfoEnum.hatuekiKusu,
+    CardInfoEnum.tyakueki,
+    CardInfoEnum.kensyu2,
+  ],
+  31 || 32 => [
+    CardInfoEnum.baitaiSyubetu,
+    CardInfoEnum.yukoKaisibi,
+    CardInfoEnum.yukoSyuryoubi,
+    CardInfoEnum.hatueki,
+    CardInfoEnum.keiyu1,
+    CardInfoEnum.tyakueki,
+    CardInfoEnum.huricode,
+  ],
+  _ => [],
+};
