@@ -1,0 +1,82 @@
+// INSERT after line 261 (after _sendFareJudgeAndNavigate closes)
+
+class _RouteText extends StatelessWidget {
+  const _RouteText({required this.item, super.key});
+
+  final JudgeRouteInfo item;
+
+  @override
+  Widget build(BuildContext context) {
+    if (item.companypattern == 0) {
+      // 経路情報のみ
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Text(routeMap[item.routepattern] ?? "", style: _btnTextStyle),
+          ),
+        ],
+      );
+    } else if (item.routepattern == 0) {
+      // 事業者のみ表示
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Text(
+              companyMap[item.companypattern] ?? "",
+              style: _btnTextStyleL,
+            ),
+          ),
+        ],
+      );
+    } else {
+      // 事業者+経路情報
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              companyMap[item.companypattern] ?? "",
+              style: _btnTextStyleS,
+            ),
+          ),
+          Center(
+            child: Text(routeMap[item.routepattern] ?? "", style: _btnTextStyleL),
+          ),
+        ],
+      );
+    }
+  }
+}
+
+
+
+
+
+// BEFORE (line 87)
+child: buildRouteText(judgeRouteBtnList[i]),
+
+// AFTER
+child: _RouteText(item: judgeRouteBtnList[i]),
+
+
+
+// BEFORE (lines 107-109)
+child: buildRouteText(
+  judgeRouteBtnList[i + 1],
+),
+
+// AFTER
+child: _RouteText(item: judgeRouteBtnList[i + 1]),
+
+
+
+
