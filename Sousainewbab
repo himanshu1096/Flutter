@@ -1,0 +1,170 @@
+  keiyu1('経由１', ''),
+  keiyu2('経由２', ''),
+  keiyu3('経由３', ''),
+  keiyu4('経由４', ''),
+  keiyu5('経由５', ''),
+  keiyu6('経由６', ''),
+  keiyu7('経由７', ''),
+  keiyu8('経由８', ''),
+  kensyu('券種', ''),
+  kensyu2('券種２', ''),
+  kensyu2Detail1('券種２の詳細１', ''),
+  kensyu2Detail2('券種２の詳細２', ''),
+  kensyu3('券種３', ''),
+  ikkenpenOufuku('一券片往復', ''),
+  freeKukan('フリー区間', ''),
+  otonaKodomo('大人/小人', ''),
+  huricode('フリーコード(※)', ''),
+  empty('', '');
+
+
+
+      case CardInfoEnum.keiyu5:
+        return data.route5 ?? '';
+      case CardInfoEnum.keiyu6:
+        return data.route6 ?? '';
+      case CardInfoEnum.keiyu7:
+        return data.route7 ?? '';
+      case CardInfoEnum.keiyu8:
+        return data.route8 ?? '';
+
+
+
+      case CardInfoEnum.kensyu3:
+        // 券種３: 9 (10進1桁)
+        return data.ticketType3?.toString() ?? '';
+      case CardInfoEnum.ikkenpenOufuku:
+        return _csv.lookup('ROUNDTRIPFLAG', data.roundTripFlag);
+      case CardInfoEnum.freeKukan:
+        return _csv.lookup('FREESECTION', data.freeSection);
+      case CardInfoEnum.otonaKodomo:
+        return _csv.lookup('PASSENGERTYPE', data.passengerType);
+
+
+
+
+
+
+    final mediaType = displayData?.mediaType;
+
+    // ── 左列 (info1) ────────────────────────────────
+    late final List<CardInfoEnum> leftFields;
+    // ── 右列 (info2) ────────────────────────────────
+    late final List<CardInfoEnum> rightFields;
+
+    if (mediaType == 21 || mediaType == 22) {
+      // 回数券
+      leftFields = [
+        CardInfoEnum.qrHakkouStatus,
+        CardInfoEnum.siyouStatus,
+        CardInfoEnum.baitaiSyubetu,
+        CardInfoEnum.yukoSyuryoubi,
+        CardInfoEnum.hatueki,
+        CardInfoEnum.tyakueki,
+        CardInfoEnum.hatuekiKusu,
+        CardInfoEnum.keiyu1,
+        CardInfoEnum.keiyu2,
+        CardInfoEnum.kensyu2,
+        CardInfoEnum.kensyu2Detail1,
+        CardInfoEnum.kensyu2Detail2,
+      ];
+      rightFields = [
+        CardInfoEnum.empty,
+        CardInfoEnum.nyuusyutuzyouStatus,
+        CardInfoEnum.zyosyaeki,
+        CardInfoEnum.nyusyutuzyoBit,
+        CardInfoEnum.zyosyaTukihi,
+        CardInfoEnum.zyosyaZikoku,
+        CardInfoEnum.empty,
+        CardInfoEnum.keiyu3,
+        CardInfoEnum.keiyu4,
+        CardInfoEnum.kensyu,
+        CardInfoEnum.empty,
+        CardInfoEnum.empty,
+      ];
+    } else if (mediaType == 31 || mediaType == 32) {
+      // 企画券
+      leftFields = [
+        CardInfoEnum.qrHakkouStatus,
+        CardInfoEnum.siyouStatus,
+        CardInfoEnum.baitaiSyubetu,
+        CardInfoEnum.yukoSyuryoubi,
+        CardInfoEnum.hatueki,
+        CardInfoEnum.tyakueki,
+        CardInfoEnum.keiyu1,
+        CardInfoEnum.keiyu2,
+        CardInfoEnum.keiyu3,
+        CardInfoEnum.keiyu4,
+        CardInfoEnum.kensyu3,
+        CardInfoEnum.empty,
+        CardInfoEnum.otonaKodomo,
+      ];
+      rightFields = [
+        CardInfoEnum.empty,
+        CardInfoEnum.nyuusyutuzyouStatus,
+        CardInfoEnum.zyosyaeki,
+        CardInfoEnum.nyusyutuzyoBit,
+        CardInfoEnum.zyosyaTukihi,
+        CardInfoEnum.zyosyaZikoku,
+        CardInfoEnum.keiyu5,
+        CardInfoEnum.keiyu6,
+        CardInfoEnum.keiyu7,
+        CardInfoEnum.keiyu8,
+        CardInfoEnum.ikkenpenOufuku,
+        CardInfoEnum.freeKukan,
+        CardInfoEnum.huricode,
+      ];
+    } else {
+      // 普通券 (11/12) — デフォルト
+      leftFields = [
+        CardInfoEnum.qrHakkouStatus,
+        CardInfoEnum.siyouStatus,
+        CardInfoEnum.baitaiSyubetu,
+        CardInfoEnum.yukoSyuryoubi,
+        CardInfoEnum.hatueki,
+        CardInfoEnum.hatuekiKusu,
+        CardInfoEnum.renrakueki,
+        CardInfoEnum.renrakuekiKusu,
+        CardInfoEnum.keiyu1,
+        CardInfoEnum.keiyu2,
+        CardInfoEnum.kensyu2,
+        CardInfoEnum.kensyu2Detail1,
+        CardInfoEnum.kensyu2Detail2,
+      ];
+      rightFields = [
+        CardInfoEnum.empty,
+        CardInfoEnum.nyuusyutuzyouStatus,
+        CardInfoEnum.zyosyaeki,
+        CardInfoEnum.nyusyutuzyoBit,
+        CardInfoEnum.zyosyaTukihi,
+        CardInfoEnum.zyosyaZikoku,
+        CardInfoEnum.empty,
+        CardInfoEnum.empty,
+        CardInfoEnum.keiyu3,
+        CardInfoEnum.keiyu4,
+        CardInfoEnum.kensyu,
+        CardInfoEnum.empty,
+        CardInfoEnum.empty,
+      ];
+    }
+
+    // 共通ヘッダ行 (QRチケット番号 / QR有効無効ステータス)
+    final info1 = <(String, String)>[
+      ('QRチケット番号', qrTicketNo),
+      (
+        CardInfoEnum.qrYukoMukoStatus.name,
+        getValue(CardInfoEnum.qrYukoMukoStatus),
+      ),
+      ...getTupleList(leftFields),
+    ];
+
+    final info2 = <(String, String)>[
+      ...getTupleList([CardInfoEnum.empty, CardInfoEnum.empty]),
+      ...rightFields.map((c) {
+        // 乗降駅・入出場状態は別名表示
+        if (c == CardInfoEnum.zyosyaeki || c == CardInfoEnum.nyusyutuzyoBit) {
+          return (c.getAnotherName(), getValue(c));
+        }
+        return (c.name, getValue(c));
+      }),
+    ];
