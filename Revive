@@ -1,0 +1,142 @@
+// ADD this method inside _QrReading class (after build method, around line 488)
+
+Future<void> _doQrInquiry({
+  required BuildContext context,
+  required WidgetRef ref,
+  required int designation,
+  Uint8List? rawData,
+  String? qrNumber,
+}) async {
+  showCustomAlertDialog(context: context, text: '照会中');
+  try {
+    final response = await TcpService().sendQrServerRequest(
+      designation: designation,
+      rawData: rawData,
+      qrNumber: qrNumber,
+    );
+    if (context.mounted) Navigator.of(context).pop();
+
+    if (response.result) {
+      AppLogger().info('QrReading', 'QR照会成功 → 0x1201送信');
+      final displayData = await TcpService().sendDisplayDataRequest();
+      if (displayData.result) {
+        AppLogger().info('QrReading', '表示データ取得成功');
+        ref.read(displayDataProvider.notifier).set(displayData);
+        ref.read(qrTicketNoProvider.notifier).reset();
+        gotoQrState.call(true);
+      } else {
+        AppLogger().warn('QrReading', '表示データ取得失敗');
+        if (context.mounted) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => CustomConfirmDialog(
+              text: '表示データの取得に失敗しました',
+              trueBtnText: '確認',
+              hasFalseBtn: false,
+            ),
+          );
+        }
+      }
+    } else {
+      AppLogger().warn('QrReading', 'QR照会失敗: ${response.errCode}');
+      if (context.mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => CustomConfirmDialog(
+            text: 'QR照会に失敗しました\nエラーコード: ${response.errCode}',
+            trueBtnText: '確認',
+            hasFalseBtn: false,
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    if (context.mounted) Navigator.of(context).pop();
+    AppLogger().error('QrReading', 'QR照会エラー', e);
+    if (context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => CustomConfirmDialog(
+          text: '通信エラーが発生しました',
+          trueBtnText: '確認',
+          hasFalseBtn: false,
+        ),
+      );
+    }
+  }
+}
+
+
+// BEFORE (lines 106-177) — all the camera inquiry logic
+if (qrData != null && context.mounted) {
+  showCustomAlertDialog(context: context, text: '照会中');
+  try { ... } catch (e) { ... }
+}
+
+// AFTER
+if (qrData != null && context.mounted) {
+  await _doQrInquiry(
+    context: context,
+    ref: ref,
+    designation: 1,
+    rawData: qrData,
+  );
+}
+
+
+
+// BEFORE (lines 385-462) — all the keyboard inquiry logic
+onPressed: () async {
+  FocusManager.instance.primaryFocus?.unfocus();
+  showCustomAlertDialog(context: context, text: '照会中');
+  try { ... } catch (e) { ... }
+}
+
+// AFTER
+onPressed: () async {
+  FocusManager.instance.primaryFocus?.unfocus();
+  final ticketNo = ref.read(qrTicketNoProvider);
+  AppLogger().info('QrReading', 'QR番号照会: $ticketNo');
+  await _doQrInquiry(
+    context: context,
+    ref: ref,
+    designation: 2,
+    qrNumber: ticketNo,
+  );
+}
+
+
+
+// ADD this method inside _QrReading class
+Future<void> _openKeyboardDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required TextEditingController controller,
+  required ValueNotifier<bool> disableQrReferenceButton,
+}) async {
+  final result = await showDialog<String?>(
+    barrierDismissible: false,
+    context: context,
+    builder: (context) => SoftwareKeyboard(
+      keyboardUsage: KeyboardUsage.qrTicketNo,
+      initialText: controller.text,
+    ),
+  );
+  if (result != null) {
+    controller.text = result;
+    if (result.length >= 1) {
+      ref.read(qrTicketNoProvider.notifier).changeNo(result.replaceAll(' ', ''));
+      disableQrReferenceButton.value = true;
+    } else {
+      disableQrReferenceButton.value = false;
+    }
+  } else {
+    controller.text = '';
+    ref.read(qrTicketNoProvider.notifier).reset();
+    disableQrReferenceButton.value = false;
+  }
+}
+
