@@ -1,0 +1,39 @@
+/// 画面制御初期化要求 (0x0A81) のデータモデル
+class InitData {
+  // COMMON
+  final bool result;
+  final int errCode;
+  final int errKind;
+  // DATA
+  final String stationName;
+  final bool connectionTestResult;
+  final bool printConnResult;
+
+  const InitData({
+    required this.result,
+    required this.errCode,
+    required this.errKind,
+    required this.stationName,
+    required this.connectionTestResult,
+    required this.printConnResult,
+  });
+
+  factory InitData.fromJson(Map<String, dynamic> json) {
+    final common = json['COMMON'] as Map<String, dynamic>? ?? {};
+    final data = json['DATA'] as Map<String, dynamic>? ?? {};
+    return InitData(
+      result: common['RESULT'] as bool? ?? false,
+      errCode: common['ERRCODE'] as int? ?? -1,
+      errKind: common['ERRKIND'] as int? ?? -1,
+      stationName: data['PLACESTATION'] as String? ?? '',
+      connectionTestResult: data['CONNTESTRESULT'] as bool? ?? false,
+      printConnResult: data['PRINTCONNRESULT'] as bool? ?? false,
+    );
+  }
+
+  @override
+  String toString() =>
+      'InitData(result: $result, errCode: $errCode, errKind: $errKind, '
+      'stationName: $stationName, connectionTestResult: $connectionTestResult, '
+      'printConnResult: $printConnResult)';
+}
