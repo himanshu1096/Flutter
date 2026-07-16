@@ -1,0 +1,19 @@
+      } else {
+        // AUTHORITY = 0 → 認証失敗: エラー定義から取得して表示
+        AppLogger().warn(
+          'LoginPage',
+          'AUTHORITY=0 認証失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+        );
+        if (mounted) {
+          final result = await handleServerError(
+            context: context,
+            errKind: response.errKind,
+            errCode: response.errCode,
+          );
+          // ログインエラー(0000-0101〜0103)はコマンド無し → ダイアログを閉じるだけ
+          // 定義が見つからない場合は従来のメッセージ
+          if (!result.handled && mounted) {
+            await _showAuthErrorDialog(response.errCode);
+          }
+        }
+      }
