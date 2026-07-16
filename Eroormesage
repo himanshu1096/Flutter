@@ -1,0 +1,189 @@
+/// KbaErrorMessage.json の1エントリ
+class ErrorMessage {
+  final String errorKind; // ERRKIND (4桁文字列 例: "0000")
+  final String errorCode; // ERRCODE (4桁文字列 例: "0015")
+  final String message;
+  final String button1Txt;
+  final String button1Cmd;
+  final String button2Txt;
+  final String button2Cmd;
+
+  const ErrorMessage({
+    required this.errorKind,
+    required this.errorCode,
+    required this.message,
+    required this.button1Txt,
+    required this.button1Cmd,
+    required this.button2Txt,
+    required this.button2Cmd,
+  });
+
+  factory ErrorMessage.fromJson(Map<String, dynamic> json) {
+    return ErrorMessage(
+      errorKind: json['ERRORKIND'] as String? ?? '',
+      errorCode: json['ERRORCODE'] as String? ?? '',
+      message: json['MESSAGE'] as String? ?? '',
+      button1Txt: json['BUTTON1TXT'] as String? ?? '',
+      button1Cmd: json['BUTTON1CMD'] as String? ?? '',
+      button2Txt: json['BUTTON2TXT'] as String? ?? '',
+      button2Cmd: json['BUTTON2CMD'] as String? ?? '',
+    );
+  }
+
+  bool get hasButton2 => button2Txt.isNotEmpty;
+}
+
+
+
+
+
+import 'dart:convert';
+import 'dart:io';
+import 'package:qr_multidemo/config/tcp_config.dart';
+import 'package:qr_multidemo/model/error_message.dart';
+import 'app_logger.dart';
+
+/// エラーメッセージ定義ファイル (KbaErrorMessage.json) のルックアップサービス
+/// ERRKIND + ERRCODE の複合キーでメッセージ・ボタン定義を取得
+class ErrorMessageService {
+  static final ErrorMessageService _instance =
+      ErrorMessageService._internal();
+  factory ErrorMessageService() => _instance;
+  ErrorMessageService._internal();
+
+  String get _path => TcpConfig().errorMsgPath;
+  static const String _tag = 'ErrorMessageService';
+
+  // キャッシュ: { "ERRKIND-ERRCODE": ErrorMessage }
+  final Map<String, ErrorMessage> _cache = {};
+  bool _loaded = false;
+
+  String _key(String kind, String code) => '$kind-$code';
+  String _pad(int v) => v.toString().padLeft(4, '0');
+
+  /// 読み込み — アプリ起動時に一度だけ呼ぶ
+  Future<void> load() async {
+    if (_loaded) return;
+    try {
+      final file = File(_path);
+      if (!await file.exists()) {
+        AppLogger().warn(_tag, 'エラーメッセージファイルが見つかりません: $_path');
+        return;
+      }
+      final contents = await file.readAsString();
+      final list = jsonDecode(contents) as List<dynamic>;
+      for (final item in list) {
+        final em = ErrorMessage.fromJson(item as Map<String, dynamic>);
+        _cache[_key(em.errorKind, em.errorCode)] = em;
+      }
+      _loaded = true;
+      AppLogger().info(_tag, 'エラーメッセージ読み込み完了: ${_cache.length}件');
+    } catch (e) {
+      AppLogger().error(_tag, 'エラーメッセージ読み込みエラー', e);
+    }
+  }
+
+  /// ERRKIND + ERRCODE でルックアップ (見つからなければ null)
+  ErrorMessage? lookup(int errKind, int errCode) {
+    return _cache[_key(_pad(errKind), _pad(errCode))];
+  }
+}
+
+
+
+
+
+import 'package:flutter/material.dart';
+import 'package:qr_multidemo/model/error_message.dart';
+import 'confirm_dialog.dart';
+
+/// エラー定義に基づくダイアログを表示する。
+/// 戻り値: 押されたボタンのコマンド文字列 (例 "0xC101")。
+///   - ボタン1押下 → button1Cmd
+///   - ボタン2押下 → button2Cmd
+///   - コマンド未定義なら空文字
+Future<String> showErrorDialog({
+  required BuildContext context,
+  required ErrorMessage error,
+}) async {
+  final pressedTrue = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return CustomConfirmDialog(
+        text: error.message,
+        trueBtnText: error.button1Txt.isEmpty ? '確認' : error.button1Txt,
+        falseBtnText: error.button2Txt,
+        hasTrueBtn: true,
+        hasFalseBtn: error.hasButton2,
+      );
+    },
+  );
+  // true=ボタン1, false=ボタン2, null=barrier閉じ(発生しない設定)
+  if (pressedTrue == false) {
+    return error.button2Cmd;
+  }
+  return error.button1Cmd;
+}
+
+
+
+import 'package:flutter/material.dart';
+import 'package:qr_multidemo/service/error_message_service.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'error_dialog.dart';
+
+/// エラーダイアログの結果
+class ErrorResult {
+  /// エラー定義が見つかり、ダイアログを表示したか
+  final bool handled;
+
+  /// 押されたボタンに定義されたコマンド (16進文字列, 例 "0xC101")。未定義なら空文字。
+  final String command;
+
+  const ErrorResult({required this.handled, this.command = ''});
+
+  static const notHandled = ErrorResult(handled: false);
+
+  /// 再試行系コマンド (印刷再実行) か
+  bool get isRetryPrint =>
+      command == '0xC101' ||
+      command == '0xC201' ||
+      command == '0xC301' ||
+      command == '0xC401' ||
+      command == '0xC501';
+
+  /// アプリ終了コマンドか
+  bool get isAppExit => command == '0x0F01';
+}
+
+/// ERRKIND/ERRCODE からエラーダイアログを表示する。
+/// コマンド送信は行わず、押されたボタンのコマンドを [ErrorResult] で返す。
+/// 呼び出し元が command を見て再試行・終了などを実行する。
+Future<ErrorResult> handleServerError({
+  required BuildContext context,
+  required int errKind,
+  required int errCode,
+}) async {
+  final error = ErrorMessageService().lookup(errKind, errCode);
+  if (error == null) {
+    AppLogger().warn(
+      'ErrorHandler',
+      'エラー定義なし: ERRKIND=$errKind ERRCODE=$errCode',
+    );
+    return ErrorResult.notHandled;
+  }
+
+  if (!context.mounted) return ErrorResult.notHandled;
+  final cmd = await showErrorDialog(context: context, error: error);
+  return ErrorResult(handled: true, command: cmd);
+}
+
+
+lib/model/error_message.dart
+
+lib/service/error_message_service.dart
+
+lib/utility/error_dialog.dart
+
+lib/utility/error_handler.dart
