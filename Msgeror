@@ -1,0 +1,99 @@
+  /// 0xFA81 — 本体制御異常ダイアログ表示 (エラー定義から取得)
+  void _showSystemErrorDialog(int errKind, int errCode) {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    handleServerError(
+      context: context,
+      errKind: errKind,
+      errCode: errCode,
+    ).then((result) {
+      // 0x0F01 (シャットダウン) が定義されていればアプリ終了
+      if (result.isAppExit) {
+        sendAppExit();
+      }
+    });
+  }
+
+
+
+      case CommandId.systemErrorNotify:
+        AppLogger().error(_tag, '0xFA81 本体制御異常通知 受信');
+        try {
+          final common = packet.json['COMMON'] as Map<String, dynamic>? ?? {};
+          final errCode = common['ERRCODE'] as int? ?? -1;
+          final errKind = common['ERRKIND'] as int? ?? 0; // 0xFA81は0000固定
+          _showSystemErrorDialog(errKind, errCode);
+        } catch (e) {
+          AppLogger().error(_tag, '0xFA81 パースエラー', e);
+        }
+        break;
+
+
+
+
+                onPressed: () async {
+                  bool retry = true;
+                  while (retry) {
+                    retry = false;
+                    showCustomAlertDialog(context: context, text: '印刷中');
+                    try {
+                      final response = await TcpService().sendPrintQrInfo(
+                        qrTicketNo.replaceAll(' ', ''),
+                      );
+                      if (context.mounted) Navigator.of(context).pop();
+                      if (response.result) {
+                        // 成功
+                        if (context.mounted) {
+                          await showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => CustomConfirmDialog(
+                              text: '印刷が完了しました',
+                              trueBtnText: '確認',
+                              hasFalseBtn: false,
+                            ),
+                          );
+                        }
+                      } else {
+                        // 失敗 → エラー定義に基づくダイアログ
+                        if (context.mounted) {
+                          final result = await handleServerError(
+                            context: context,
+                            errKind: response.errKind,
+                            errCode: response.errCode,
+                          );
+                          if (result.isRetryPrint) {
+                            retry = true; // 再試行 → ループ
+                          } else if (!result.handled) {
+                            // 定義が無い場合は従来の汎用メッセージ
+                            if (context.mounted) {
+                              await showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => CustomConfirmDialog(
+                                  text: '印刷に失敗しました',
+                                  trueBtnText: '確認',
+                                  hasFalseBtn: false,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) Navigator.of(context).pop();
+                      AppLogger().error('Print', '印刷エラー', e);
+                      if (context.mounted) {
+                        await showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => CustomConfirmDialog(
+                            text: '通信エラーが発生しました',
+                            trueBtnText: '確認',
+                            hasFalseBtn: false,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                },
