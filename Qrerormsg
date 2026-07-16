@@ -1,0 +1,55 @@
+      } else {
+        AppLogger().warn(
+          'QrReading',
+          'QR照会失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+        );
+        if (context.mounted) {
+          final result = await handleServerError(
+            context: context,
+            errKind: response.errKind,
+            errCode: response.errCode,
+          );
+          // 照会段階では業務未開始のため、コマンド送信・遷移は行わない。
+          // メッセージ表示のみ。定義が無ければ従来メッセージ。
+          if (!result.handled && context.mounted) {
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => CustomConfirmDialog(
+                text: 'QR照会に失敗しました\nエラーコード: ${response.errCode}',
+                trueBtnText: '確認',
+                hasFalseBtn: false,
+              ),
+            );
+          }
+        }
+      }
+
+
+
+
+
+        } else {
+          AppLogger().warn(
+            'QrReading',
+            '表示データ取得失敗: ERRKIND=${displayData.errKind} ERRCODE=${displayData.errCode}',
+          );
+          if (context.mounted) {
+            final result = await handleServerError(
+              context: context,
+              errKind: displayData.errKind,
+              errCode: displayData.errCode,
+            );
+            if (!result.handled && context.mounted) {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => CustomConfirmDialog(
+                  text: '表示データの取得に失敗しました',
+                  trueBtnText: '確認',
+                  hasFalseBtn: false,
+                ),
+              );
+            }
+          }
+        }
