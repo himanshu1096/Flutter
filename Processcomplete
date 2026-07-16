@@ -1,0 +1,79 @@
+          onCompleteButtonPressed: () async {
+            bool retry = true;
+            while (retry) {
+              retry = false;
+              try {
+                final response = await TcpService().sendPrintReceipt();
+                if (response.result) {
+                  // 成功 → "印刷が完了しました" → 確認 → 0xB101送信 → 0xB181後 0xFB81でQR読取へ
+                  if (context.mounted) {
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => CustomConfirmDialog(
+                        text: '印刷が完了しました',
+                        trueBtnText: '確認',
+                        hasFalseBtn: false,
+                      ),
+                    );
+                    await TcpService().sendCancel();
+                  }
+                } else {
+                  // 失敗 → エラー定義に基づくダイアログ
+                  if (context.mounted) {
+                    final result = await handleServerError(
+                      context: context,
+                      errKind: response.errKind,
+                      errCode: response.errCode,
+                    );
+                    if (result.isRetryPrint) {
+                      // 用紙切れ(0000-1003) → 再試行 → ループ
+                      retry = true;
+                    } else if (result.isCancel) {
+                      // コマンド異常(2000-0016) → 0xB101 → 0xFB81でQR読取へ
+                      await TcpService().sendCancel();
+                    } else if (result.handled) {
+                      // コマンド無し(1001印刷失敗など) → 同じページに留まる
+                    } else {
+                      // 定義なし → "印刷に失敗しました" → 0xB101 → QR読取へ
+                      if (context.mounted) {
+                        await showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => CustomConfirmDialog(
+                            text: '印刷に失敗しました',
+                            trueBtnText: '確認',
+                            hasFalseBtn: false,
+                          ),
+                        );
+                        await TcpService().sendCancel();
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                // 通信エラー → "通信エラー" → 確認 → 0xB101 → QR読取へ
+                AppLogger().error('ProcessCompletedPrint', '領収書印刷エラー', e);
+                if (context.mounted) {
+                  await showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => CustomConfirmDialog(
+                      text: '通信エラーが発生しました',
+                      trueBtnText: '確認',
+                      hasFalseBtn: false,
+                    ),
+                  );
+                  try {
+                    await TcpService().sendCancel();
+                  } catch (e2) {
+                    AppLogger().error(
+                      'ProcessCompletedPrint',
+                      '取消送信エラー',
+                      e2,
+                    );
+                  }
+                }
+              }
+            }
+          },
