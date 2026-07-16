@@ -1,0 +1,50 @@
+  /// 読み込み — アプリ起動時に一度だけ呼ぶ
+  Future<void> load() async {
+    AppLogger().info(_tag, '★エラーメッセージ読み込み開始');
+    AppLogger().info(_tag, '★対象パス: $_path');
+
+    if (_loaded) {
+      AppLogger().info(_tag, '★既に読み込み済み — スキップ');
+      return;
+    }
+    try {
+      final file = File(_path);
+      final exists = await file.exists();
+      AppLogger().info(_tag, '★ファイル存在チェック: $exists');
+
+      if (!exists) {
+        AppLogger().warn(_tag, '★ファイルが見つかりません: $_path');
+        return;
+      }
+
+      final contents = await file.readAsString();
+      AppLogger().info(_tag, '★ファイル読み込み成功: ${contents.length}文字');
+
+      final root = jsonDecode(contents) as Map<String, dynamic>;
+      final list = root['ErrorList'] as List<dynamic>? ?? [];
+      AppLogger().info(_tag, '★ErrorList件数: ${list.length}');
+
+      for (final item in list) {
+        final em = ErrorMessage.fromJson(item as Map<String, dynamic>);
+        _cache[_key(em.errorKind, em.errorCode)] = em;
+      }
+      _loaded = true;
+      AppLogger().info(_tag, '★エラーメッセージ読み込み完了: ${_cache.length}件キャッシュ');
+    } catch (e, st) {
+      AppLogger().error(_tag, '★エラーメッセージ読み込み失敗', e);
+      AppLogger().error(_tag, '★スタックトレース', st);
+    }
+  }
+
+
+  /// ERRKIND + ERRCODE でルックアップ (見つからなければ null)
+  ErrorMessage? lookup(int errKind, int errCode) {
+    final key = _key(_pad(errKind), _pad(errCode));
+    final found = _cache[key];
+    AppLogger().info(
+      _tag,
+      '★ルックアップ: key=$key → ${found != null ? "見つかった" : "見つからない"} (キャッシュ${_cache.length}件)',
+    );
+    return found;
+  }
+
