@@ -1,0 +1,146 @@
+/// エラーダイアログのボタン1つ分
+class ErrorButton {
+  final String text;
+  final String command; // 16進文字列 (例 "0xB101"), 空文字ならコマンドなし
+
+  const ErrorButton({required this.text, required this.command});
+
+  factory ErrorButton.fromJson(Map<String, dynamic> json) {
+    return ErrorButton(
+      text: json['Buttontxt'] as String? ?? '',
+      command: json['Buttoncommand'] as String? ?? '',
+    );
+  }
+}
+
+/// KbaErrorMessage.json の ErrorList 内1エントリ
+class ErrorMessage {
+  final String errorKind; // 4桁文字列 例 "0000"
+  final String errorCode; // 4桁文字列 例 "0008"
+  final String message;
+  final List<ErrorButton> buttons;
+
+  const ErrorMessage({
+    required this.errorKind,
+    required this.errorCode,
+    required this.message,
+    required this.buttons,
+  });
+
+  factory ErrorMessage.fromJson(Map<String, dynamic> json) {
+    final btnList = (json['Buttonlist'] as List<dynamic>? ?? [])
+        .map((b) => ErrorButton.fromJson(b as Map<String, dynamic>))
+        .toList();
+    return ErrorMessage(
+      errorKind: json['Errorkind'] as String? ?? '',
+      errorCode: json['Errorcode'] as String? ?? '',
+      message: json['Message'] as String? ?? '',
+      buttons: btnList,
+    );
+  }
+
+  ErrorButton? get button1 => buttons.isNotEmpty ? buttons[0] : null;
+  ErrorButton? get button2 => buttons.length > 1 ? buttons[1] : null;
+  bool get hasButton2 => buttons.length > 1;
+}
+
+
+
+
+      final contents = await file.readAsString();
+      final root = jsonDecode(contents) as Map<String, dynamic>;
+      final list = root['ErrorList'] as List<dynamic>? ?? [];
+      for (final item in list) {
+        final em = ErrorMessage.fromJson(item as Map<String, dynamic>);
+        _cache[_key(em.errorKind, em.errorCode)] = em;
+      }
+
+
+
+import 'package:flutter/material.dart';
+import 'package:qr_multidemo/model/error_message.dart';
+import 'confirm_dialog.dart';
+
+/// エラー定義に基づくダイアログを表示する。
+/// 戻り値: 押されたボタンのコマンド文字列 (例 "0xB101")。未定義なら空文字。
+Future<String> showErrorDialog({
+  required BuildContext context,
+  required ErrorMessage error,
+}) async {
+  final b1 = error.button1;
+  final b2 = error.button2;
+
+  final pressedTrue = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return CustomConfirmDialog(
+        text: error.message,
+        trueBtnText: (b1?.text.isNotEmpty ?? false) ? b1!.text : '確認',
+        falseBtnText: b2?.text ?? '',
+        hasTrueBtn: true,
+        hasFalseBtn: error.hasButton2,
+      );
+    },
+  );
+
+  // true=ボタン1, false=ボタン2
+  if (pressedTrue == false && b2 != null) {
+    return b2.command;
+  }
+  return b1?.command ?? '';
+}
+
+
+
+
+class ErrorResult {
+  final bool handled;
+  final String command;
+
+  const ErrorResult({required this.handled, this.command = ''});
+  static const notHandled = ErrorResult(handled: false);
+
+  bool get isRetryPrint =>
+      command == '0xC101' ||
+      command == '0xC201' ||
+      command == '0xC301' ||
+      command == '0xC401' ||
+      command == '0xC501';
+
+  bool get isAppExit => command == '0x0F01';
+  bool get isCancel => command == '0xB101';
+}
+
+
+
+    } else {
+      AppLogger().warn('ExecuteButton', '処理失敗: ${response.errCode}');
+      if (context.mounted) {
+        final result = await handleServerError(
+          context: context,
+          errKind: response.errKind,
+          errCode: response.errCode,
+        );
+        if (result.isCancel) {
+          // 確認(0xB101) → 業務取消してQR読取へ戻る
+          await TcpService().sendCancel();
+          // 0xFB81が来て_navigateToQrReadingが実行される
+        } else if (result.isAppExit) {
+          await TcpService().sendAppExit();
+        } else if (!result.handled) {
+          // 定義なし → 従来の汎用メッセージ
+          if (context.mounted) {
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => CustomConfirmDialog(
+                text: '処理が失敗しました',
+                trueBtnText: '確認',
+                hasFalseBtn: false,
+              ),
+            );
+          }
+        }
+      }
+    }
