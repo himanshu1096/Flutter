@@ -1,0 +1,49 @@
+/// エラーダイアログのボタン1つ分
+class ErrorButton {
+  final String text;
+  final int? command; // 例: 45313 (=0xB101)。nullならコマンドなし
+
+  const ErrorButton({required this.text, required this.command});
+
+  factory ErrorButton.fromJson(Map<String, dynamic> json) {
+    return ErrorButton(
+      text: json['BUTTONTXT'] as String? ?? '',
+      command: json['BUTTONCMD'] as int?, // int or null
+    );
+  }
+
+  /// コマンドを "0xB101" 形式に変換 (無ければ空文字)
+  String get commandHex =>
+      command == null ? '' : '0x${command!.toRadixString(16).toUpperCase().padLeft(4, '0')}';
+}
+
+/// KbaErrorMessage.json の ERRORLIST 内1エントリ
+class ErrorMessage {
+  final int errorKind; // int 例: 0
+  final int errorCode; // int 例: 769 (=0x0301)
+  final String message;
+  final List<ErrorButton> buttons;
+
+  const ErrorMessage({
+    required this.errorKind,
+    required this.errorCode,
+    required this.message,
+    required this.buttons,
+  });
+
+  factory ErrorMessage.fromJson(Map<String, dynamic> json) {
+    final btnList = (json['BUTTONLIST'] as List<dynamic>? ?? [])
+        .map((b) => ErrorButton.fromJson(b as Map<String, dynamic>))
+        .toList();
+    return ErrorMessage(
+      errorKind: json['ERRORKIND'] as int? ?? -1,
+      errorCode: json['ERRORCODE'] as int? ?? -1,
+      message: json['MESSAGE'] as String? ?? '',
+      buttons: btnList,
+    );
+  }
+
+  ErrorButton? get button1 => buttons.isNotEmpty ? buttons[0] : null;
+  ErrorButton? get button2 => buttons.length > 1 ? buttons[1] : null;
+  bool get hasButton2 => buttons.length > 1;
+}
