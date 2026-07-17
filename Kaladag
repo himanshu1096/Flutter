@@ -1,0 +1,112 @@
+void showCustomAlertDialog({
+  required BuildContext context,
+  required String text,
+  int? closeSec,
+}) {
+  showDialog(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: false,
+    builder: (context) {
+
+
+
+  Future<void> _doQrInquiry({
+    required BuildContext context,
+    required WidgetRef ref,
+    required int designation,
+    Uint8List? rawData,
+    String? qrNumber,
+  }) async {
+    // await前にnotifierを取得 (await後のref使用はunmountで不正になるため)
+    final displayDataNotifier = ref.read(displayDataProvider.notifier);
+    final qrTicketNoNotifier = ref.read(qrTicketNoProvider.notifier);
+
+    showCustomAlertDialog(context: context, text: '照会中');
+    try {
+      final response = await TcpService().sendQrServerRequest(
+        designation: designation,
+        rawData: rawData,
+        qrNumber: qrNumber,
+      );
+      // 照会中ダイアログをrootNavigatorで確実に閉じる
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      if (response.result) {
+        AppLogger().info('QrReading', 'QR照会成功 → 0x1201送信');
+        final displayData = await TcpService().sendDisplayDataRequest();
+        if (displayData.result) {
+          AppLogger().info('QrReading', '表示データ取得成功');
+          displayDataNotifier.set(displayData);
+          qrTicketNoNotifier.reset();
+          gotoQrState.call(true);
+        } else {
+          AppLogger().warn(
+            'QrReading',
+            '表示データ取得失敗: ERRKIND=${displayData.errKind} ERRCODE=${displayData.errCode}',
+          );
+          if (context.mounted) {
+            final result = await handleServerError(
+              context: context,
+              errKind: displayData.errKind,
+              errCode: displayData.errCode,
+            );
+            if (!result.handled && context.mounted) {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => CustomConfirmDialog(
+                  text: '表示データの取得に失敗しました',
+                  trueBtnText: '確認',
+                  hasFalseBtn: false,
+                ),
+              );
+            }
+          }
+        }
+      } else {
+        AppLogger().warn(
+          'QrReading',
+          'QR照会失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+        );
+        if (context.mounted) {
+          final result = await handleServerError(
+            context: context,
+            errKind: response.errKind,
+            errCode: response.errCode,
+          );
+          // 照会段階では業務未開始のため、コマンド送信・遷移は行わない
+          if (!result.handled && context.mounted) {
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => CustomConfirmDialog(
+                text: 'QR照会に失敗しました\nエラーコード: ${response.errCode}',
+                trueBtnText: '確認',
+                hasFalseBtn: false,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // 照会中ダイアログをrootNavigatorで確実に閉じる
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      AppLogger().error('QrReading', 'QR照会エラー', e);
+      if (context.mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => CustomConfirmDialog(
+            text: '通信エラーが発生しました',
+            trueBtnText: '確認',
+            hasFalseBtn: false,
+          ),
+        );
+      }
+    }
+  }
