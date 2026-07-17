@@ -1,0 +1,137 @@
+/// エラーダイアログのボタン1つ分
+class ErrorButton {
+  final String text;
+  final int? command; // 例: 45313 (=0xB101)。nullならコマンドなし
+
+  const ErrorButton({required this.text, required this.command});
+
+  factory ErrorButton.fromJson(Map<String, dynamic> json) {
+    return ErrorButton(
+      text: json['BUTTONTXT'] as String? ?? '',
+      command: json['BUTTONCMD'] as int?,
+    );
+  }
+
+  /// コマンドを "0xB101" 形式に変換 (無ければ空文字)
+  String get commandHex => command == null
+      ? ''
+      : '0x${command!.toRadixString(16).toUpperCase().padLeft(4, '0')}';
+}
+
+/// KbaErrorMessage.json の ERRORLIST 内1エントリ
+class ErrorMessage {
+  final int errorKind; // int 例: 0
+  final int errorCode; // int 例: 769 (=0x0301)
+  final String message;
+  final List<ErrorButton> buttons;
+
+  const ErrorMessage({
+    required this.errorKind,
+    required this.errorCode,
+    required this.message,
+    required this.buttons,
+  });
+
+  factory ErrorMessage.fromJson(Map<String, dynamic> json) {
+    final btnList = (json['BUTTONLIST'] as List<dynamic>? ?? [])
+        .map((b) => ErrorButton.fromJson(b as Map<String, dynamic>))
+        .toList();
+    return ErrorMessage(
+      errorKind: json['ERRORKIND'] as int? ?? -1,
+      errorCode: json['ERRORCODE'] as int? ?? -1,
+      message: json['MESSAGE'] as String? ?? '',
+      buttons: btnList,
+    );
+  }
+
+  ErrorButton? get button1 => buttons.isNotEmpty ? buttons[0] : null;
+  ErrorButton? get button2 => buttons.length > 1 ? buttons[1] : null;
+  bool get hasButton2 => buttons.length > 1;
+}
+
+
+
+
+import 'dart:convert';
+import 'dart:io';
+import 'package:charset_converter/charset_converter.dart';
+import 'package:qr_multidemo/config/tcp_config.dart';
+import 'package:qr_multidemo/model/error_message.dart';
+import 'app_logger.dart';
+
+/// エラーメッセージ定義ファイル (KbaErrorMessage.json) のルックアップサービス
+/// ERRKIND + ERRCODE の複合キーでメッセージ・ボタン定義を取得
+class ErrorMessageService {
+  static final ErrorMessageService _instance = ErrorMessageService._internal();
+  factory ErrorMessageService() => _instance;
+  ErrorMessageService._internal();
+
+  String get _path => TcpConfig().errorMsgPath;
+  static const String _tag = 'ErrorMessageService';
+
+  // キャッシュ: { "ERRKIND-ERRCODE": ErrorMessage }
+  final Map<String, ErrorMessage> _cache = {};
+  bool _loaded = false;
+
+  String _key(int kind, int code) => '$kind-$code';
+
+  /// 読み込み — アプリ起動時に一度だけ呼ぶ
+  Future<void> load() async {
+    AppLogger().info(_tag, '★エラーメッセージ読み込み開始');
+    AppLogger().info(_tag, '★対象パス: $_path');
+
+    if (_loaded) {
+      AppLogger().info(_tag, '★既に読み込み済み — スキップ');
+      return;
+    }
+    try {
+      final file = File(_path);
+      final exists = await file.exists();
+      AppLogger().info(_tag, '★ファイル存在チェック: $exists');
+
+      if (!exists) {
+        AppLogger().warn(_tag, '★ファイルが見つかりません: $_path');
+        return;
+      }
+
+      // Shift-JISでデコード
+      final bytes = await file.readAsBytes();
+      final contents = await CharsetConverter.decode('Shift_JIS', bytes);
+      AppLogger().info(_tag, '★ファイル読み込み成功: ${contents.length}文字');
+
+      final root = jsonDecode(contents) as Map<String, dynamic>;
+      final list = root['ERRORLIST'] as List<dynamic>? ?? [];
+      AppLogger().info(_tag, '★ERRORLIST件数: ${list.length}');
+
+      for (final item in list) {
+        final em = ErrorMessage.fromJson(item as Map<String, dynamic>);
+        _cache[_key(em.errorKind, em.errorCode)] = em;
+      }
+      _loaded = true;
+      AppLogger().info(_tag, '★エラーメッセージ読み込み完了: ${_cache.length}件キャッシュ');
+    } catch (e, st) {
+      AppLogger().error(_tag, '★エラーメッセージ読み込み失敗', e);
+      AppLogger().error(_tag, '★スタックトレース', st);
+    }
+  }
+
+  /// ERRKIND + ERRCODE でルックアップ (見つからなければ null)
+  ErrorMessage? lookup(int errKind, int errCode) {
+    final key = _key(errKind, errCode);
+    final found = _cache[key];
+    AppLogger().info(
+      _tag,
+      '★ルックアップ: key=$key → ${found != null ? "見つかった" : "見つからない"} (キャッシュ${_cache.length}件)',
+    );
+    return found;
+  }
+}
+
+
+
+
+  if (pressedTrue == false && b2 != null) {
+    return b2.commandHex;
+  }
+  return b1?.commandHex ?? '';
+
