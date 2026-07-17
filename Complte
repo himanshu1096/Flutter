@@ -1,0 +1,90 @@
+          onCompleteButtonPressed: () async {
+            bool retry = true;
+            while (retry) {
+              retry = false;
+              // 印刷中ダイアログ表示
+              if (context.mounted) {
+                showCustomAlertDialog(context: context, text: '印刷中');
+              }
+              try {
+                final response = await TcpService().sendPrintReceipt();
+                // 印刷中ダイアログを閉じる (rootNavigatorで確実に)
+                if (context.mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                }
+                if (response.result) {
+                  // 成功 → "印刷が完了しました" → 確認 → 0xB101 → QR読取へ (自flowで遷移)
+                  if (context.mounted) {
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => CustomConfirmDialog(
+                        text: '印刷が完了しました',
+                        trueBtnText: '確認',
+                        hasFalseBtn: false,
+                      ),
+                    );
+                    await TcpService().sendCancel(); // 0xB101 → 0xB181待ち
+                    TcpService().navigateToQrReading(); // 明示的にQR読取へ
+                  }
+                } else {
+                  // 失敗 → エラー定義に基づくダイアログ
+                  if (context.mounted) {
+                    final result = await handleServerError(
+                      context: context,
+                      errKind: response.errKind,
+                      errCode: response.errCode,
+                    );
+                    if (result.isRetryPrint) {
+                      // 用紙切れ(0000-1003) → 再試行 → ループ (再び印刷中表示)
+                      retry = true;
+                    } else if (result.isCancel) {
+                      // コマンド異常(2000-0016) → 0xB101 → QR読取へ
+                      await TcpService().sendCancel();
+                      TcpService().navigateToQrReading();
+                    } else if (result.handled) {
+                      // コマンド無し(1001印刷失敗など) → 同じページに留まる
+                    } else {
+                      // 定義なし → "印刷に失敗しました" → 0xB101 → QR読取へ
+                      if (context.mounted) {
+                        await showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => CustomConfirmDialog(
+                            text: '印刷に失敗しました',
+                            trueBtnText: '確認',
+                            hasFalseBtn: false,
+                          ),
+                        );
+                        await TcpService().sendCancel();
+                        TcpService().navigateToQrReading();
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                // 印刷中ダイアログを閉じる
+                if (context.mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                }
+                AppLogger().error('ProcessCompletedPrint', '領収書印刷エラー', e);
+                if (context.mounted) {
+                  await showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => CustomConfirmDialog(
+                      text: '通信エラーが発生しました',
+                      trueBtnText: '確認',
+                      hasFalseBtn: false,
+                    ),
+                  );
+                  try {
+                    await TcpService().sendCancel();
+                    TcpService().navigateToQrReading();
+                  } catch (e2) {
+                    AppLogger().error('ProcessCompletedPrint', '取消送信エラー', e2);
+                  }
+                }
+              }
+            }
+          },
