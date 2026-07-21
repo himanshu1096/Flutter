@@ -1,0 +1,86 @@
+/// YUV420のY平面(輝度)から直接Int32Listを作る
+/// JPEGデコード不要なので高速
+Int32List _yPlaneToInt32List(CameraImage image) {
+  final yPlane = image.planes[0];
+  final bytes = yPlane.bytes;
+  final width = image.width;
+  final height = image.height;
+  final rowStride = yPlane.bytesPerRow;
+
+  final pixels = Int32List(width * height);
+  var idx = 0;
+  for (var y = 0; y < height; y++) {
+    final rowStart = y * rowStride;
+    for (var x = 0; x < width; x++) {
+      final lum = bytes[rowStart + x];
+      // グレースケールをARGBに詰める
+      pixels[idx++] = (0xFF << 24) | (lum << 16) | (lum << 8) | lum;
+    }
+  }
+  return pixels;
+}
+
+
+
+
+  /// 検知ループ開始 (imageStream版 — ディスクI/O・JPEGデコード不要で高速)
+  void _startDetectionLoop() {
+    _isDetecting.value = true;
+    final controller = _controller;
+    if (controller == null) return;
+
+    DateTime lastAttempt = DateTime.fromMillisecondsSinceEpoch(0);
+
+    controller.startImageStream((CameraImage image) async {
+      if (!mounted || !_isDetecting.value) return;
+      if (_isDecoding) return;
+
+      // 間隔スロットリング (config: CAMERA_INTERVAL_MS)
+      final now = DateTime.now();
+      final interval = widget.interval ?? _cameraInterval;
+      if (now.difference(lastAttempt) < interval) return;
+      lastAttempt = now;
+
+      _isDecoding = true;
+      try {
+        final luminanceSource = RGBLuminanceSource(
+          image.width,
+          image.height,
+          _yPlaneToInt32List(image),
+        );
+        final bitmap = BinaryBitmap(HybridBinarizer(luminanceSource));
+        final reader = QRCodeReader();
+
+        try {
+          final result = reader.decode(bitmap);
+          final byteSegments =
+              result.resultMetadata[ResultMetadataType.byteSegments];
+          if (byteSegments != null &&
+              byteSegments is List &&
+              byteSegments.isNotEmpty) {
+            final signedBytes = byteSegments[0] as List<int>;
+            final rawBytes =
+                Uint8List.fromList(signedBytes.map((b) => b & 0xFF).toList());
+            debugPrint('QR byte length: ${rawBytes.length}');
+            _qrText.value = 'Bytes: ${rawBytes.length}';
+
+            // 検知したらストリーム停止 (多重検知防止)
+            _isDetecting.value = false;
+            await controller.stopImageStream();
+            widget.onDetected?.call(rawBytes);
+          }
+        } catch (_) {
+          // QRが見つからないフレームは無視 (通常ケース)
+        }
+      } catch (e) {
+        debugPrint('decode error: $e');
+      } finally {
+        _isDecoding = false;
+      }
+    });
+  }
+
+
+    if (_controller?.value.isStreamingImages ?? false) {
+      _controller?.stopImageStream();
+    }
