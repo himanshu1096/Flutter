@@ -1,0 +1,37 @@
+            // JPEGを縮小デコード (QRは低解像度でも読める。デコード負荷を大幅削減)
+            img.Image? decoded = img.decodeJpg(bytes);
+            if (decoded != null) {
+              // 長辺が500pxを超える場合は縮小
+              if (decoded.width > 500 || decoded.height > 500) {
+                decoded = img.copyResize(
+                  decoded,
+                  width: decoded.width >= decoded.height ? 500 : null,
+                  height: decoded.height > decoded.width ? 500 : null,
+                );
+              }
+            }
+            if (decoded case final image?) {
+              final luminanceSource = RGBLuminanceSource(
+                image.width,
+                image.height,
+                convertToInt32List(image),
+              );
+
+
+
+  /// 画像をInt32Listに変換 (輝度グレースケール — QR判定にはこれで十分)
+  Int32List convertToInt32List(img.Image image) {
+    final w = image.width;
+    final h = image.height;
+    final pixels = Int32List(w * h);
+    int idx = 0;
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        final p = image.getPixel(x, y);
+        // 輝度 = 0.299R + 0.587G + 0.114B の近似 (整数演算)
+        final lum = (p.r.toInt() * 77 + p.g.toInt() * 150 + p.b.toInt() * 29) >> 8;
+        pixels[idx++] = (0xFF << 24) | (lum << 16) | (lum << 8) | lum;
+      }
+    }
+    return pixels;
+  }
