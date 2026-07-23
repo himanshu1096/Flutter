@@ -1,0 +1,44 @@
+  Future<CameraLensDirection> switchCamera([
+    CameraDescription? cameraDescription,
+  ]) async {
+    if (_controller case final controller?) {
+      AppLogger().info(
+        'CameraScanner',
+        '★カメラ台数=${_cameras.length} '
+        '現在=${controller.description.name}/${controller.description.lensDirection.name}',
+      );
+      for (final c in _cameras) {
+        AppLogger().info(
+          'CameraScanner',
+          '★利用可能カメラ: ${c.name} / ${c.lensDirection.name}',
+        );
+      }
+
+      if (_cameras.length > 1) {
+        final nextCamera = cameraDescription ?? _getNextCamera();
+        AppLogger().info(
+          'CameraScanner',
+          '★切替先=${nextCamera.name}/${nextCamera.lensDirection.name}',
+        );
+
+        if (nextCamera != controller.description) {
+          await controller.setDescription(nextCamera);
+          AppLogger().info('CameraScanner', '★setDescription完了');
+        } else {
+          AppLogger().warn('CameraScanner', '★切替先が現在と同一 — 切替なし');
+        }
+
+        AppLogger().info(
+          'CameraScanner',
+          '★切替後 controller.description='
+          '${controller.description.name}/${controller.description.lensDirection.name}',
+        );
+        return nextCamera.lensDirection;
+      } else {
+        AppLogger().error('CameraScanner', '★カメラが1台のみ — 切替不可', null);
+        throw Exception("カメラが1つしかないから切り替え不可。:switchCamera()");
+      }
+    } else {
+      throw Exception("カメラのコントローラがnullです。:switchCamera()");
+    }
+  }
