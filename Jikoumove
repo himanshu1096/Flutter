@@ -1,0 +1,51 @@
+class ProcessFailed extends StatelessWidget {
+  const ProcessFailed({super.key, this.message, this.onCompleteButtonPressed});
+
+  /// 失敗メッセージ (JSONから取得。nullなら既定メッセージ)
+  final String? message;
+
+  /// 確認ボタン押下時の処理
+  final Future<void> Function()? onCompleteButtonPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProcessCompleteBase(
+      message: message ?? "処理に失敗しました。",
+      completeButtonLabel: '確認   ',
+      onCompleteButtonPressed: onCompleteButtonPressed,
+    );
+  }
+}
+
+/// 処理失敗画面に表示するメッセージ
+@riverpod
+class FailedMessage extends _$FailedMessage {
+  @override
+  String? build() => null;
+
+  void set(String? message) => state = message;
+}
+
+
+            complete: ProcessCompleted(),
+      completePrint: ProcessCompletedPrint(),
+      failed: Consumer(
+        builder: (context, ref, _) =>
+            ProcessFailed(message: ref.watch(failedMessageProvider)),
+      ),
+
+
+
+
+    } else {
+      AppLogger().warn('ExecuteButton', '処理失敗: ${response.errCode}');
+      // JSONからメッセージ取得 (無ければnull → 既定メッセージ)
+      final errorDef = ErrorMessageService().lookup(
+        response.errKind,
+        response.errCode,
+      );
+      container.read(failedMessageProvider.notifier).set(errorDef?.message);
+      // 失敗画面へ遷移 (ダイアログ無し・音無し)
+      QrProcessMenuState.tabKey.currentState?.gotoFailedTab();
+    }
+
