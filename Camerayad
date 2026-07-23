@@ -1,0 +1,93 @@
+    // 起動するカメラを選択する
+    // Windowsでは複数カメラが全てfrontと報告されるため、
+    // lensDirectionでは識別できない。保存済みカメラ名を優先する。
+    CameraDescription? camera;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedName = prefs.getString('camera_name');
+      if (savedName != null) {
+        camera = _cameras.firstWhereOrNull((c) => c.name == savedName);
+        AppLogger().info(
+          'CameraScanner',
+          '★保存カメラ名=$savedName 該当=${camera != null}',
+        );
+      }
+    } catch (e) {
+      AppLogger().error('CameraScanner', '★保存カメラ読込エラー', e);
+    }
+    // 保存が無い/見つからない場合は従来通りlensDirectionで選択
+    camera ??= _cameras.firstWhere(
+      (x) => x.lensDirection == widget.lensDirection,
+      orElse: () => _cameras.first,
+    );
+    AppLogger().info('CameraScanner', '★使用カメラ=${camera.name}');
+
+
+
+  /// 次のカメラに切り替え、切替後のカメラ名を返す
+  Future<String> switchCameraByName() async {
+    if (_controller case final controller?) {
+      if (_cameras.length > 1) {
+        final nextCamera = _getNextCamera();
+        if (nextCamera != controller.description) {
+          await controller.setDescription(nextCamera);
+        }
+        AppLogger().info('CameraScanner', '★切替後カメラ名=${nextCamera.name}');
+        return nextCamera.name;
+      }
+      return controller.description.name;
+    }
+    throw Exception("カメラのコントローラがnullです。:switchCameraByName()");
+  }
+
+
+
+  /// カメラを切り替え、切替後のカメラ名を返す
+  Future<String> switchCameraByName() async {
+    return await _state.switchCameraByName();
+  }
+
+
+
+  /// SharedPreferencesにカメラ名を保存する
+  Future<void> _saveCameraName(String name) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ok = await prefs.setString('camera_name', name);
+      AppLogger().info('Scanner', '★カメラ名保存: $name 結果=$ok');
+    } catch (e) {
+      AppLogger().error('Scanner', '★カメラ名保存エラー', e);
+    }
+  }
+
+
+
+              onPressed: () async {
+                final newName = await _controller.switchCameraByName();
+                await _saveCameraName(newName);
+              },
+
+
+
+              final prefs = await SharedPreferences.getInstance();
+              final savedName = prefs.getString('camera_name');
+              AppLogger().info('QrReading', '★保存済みカメラ名: $savedName');
+
+
+
+
+    // 保存されたカメラがあれば復元
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedName = prefs.getString('camera_name');
+      if (savedName != null) {
+        final target = _cameras.firstWhereOrNull((c) => c.name == savedName);
+        if (target != null && target != _controller!.description) {
+          await _controller!.setDescription(target);
+          AppLogger().info('CameraScanner', '★保存カメラを復元: $savedName');
+        }
+      }
+    } catch (e) {
+      AppLogger().error('CameraScanner', '★カメラ復元エラー', e);
+    }
+
