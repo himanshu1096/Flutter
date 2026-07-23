@@ -1,0 +1,16 @@
+  /// SharedPreferencesにカメラ方向を保存する
+  Future<void> _saveCameraDirection(CameraLensDirection direction) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ok = await prefs.setString('camera_direction', direction.name);
+      AppLogger().info(
+        'Scanner',
+        '★カメラ方向保存: ${direction.name} 結果=$ok',
+      );
+      // 直後に読み戻して確認
+      final check = prefs.getString('camera_direction');
+      AppLogger().info('Scanner', '★保存後の読み戻し: $check');
+    } catch (e) {
+      AppLogger().error('Scanner', '★カメラ方向保存エラー', e);
+    }
+  }
