@@ -1,0 +1,14 @@
+        onScaleUpdate: (details) async {
+          // カメラがズーム非対応なら何もしない
+          if (_maxZoom <= _minZoom) return;
+          final newZoom =
+              (_baseZoomLevel * details.scale).clamp(_minZoom, _maxZoom);
+          if ((newZoom - _zoomLevel).abs() < 0.01) return;
+          _zoomLevel = newZoom;
+          try {
+            await controller.setZoomLevel(_zoomLevel);
+            AppLogger().info('CameraScanner', '★ズーム適用: $_zoomLevel');
+          } catch (e) {
+            AppLogger().error('CameraScanner', '★setZoomLevel失敗', e);
+          }
+        },
