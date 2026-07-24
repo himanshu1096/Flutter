@@ -1,0 +1,32 @@
+  /// デジタルズーム: 画像中央を 1/zoom のサイズで切り出す
+  img.Image _cropCenter(img.Image src, double zoom) {
+    if (zoom <= 1.0) return src;
+    final w = (src.width / zoom).round();
+    final h = (src.height / zoom).round();
+    final x = ((src.width - w) / 2).round();
+    final y = ((src.height - h) / 2).round();
+    return img.copyCrop(src, x: x, y: y, width: w, height: h);
+  }
+
+  Int32List convertToInt32List(img.Image image) {
+
+
+
+            if (decoded case final resizedImage?) {
+              // デジタルズーム: 中央を切り出す (_zoomLevel倍)
+              final image = _cropCenter(resizedImage, _zoomLevel);
+              final luminanceSource = RGBLuminanceSource(
+                image.width,
+                image.height,
+                convertToInt32List(image),
+              );
+
+
+
+                    child: Transform.flip(
+                      flipX: true,
+                      child: Transform.scale(
+                        scale: _zoomLevel,
+                        child: CameraPreview(controller),
+                      ),
+                    ),
