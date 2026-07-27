@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>締切タブ レイアウト比較</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#ff8608;
+    --primary-container:#fff7ef;
+    --on-primary-container:#432200;
+    --secondary-container:#ccffe6;
+    --on-secondary-container:#004322;
+    --indigo:#303F9F;
+    --indigo-dark:#233B77;
+    --surface-container:#cce5ff;
+    --table-header:#E1F5FE;
+    --table-border:#90CAF9;
+    --gold-a:#FFD98A;
+    --gold-b:#F2A93B;
+    --cyan-a:#BEEBFB;
+    --cyan-b:#5FC6F2;
+    --page-bg:#eef0f4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'M PLUS Rounded 1c', 'Hiragino Sans', sans-serif;
+    background:var(--page-bg);
+    color:#26313f;
+    padding:28px 16px 60px;
+  }
+  .page{ max-width:1040px; margin:0 auto; }
+  h1{ font-size:20px; margin:0 0 4px; color:var(--indigo-dark); }
+  .lede{ font-size:13px; color:#5b6675; margin:0 0 4px; }
+  .dummy-flag{ font-size:12px; color:#a3663c; background:#fff3e6; border:1px solid #ffdcb0; display:inline-block; padding:3px 10px; border-radius:20px; margin:8px 0 20px; }
+
+  /* pattern switcher */
+  .pswitch-row{ display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .pswitch{
+    flex:1 1 220px;
+    border:2px solid #d7dee8;
+    background:#fff;
+    border-radius:14px;
+    padding:10px 14px;
+    text-align:left;
+    cursor:pointer;
+    font-family:inherit;
+    transition:.15s;
+  }
+  .pswitch b{ display:block; font-size:14px; color:var(--indigo-dark); }
+  .pswitch span{ display:block; font-size:12px; color:#7c8798; margin-top:2px; }
+  .pswitch:hover{ border-color:var(--primary); }
+  .pswitch.active{ border-color:var(--primary); background:var(--primary-container); box-shadow:0 2px 8px rgba(255,134,8,.18); }
+  .pswitch.active b{ color:var(--primary); }
+
+  /* tablet frame */
+  .tablet-frame{
+    background:#1b1f27;
+    border-radius:26px;
+    padding:14px;
+    box-shadow:0 18px 40px rgba(20,25,35,.28);
+  }
+  .tablet-screen{
+    background:var(--primary-container);
+    border-radius:14px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* top chrome */
+  .topbar{
+    display:flex; align-items:center; gap:14px;
+    background:#fff; padding:8px 14px;
+  }
+  .datetime{ font-size:13px; color:#3a4553; white-space:nowrap; }
+  .maintabs{ display:flex; gap:4px; flex:1; }
+  .maintab{
+    padding:8px 18px; border-radius:12px 12px 0 0; font-size:13px; font-weight:700;
+    background:var(--indigo); color:#fff;
+  }
+  .maintab.active{ background:#fff; color:var(--indigo-dark); border-top:2px solid var(--indigo-dark); border-left:2px solid var(--indigo-dark); border-right:2px solid var(--indigo-dark); position:relative; }
+  .maintab.active::after{ content:''; position:absolute; left:8px; right:8px; bottom:4px; height:3px; background:var(--primary); border-radius:2px; }
+  .topright{ display:flex; align-items:center; gap:8px; }
+  .badge{ width:22px; height:22px; border-radius:6px; border:2px solid #3bb273; display:flex; align-items:center; justify-content:center; font-size:11px; background:#fff; }
+  .station{ font-size:12px; color:#3a4553; }
+  .logoff{ background:#c94b4b; color:#fff; font-size:12px; font-weight:700; padding:6px 12px; border-radius:10px; }
+
+  .subtabs{ display:flex; gap:10px; padding:10px 14px 0; background:var(--primary-container); }
+  .subtab{ padding:7px 16px; border-radius:20px; font-size:12px; font-weight:700; color:#2c2c2c; }
+  .subtab.active{ background:linear-gradient(var(--cyan-a),var(--cyan-b)); box-shadow:0 2px 4px rgba(0,0,0,.15); }
+  .subtab.gold{ background:linear-gradient(var(--gold-a),var(--gold-b)); }
+
+  .pattern-content{ padding:14px; flex:1; display:flex; flex-direction:column; gap:10px; }
+
+  .scroll-area{ overflow-y:auto; max-height:430px; padding-right:4px; }
+  .scroll-area::-webkit-scrollbar{ width:8px; }
+  .scroll-area::-webkit-scrollbar-thumb{ background:#c9d2de; border-radius:4px; }
+
+  /* cards */
+  .card{ background:var(--secondary-container); border:1px solid var(--surface-container); border-radius:14px; margin-bottom:10px; overflow:hidden; }
+  .card:last-child{ margin-bottom:0; }
+  .card-header{ display:flex; align-items:center; gap:8px; padding:10px 14px; color:var(--on-secondary-container); font-weight:800; font-size:14px; cursor:default; list-style:none; }
+  .card-header::-webkit-details-marker{ display:none; }
+  .card-header .icon{ font-size:16px; }
+  .card-body{ padding:0 12px 12px; }
+
+  .row-grid{ display:grid; grid-template-columns:32% 15% 19% 15% 19%; gap:2px; margin-bottom:2px; font-size:12.5px; }
+  .row-name{ display:flex; align-items:center; padding:5px 6px; color:#26313f; }
+  .cell-label{ background:var(--table-header); display:flex; align-items:center; justify-content:center; border-radius:3px; }
+  .cell-value{ background:#fff; display:flex; align-items:center; justify-content:flex-end; padding:5px 8px; border-radius:3px; font-weight:600; }
+
+  .bd-group-title{ font-weight:800; color:var(--on-secondary-container); font-size:13px; margin:10px 0 4px; }
+  .bd-group:first-child .bd-group-title{ margin-top:2px; }
+  .bd-table{ width:100%; border-collapse:collapse; font-size:11.5px; margin:6px 0 4px; }
+  .bd-table th{ background:var(--table-header); border:1px solid var(--table-border); padding:4px 3px; font-weight:700; }
+  .bd-table td{ background:#fff; border:1px solid var(--table-border); padding:4px 3px; text-align:center; }
+  .bd-table td.cname{ text-align:left; font-weight:600; padding-left:6px; }
+
+  /* accordion (pattern C) */
+  details.card summary{ display:flex; align-items:center; gap:8px; }
+  details.card summary .chevron{ margin-left:auto; transition:transform .15s; color:var(--on-secondary-container); }
+  details.card[open] summary .chevron{ transform:rotate(90deg); }
+
+  /* pattern B inner tabs */
+  .inner-subtabs{ display:flex; gap:8px; margin-bottom:4px; }
+  .innertab{ padding:8px 16px; border-radius:20px; font-size:12.5px; font-weight:700; background:#e4e9f1; color:#4b5566; border:none; font-family:inherit; cursor:pointer; }
+  .innertab.active{ background:var(--indigo); color:#fff; }
+
+  .footer-btn{ display:flex; justify-content:flex-end; padding-top:6px; margin-top:auto; }
+  .exec-btn{ background:linear-gradient(var(--gold-a),var(--gold-b)); border:1px solid #fff; box-shadow:0 3px 6px rgba(0,0,0,.18); border-radius:12px; padding:11px 26px; font-size:14px; font-weight:800; color:#2c2c2c; font-family:inherit; cursor:pointer; }
+
+  /* notes */
+  .notes{ background:#fff; border:1px solid #d7dee8; border-radius:14px; padding:16px 18px; margin-top:20px; font-size:13.5px; line-height:1.7; }
+  .notes h2{ font-size:14px; margin:0 0 8px; color:var(--indigo-dark); }
+  .notes ul{ margin:0; padding-left:18px; }
+  .notes li{ margin-bottom:4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>締切タブ レイアウト比較 — 3パターン</h1>
+  <p class="lede">画像2・3の項目案（総取扱計 / 磁気乗車券取扱 / 件数 / 各社別精算内訳）をすべて反映。タップして切替・スクロール・開閉を試せます。</p>
+  <span class="dummy-flag">※ 数値はレイアウト検証用のダミーです（実データではありません）</span>
+
+  <div class="pswitch-row">
+    <button class="pswitch active" data-pattern="a"><b>パターン A</b><span>一括スクロール — 全4セクションを1本の縦スクロールで表示</span></button>
+    <button class="pswitch" data-pattern="b"><b>パターン B</b><span>サブタブ分割 — サマリー / 各社別精算内訳 の2タブに分離</span></button>
+    <button class="pswitch" data-pattern="c"><b>パターン C</b><span>アコーディオン — セクション見出しをタップして開閉</span></button>
+  </div>
+
+  <div class="tablet-frame">
+    <div class="tablet-screen">
+      <div class="topbar">
+        <div class="datetime">2026.07.27(月) 15:47</div>
+        <div class="maintabs">
+          <div class="maintab">QR読取</div>
+          <div class="maintab active">関連業務</div>
+        </div>
+        <div class="topright">
+          <span class="badge">デ</span><span class="badge">QR</span><span class="badge">🖨</span>
+          <span class="station">和光市</span>
+          <span class="logoff">ログオフ &gt;</span>
+        </div>
+      </div>
+      <div class="subtabs">
+        <div class="subtab active">締切 &gt;</div>
+        <div class="subtab gold">締切速報 &gt;</div>
+        <div class="subtab gold">締切再出力 &gt;</div>
+        <div class="subtab gold">接客履歴 &gt;</div>
+      </div>
+
+      <!-- PATTERN A -->
+      <div class="pattern-content" id="pattern-a">
+        <div class="scroll-area" id="a-cards"></div>
+        <div class="footer-btn"><button class="exec-btn">実行 &gt;</button></div>
+      </div>
+
+      <!-- PATTERN B -->
+      <div class="pattern-content" id="pattern-b" hidden>
+        <div class="inner-subtabs">
+          <button class="innertab active" data-tab="summary">サマリー</button>
+          <button class="innertab" data-tab="breakdown">各社別精算内訳</button>
+        </div>
+        <div class="scroll-area" id="b-summary" data-tabview="summary"></div>
+        <div class="scroll-area" id="b-breakdown" data-tabview="breakdown" hidden></div>
+        <div class="footer-btn"><button class="exec-btn">実行 &gt;</button></div>
+      </div>
+
+      <!-- PATTERN C -->
+      <div class="pattern-content" id="pattern-c" hidden>
+        <div class="scroll-area" id="c-cards"></div>
+        <div class="footer-btn"><button class="exec-btn">実行 &gt;</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+const cardSections = [
+  { icon:'📋', title:'総取扱計', cols:['枚数','金額'], rows:[
+    {label:'合計', a:'5,842件', b:'3,127,400円'},
+    {label:'現金', a:'3,214件', b:'1,842,600円'},
+  ]},
+  { icon:'🎫', title:'磁気乗車券取扱', cols:['枚数','金額'], rows:[
+    {label:'合計', a:'2,628件', b:'1,284,800円'},
+    {label:'現金収入', a:'2,890件', b:'1,402,300円'},
+    {label:'現金支出', a:'262件', b:'117,500円'},
+  ]},
+  { icon:'🔢', title:'件数', cols:['件数','金額'], rows:[
+    {label:'入場', a:'1,847件', b:'1,847,000円'},
+    {label:'出場', a:'1,803件', b:'1,803,000円'},
+    {label:'廃札', a:'12件', b:'3,600円'},
+    {label:'発駅キャンセル', a:'8件', b:'2,400円'},
+    {label:'精算合計（現金）', a:'156件', b:'89,200円'},
+  ]},
+];
+
+const companyBreakdown = {
+  icon:'🏢', title:'各社別精算内訳',
+  groups:[
+    { name:'全体', total:{a:'428件',b:'512,300円'}, cash:{a:'312件',b:'358,900円'}, companies:[
+      {name:'東京メトロ(632)', up:'45件 / 62,000円', down:'12件 / 8,400円', net:'33件 / 53,600円'},
+      {name:'都営(611)', up:'28件 / 34,200円', down:'6件 / 3,100円', net:'22件 / 31,100円'},
+      {name:'西武(621)', up:'15件 / 19,800円', down:'3件 / 1,600円', net:'12件 / 18,200円'},
+    ]},
+    { name:'東武分', total:{a:'210件',b:'248,600円'}, cash:{a:'168件',b:'201,400円'}, companies:[
+      {name:'東京メトロ(632)', up:'22件 / 29,000円', down:'5件 / 3,200円', net:'17件 / 25,800円'},
+      {name:'都営(611)', up:'14件 / 16,500円', down:'3件 / 1,400円', net:'11件 / 15,100円'},
+    ]},
+    { name:'メトロ分', total:{a:'218件',b:'263,700円'}, cash:{a:'144件',b:'157,500円'}, companies:[
+      {name:'東京メトロ(632)', up:'23件 / 33,000円', down:'7件 / 5,200円', net:'16件 / 27,800円'},
+      {name:'西武(621)', up:'9件 / 11,200円', down:'2件 / 900円', net:'7件 / 10,300円'},
+    ]},
+  ]
+};
+
+function rowHTML(label, l1, v1, l2, v2){
+  return `<div class="row-grid">
+    <div class="row-name">${label}</div>
+    <div class="cell-label">${l1}</div>
+    <div class="cell-value">${v1}</div>
+    <div class="cell-label">${l2}</div>
+    <div class="cell-value">${v2}</div>
+  </div>`;
+}
+function rowsHTML(section){
+  return section.rows.map(r => rowHTML(r.label, section.cols[0], r.a, section.cols[1], r.b)).join('');
+}
+function cardHTML(section){
+  return `<div class="card">
+    <div class="card-header"><span class="icon">${section.icon}</span><span>${section.title}</span></div>
+    <div class="card-body">${rowsHTML(section)}</div>
+  </div>`;
+}
+function breakdownGroupsHTML(bd){
+  return bd.groups.map(g => `
+    <div class="bd-group">
+      <div class="bd-group-title">${g.name}</div>
+      ${rowHTML('合計','枚数', g.total.a, '金額', g.total.b)}
+      ${rowHTML('現金','枚数', g.cash.a, '金額', g.cash.b)}
+      <table class="bd-table">
+        <thead><tr><th>会社名</th><th>増</th><th>減</th><th>相殺</th></tr></thead>
+        <tbody>
+          ${g.companies.map(c => `<tr><td class="cname">${c.name}</td><td>${c.up}</td><td>${c.down}</td><td>${c.net}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
+}
+function breakdownCardHTML(bd){
+  return `<div class="card">
+    <div class="card-header"><span class="icon">${bd.icon}</span><span>${bd.title}</span></div>
+    <div class="card-body">${breakdownGroupsHTML(bd)}</div>
+  </div>`;
+}
+function accordionCardHTML(section, open){
+  return `<details class="card acc" ${open ? 'open' : ''}>
+    <summary class="card-header"><span class="icon">${section.icon}</span><span>${section.title}</span><span class="chevron">▸</span></summary>
+    <div class="card-body">${rowsHTML(section)}</div>
+  </details>`;
+}
+function accordionBreakdownHTML(bd, open){
+  return `<details class="card acc" ${open ? 'open' : ''}>
+    <summary class="card-header"><span class="icon">${bd.icon}</span><span>${bd.title}</span><span class="chevron">▸</span></summary>
+    <div class="card-body">${breakdownGroupsHTML(bd)}</div>
+  </details>`;
+}
+
+// Pattern A: everything, one scroll
+document.getElementById('a-cards').innerHTML =
+  cardSections.map(cardHTML).join('') + breakdownCardHTML(companyBreakdown);
+
+// Pattern B: split
+document.getElementById('b-summary').innerHTML = cardSections.map(cardHTML).join('');
+document.getElementById('b-breakdown').innerHTML = breakdownCardHTML(companyBreakdown);
+
+// Pattern C: accordion (総取扱計・件数 open by default, 磁気乗車券取扱・各社別精算内訳 closed)
+document.getElementById('c-cards').innerHTML =
+  accordionCardHTML(cardSections[0], true) +
+  accordionCardHTML(cardSections[1], false) +
+  accordionCardHTML(cardSections[2], true) +
+  accordionBreakdownHTML(companyBreakdown, false);
+
+// pattern switcher
+const notesByPattern = {
+  a: `<h2>Pattern A — Single continuous scroll</h2>
+      <ul>
+        <li><b>+</b> Smallest change from today's code — just extends <code>CloseTallyMainContent</code> with 2 more cards.</li>
+        <li><b>+</b> Every number is visible without any tapping — nothing hidden.</li>
+        <li><b>−</b> Gets long fast: with real company counts, 実行 could sit several screens below the fold.</li>
+      </ul>`,
+  b: `<h2>Pattern B — Sub-tabs (サマリー / 各社別精算内訳)</h2>
+      <ul>
+        <li><b>+</b> 各社別精算内訳 can grow with the company list without pushing on the other 3 sections.</li>
+        <li><b>+</b> Matches the mental split staff already make: "the totals" vs "the per-company detail."</li>
+        <li><b>−</b> Adds a 3rd tab level (main tab → 締切/締切速報/... → サマリー/内訳) — more state to manage (<code>TabController</code> inside <code>_CloseTally</code>).</li>
+        <li><b>−</b> 実行 needs to stay meaningful/available from both sub-tabs.</li>
+      </ul>`,
+  c: `<h2>Pattern C — Accordion</h2>
+      <ul>
+        <li><b>+</b> Shortest default view — only what's open takes space.</li>
+        <li><b>+</b> No new nav level, just card-header taps (built on native <code>&lt;details&gt;</code>-style expand/collapse in Flutter via <code>ExpansionTile</code> or similar).</li>
+        <li><b>−</b> 各社別精算内訳 is closed by default, so staff must remember to tap it open every time.</li>
+        <li><b>−</b> No accordion pattern exists elsewhere in this app yet — a new interaction style to learn.</li>
+      </ul>`,
+};
+
+const pswitchBtns = document.querySelectorAll('.pswitch');
+const patternContents = document.querySelectorAll('.pattern-content');
+function selectPattern(p){
+  pswitchBtns.forEach(b => b.classList.toggle('active', b.dataset.pattern === p));
+  patternContents.forEach(pc => pc.hidden = pc.id !== 'pattern-' + p);
+  document.getElementById('notes').innerHTML = notesByPattern[p];
+}
+pswitchBtns.forEach(btn => btn.addEventListener('click', () => selectPattern(btn.dataset.pattern)));
+selectPattern('a');
+
+// Pattern B inner tabs
+const innerTabs = document.querySelectorAll('#pattern-b .innertab');
+innerTabs.forEach(btn => btn.addEventListener('click', () => {
+  innerTabs.forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const t = btn.dataset.tab;
+  document.getElementById('b-summary').hidden = t !== 'summary';
+  document.getElementById('b-breakdown').hidden = t !== 'breakdown';
+}));
+</script>
+</body>
+</html>
