@@ -562,14 +562,29 @@ class _CompanyBreakdownGroup extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6.0),
-          child: Text(
-            groupTitle,
-            style: titleTextStyle.copyWith(
-              color: fontColor,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Divider(
+                  color: fontColor,
+                  thickness: 1.5,
+                  endIndent: 12,
+                ),
+              ),
+              Text(
+                groupTitle,
+                style: titleTextStyle.copyWith(
+                  color: fontColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Expanded(
+                child: Divider(color: fontColor, thickness: 1.5, indent: 12),
+              ),
+            ],
           ),
         ),
         _ContentTable(
