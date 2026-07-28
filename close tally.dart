@@ -92,7 +92,7 @@ class CloseTallyMainContent extends StatelessWidget {
         // 磁気乗車券取扱（新規セクション／デフォルトで折りたたみ）
         _AccordionCard(
           title: '磁気乗車券取扱',
-          initiallyExpanded: false,
+          initiallyExpanded: true,
           fontColor: fontColor,
           cardBackgroundColor: cardBackgroundColor,
           cardOutlineColor: cardOutlineColor,
@@ -181,7 +181,7 @@ class CloseTallyMainContent extends StatelessWidget {
         // 各社別精算内訳（新規セクション／デフォルトで折りたたみ／全体・東武分・メトロ分をまとめて1カード）
         _AccordionCard(
           title: '各社別精算内訳',
-          initiallyExpanded: false,
+          initiallyExpanded: true,
           fontColor: fontColor,
           cardBackgroundColor: cardBackgroundColor,
           cardOutlineColor: cardOutlineColor,
@@ -203,21 +203,30 @@ class CloseTallyMainContent extends StatelessWidget {
                 companies: const [
                   _CompanyRowData(
                     name: '東京メトロ(632)',
-                    up: '45件/62,000円',
-                    down: '12件/8,400円',
-                    net: '33件/53,600円',
+                    upCount: '45',
+                    upAmount: '62,000',
+                    downCount: '12',
+                    downAmount: '8,400',
+                    netCount: '33',
+                    netAmount: '53,600',
                   ),
                   _CompanyRowData(
                     name: '都営(611)',
-                    up: '28件/34,200円',
-                    down: '6件/3,100円',
-                    net: '22件/31,100円',
+                    upCount: '28',
+                    upAmount: '34,200',
+                    downCount: '6',
+                    downAmount: '3,100',
+                    netCount: '22',
+                    netAmount: '31,100',
                   ),
                   _CompanyRowData(
                     name: '西武(621)',
-                    up: '15件/19,800円',
-                    down: '3件/1,600円',
-                    net: '12件/18,200円',
+                    upCount: '15',
+                    upAmount: '19,800',
+                    downCount: '3',
+                    downAmount: '1,600',
+                    netCount: '12',
+                    netAmount: '18,200',
                   ),
                 ],
               ),
@@ -232,15 +241,21 @@ class CloseTallyMainContent extends StatelessWidget {
                 companies: const [
                   _CompanyRowData(
                     name: '東京メトロ(632)',
-                    up: '22件/29,000円',
-                    down: '5件/3,200円',
-                    net: '17件/25,800円',
+                    upCount: '22',
+                    upAmount: '29,000',
+                    downCount: '5',
+                    downAmount: '3,200',
+                    netCount: '17',
+                    netAmount: '25,800',
                   ),
                   _CompanyRowData(
                     name: '都営(611)',
-                    up: '14件/16,500円',
-                    down: '3件/1,400円',
-                    net: '11件/15,100円',
+                    upCount: '14',
+                    upAmount: '16,500',
+                    downCount: '3',
+                    downAmount: '1,400',
+                    netCount: '11',
+                    netAmount: '15,100',
                   ),
                 ],
               ),
@@ -255,15 +270,21 @@ class CloseTallyMainContent extends StatelessWidget {
                 companies: const [
                   _CompanyRowData(
                     name: '東京メトロ(632)',
-                    up: '23件/33,000円',
-                    down: '7件/5,200円',
-                    net: '16件/27,800円',
+                    upCount: '23',
+                    upAmount: '33,000',
+                    downCount: '7',
+                    downAmount: '5,200',
+                    netCount: '16',
+                    netAmount: '27,800',
                   ),
                   _CompanyRowData(
                     name: '西武(621)',
-                    up: '9件/11,200円',
-                    down: '2件/900円',
-                    net: '7件/10,300円',
+                    upCount: '9',
+                    upAmount: '11,200',
+                    downCount: '2',
+                    downAmount: '900',
+                    netCount: '7',
+                    netAmount: '10,300',
                   ),
                 ],
               ),
@@ -457,7 +478,6 @@ class _AccordionCardState extends State<_AccordionCard> {
         child: ListTile(
           dense: true,
           isThreeLine: true,
-          onTap: _toggle,
           title: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -470,13 +490,16 @@ class _AccordionCardState extends State<_AccordionCard> {
                 ),
               ),
               const Spacer(),
-              AnimatedRotation(
-                turns: _expanded ? 0.25 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: Icon(
-                  Icons.chevron_right,
-                  color: widget.fontColor,
-                  size: 32,
+              IconButton(
+                onPressed: _toggle,
+                icon: AnimatedRotation(
+                  turns: _expanded ? 0.25 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: widget.fontColor,
+                    size: 32,
+                  ),
                 ),
               ),
             ],
@@ -561,28 +584,40 @@ class _CompanyBreakdownGroup extends StatelessWidget {
           countValue: cashCount,
           amountValue: cashAmount,
         ),
-        const SizedBox(height: 8),
-        TableInContent(
-          children: [
-            const TableRow(
-              children: [
-                TableTitleCell(title: '会社名'),
-                TableTitleCell(title: '増'),
-                TableTitleCell(title: '減'),
-                TableTitleCell(title: '相殺'),
-              ],
-            ),
-            for (final c in companies)
-              TableRow(
-                children: [
-                  TableContentCell(text: c.name),
-                  TableContentCell(text: c.up),
-                  TableContentCell(text: c.down),
-                  TableContentCell(text: c.net),
-                ],
+        for (final c in companies) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 10.0, bottom: 2.0),
+            child: Text(
+              c.name,
+              style: titleTextStyle.copyWith(
+                color: fontColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
               ),
-          ],
-        ),
+            ),
+          ),
+          _ContentTable(
+            titleText: '増',
+            subTitleText: '件数',
+            countValue: c.upCount,
+            amountValue: c.upAmount,
+            titleLeftPadding: initialPadding,
+          ),
+          _ContentTable(
+            titleText: '減',
+            subTitleText: '件数',
+            countValue: c.downCount,
+            amountValue: c.downAmount,
+            titleLeftPadding: initialPadding,
+          ),
+          _ContentTable(
+            titleText: '相殺',
+            subTitleText: '件数',
+            countValue: c.netCount,
+            amountValue: c.netAmount,
+            titleLeftPadding: initialPadding,
+          ),
+        ],
       ],
     );
   }
@@ -592,15 +627,21 @@ class _CompanyBreakdownGroup extends StatelessWidget {
 class _CompanyRowData {
   const _CompanyRowData({
     required this.name,
-    required this.up,
-    required this.down,
-    required this.net,
+    required this.upCount,
+    required this.upAmount,
+    required this.downCount,
+    required this.downAmount,
+    required this.netCount,
+    required this.netAmount,
   });
 
   final String name;
-  final String up;
-  final String down;
-  final String net;
+  final String upCount;
+  final String upAmount;
+  final String downCount;
+  final String downAmount;
+  final String netCount;
+  final String netAmount;
 }
 
 /// 実行ボタン
