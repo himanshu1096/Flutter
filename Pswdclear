@@ -1,0 +1,70 @@
+  /// 入力をクリアする（ログイン成功時に呼ぶ）
+  void clear() {
+    _input.value = null;
+  }
+
+
+  final GlobalKey<_TextBoxViewState> _idFieldKey = GlobalKey();
+  final GlobalKey<_TextBoxViewState> _pwFieldKey = GlobalKey();
+
+
+
+
+
+          _TextBoxView(
+            key: _idFieldKey,
+            iconData: Icons.person,
+            viewText: 'UserID',
+            keyboardUsage: KeyboardUsage.loginId,
+            onChanged: (input) {
+              _id = input ?? '';
+              _inputtedId.value = !(input?.isEmpty ?? true);
+            },
+          ),
+          _TextBoxView(
+            key: _pwFieldKey,
+            iconData: Icons.lock,
+            viewText: 'Password',
+            keyboardUsage: KeyboardUsage.password,
+            onChanged: (input) {
+              _password = input ?? '';
+              _inputtedPw.value = !(input?.isEmpty ?? true);
+            },
+          ),
+
+
+  const _TextBoxView({
+    super.key,
+    required this.iconData,
+    required this.viewText,
+    required this.keyboardUsage,
+    required this.onChanged,
+  });
+
+
+
+      if (response.isNormalUser) {
+        // AUTHORITY = 1 → QR読取ページへ
+        AppLogger().info('LoginPage', 'AUTHORITY=1 ログイン成功 → QR読取ページへ');
+        _clearLoginFields();
+        context.pushNamed(Pages.stationSplash.name);
+      } else if (response.isMaintenanceUser) {
+        // AUTHORITY = 99 → ログインページに留まる（保守アプリ起動）
+        AppLogger().info('LoginPage', 'AUTHORITY=99 保守員権限 → 入力クリア');
+        _clearLoginFields();
+      } else {
+
+
+
+
+
+
+  /// ログイン成功時に入力ID・パスワードをクリアする
+  void _clearLoginFields() {
+    _idFieldKey.currentState?.clear();
+    _pwFieldKey.currentState?.clear();
+    _id = '';
+    _password = '';
+    _inputtedId.value = false;
+    _inputtedPw.value = false;
+  }
