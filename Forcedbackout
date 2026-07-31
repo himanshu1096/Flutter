@@ -1,0 +1,27 @@
+      // 業務強制取消通知 (0xFB81) Server → Flutter
+      case CommandId.forceCancelNotify:
+        AppLogger().warn(_tag, '0xFB81 業務強制取消通知 受信');
+        try {
+          final common = packet.json['COMMON'] as Map<String, dynamic>? ?? {};
+          final result = common['RESULT'] as bool? ?? true;
+          final errCode = common['ERRCODE'] as int? ?? -1;
+          final errKind = common['ERRKIND'] as int? ?? 0;
+          if (!result) {
+            AppLogger().warn(
+              _tag,
+              '0xFB81 エラー通知: ERRKIND=$errKind ERRCODE=$errCode',
+            );
+            final context = navigatorKey.currentContext;
+            if (context != null && context.mounted) {
+              await handleServerError(
+                context: context,
+                errKind: errKind,
+                errCode: errCode,
+              );
+            }
+          }
+        } catch (e) {
+          AppLogger().error(_tag, '0xFB81 パースエラー', e);
+        }
+        _navigateToQrReading();
+        break;
