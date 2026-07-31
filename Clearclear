@@ -1,0 +1,23 @@
+  /// 保守ログイン成功後、画面が隠れたタイミングでクリアするためのフラグ
+  bool _pendingClear = false;
+
+
+    WidgetsBinding.instance.addObserver(this);
+
+
+
+    WidgetsBinding.instance.removeObserver(this);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 保守アプリがフォアグラウンドに来て本画面が隠れた時点でクリアする
+    if (_pendingClear &&
+        (state == AppLifecycleState.inactive ||
+            state == AppLifecycleState.hidden ||
+            state == AppLifecycleState.paused)) {
+      _pendingClear = false;
+      _clearLoginFields();
+    }
+  }
+
