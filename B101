@@ -1,0 +1,25 @@
+                          if (result.isRetryPrint) {
+                            retry = true; // 再試行 → ループ
+                          } else if (result.isCancel) {
+                            // 0xB101 → QR読取へ
+                            await TcpService().sendCancel();
+                            TcpService().navigateToQrReading();
+                          } else if (result.handled) {
+                            // コマンド無し → 同じページに留まる
+                          } else {
+                            // 定義が無い場合は従来の汎用メッセージ
+                            if (context.mounted) {
+                              await showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder:
+                                    (context) => CustomConfirmDialog(
+                                      text: '印刷に失敗しました',
+                                      trueBtnText: '確認',
+                                      hasFalseBtn: false,
+                                    ),
+                              );
+                              await TcpService().sendCancel();
+                              TcpService().navigateToQrReading();
+                            }
+                          }
