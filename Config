@@ -1,0 +1,37 @@
+// find:
+  static const int _defaultCameraInterval = 500;
+
+// replace:
+  static const int _defaultCameraInterval = 500;
+  static const int _defaultResponseTimeoutSec = 180;
+  static const int _defaultPrintTimeoutSec = 30;
+
+// find:
+  int _cameraInterval = _defaultCameraInterval;
+
+// replace:
+  int _cameraInterval = _defaultCameraInterval;
+  int _responseTimeoutSec = _defaultResponseTimeoutSec;
+  int _printTimeoutSec = _defaultPrintTimeoutSec;
+
+
+// find:
+  int get cameraInterval => _cameraInterval;
+
+// replace:
+  int get cameraInterval => _cameraInterval;
+  int get responseTimeoutSec => _responseTimeoutSec;
+  int get printTimeoutSec => _printTimeoutSec;
+
+// find:
+      _cameraInterval =
+          json['CAMERA_INTERVAL'] as int? ?? _defaultCameraInterval;
+
+// replace:
+      _cameraInterval =
+          json['CAMERA_INTERVAL'] as int? ?? _defaultCameraInterval;
+      _responseTimeoutSec =
+          json['RESPONSE_TIMEOUT_SEC'] as int? ?? _defaultResponseTimeoutSec;
+      _printTimeoutSec =
+          json['PRINT_TIMEOUT_SEC'] as int? ?? _defaultPrintTimeoutSec;
+
