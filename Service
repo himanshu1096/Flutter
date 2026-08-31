@@ -1,0 +1,125 @@
+// find:
+    return _qrCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, 'QR照会応答タイムアウト (180秒)');
+
+// replace:
+    return _qrCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, 'QR照会応答タイムアウト (${TcpConfig().responseTimeoutSec}秒)');
+
+
+// find:
+    return _displayDataCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '表示データ応答タイムアウト (180秒)');
+
+// replace:
+    return _displayDataCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '表示データ応答タイムアウト (${TcpConfig().responseTimeoutSec}秒)');
+
+// find:
+    return _fareCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x1301 タイムアウト');
+        _fareCompleter = null;
+        throw TimeoutException('再精算判定タイムアウト');
+      },
+    );
+
+// replace:
+    return _fareCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x1301 タイムアウト');
+        _fareCompleter = null;
+        throw TimeoutException('再精算判定タイムアウト');
+      },
+    );
+
+
+// find:
+    final response = await _loginCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, 'ログイン応答タイムアウト (180秒)');
+
+// replace:
+    final response = await _loginCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, 'ログイン応答タイムアウト (${TcpConfig().responseTimeoutSec}秒)');
+
+
+// find:
+    return _logoffCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xA201 タイムアウト');
+
+// replace:
+    return _logoffCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xA201 タイムアウト');
+
+// find:
+    return _processCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '$cmdHex タイムアウト');
+
+// replace:
+    return _processCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '$cmdHex タイムアウト');
+
+// find:
+    return _cancelCompleter!.future.timeout(
+      const Duration(seconds: 180),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xB101 タイムアウト');
+
+// replace:
+    return _cancelCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xB101 タイムアウト');
+
+// find:
+    return _printCompleter!.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC101 タイムアウト');
+
+// replace:
+    return _printCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().printTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC101 タイムアウト');
+
+// find:
+    return _printCompleter!.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC201 タイムアウト');
+
+// replace:
+    return _printCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().printTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC201 タイムアウト');
+
+
+"RESPONSE_TIMEOUT_SEC": 180,
+"PRINT_TIMEOUT_SEC": 30
+
+
+
