@@ -1,0 +1,203 @@
+// find:
+  /// ズームレベル (1.0 = 等倍, 最大 3.0)
+  double _zoomLevel = 1.0;
+  double _baseZoomLevel = 1.0;
+  @override
+
+// replace:
+  /// ズームレベル (1.0 = 等倍, 最大 3.0)
+  double _zoomLevel = 1.0;
+  double _baseZoomLevel = 1.0;
+
+  /// ビューファインダー枠のサイズ（プレビュー短辺に対する割合）
+  /// 読取範囲の切り出し（_cropToBox）もこの値を基準にする
+  static const double _boxFraction = 0.6;
+
+  @override
+
+
+// find:
+    return pixels;
+  }
+
+  @override
+  void dispose() {
+
+// replace:
+    return pixels;
+  }
+
+  /// ビューファインダー枠に合わせて画像中央を切り出す。
+  /// ズームするほど枠に写る実際の範囲は狭くなるため、
+  /// 切り出し範囲も _boxFraction / _zoomLevel に比例して狭める。
+  img.Image _cropToBox(img.Image image) {
+    final cropFraction = (_boxFraction / _zoomLevel).clamp(0.05, 1.0);
+    final shortSide = image.width < image.height ? image.width : image.height;
+    final cropSize = (shortSide * cropFraction).round();
+    final x = ((image.width - cropSize) / 2).round();
+    final y = ((image.height - cropSize) / 2).round();
+    return img.copyCrop(image, x: x, y: y, width: cropSize, height: cropSize);
+  }
+
+  @override
+  void dispose() {
+
+
+// find:
+            img.Image? decoded = img.decodeJpg(bytes);
+            if (decoded != null) {
+              // 長辺が500pxを超える場合は縮小
+
+// replace:
+            img.Image? decoded = img.decodeJpg(bytes);
+            if (decoded != null) {
+              // ビューファインダー枠に合わせて中央を切り出す（ズーム反映）
+              decoded = _cropToBox(decoded);
+              // 長辺が500pxを超える場合は縮小
+
+
+
+
+// find:
+        child: Stack(
+          children: [
+            // カメラのプレビュー表示
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // 縦横比を維持する
+                final width = constraints.maxWidth;
+                final height = width / controller.value.aspectRatio;
+                return Center(
+                  child: Container(
+                    width: width,
+                    height: height,
+                    alignment: Alignment.center,
+                    child: Transform.flip(
+                      flipX: true,
+                      child: CameraPreview(controller),
+                    ),
+                  ),
+                );
+              },
+            ),
+            // QRコード、カメラ状態などを表示
+
+// replace:
+        child: Stack(
+          children: [
+            // カメラのプレビュー表示 + ビューファインダー枠
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // 縦横比を維持する
+                final width = constraints.maxWidth;
+                final height = width / controller.value.aspectRatio;
+                return Center(
+                  child: SizedBox(
+                    width: width,
+                    height: height,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // プレビュー本体（ピンチ操作で拡大表示、枠内にクリップ）
+                        ClipRect(
+                          child: Transform.scale(
+                            scale: _zoomLevel,
+                            child: Transform.flip(
+                              flipX: true,
+                              child: CameraPreview(controller),
+                            ),
+                          ),
+                        ),
+                        // 読取範囲を示すビューファインダー枠
+                        IgnorePointer(
+                          child: _ViewfinderBox(fraction: _boxFraction),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            // QRコード、カメラ状態などを表示
+
+
+// find:
+  /// 検知ループ停止
+  Future<void> stopDetection() async {
+    _isDetecting.value = false;
+    if (_controller case final controller?) {
+      // プレビューを停止
+      await controller.pausePreview();
+    }
+  }
+}
+
+// replace:
+  /// 検知ループ停止
+  Future<void> stopDetection() async {
+    _isDetecting.value = false;
+    if (_controller case final controller?) {
+      // プレビューを停止
+      await controller.pausePreview();
+    }
+  }
+}
+
+/// 読取範囲を示すビューファインダー枠（四隅の角括弧のみを描画）
+class _ViewfinderBox extends StatelessWidget {
+  const _ViewfinderBox({required this.fraction});
+
+  /// 枠のサイズ（短辺に対する割合）
+  final double fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final shortSide =
+            constraints.maxWidth < constraints.maxHeight
+                ? constraints.maxWidth
+                : constraints.maxHeight;
+        final side = shortSide * fraction;
+        return SizedBox(
+          width: side,
+          height: side,
+          child: CustomPaint(painter: _ViewfinderPainter()),
+        );
+      },
+    );
+  }
+}
+
+class _ViewfinderPainter extends CustomPainter {
+  static const _cornerLength = 28.0;
+  static const _strokeWidth = 5.0;
+  static const _color = Colors.white;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = _color
+          ..strokeWidth = _strokeWidth
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke;
+
+    final w = size.width;
+    final h = size.height;
+
+    canvas.drawLine(const Offset(0, _cornerLength), Offset.zero, paint);
+    canvas.drawLine(Offset.zero, const Offset(_cornerLength, 0), paint);
+    canvas.drawLine(Offset(w - _cornerLength, 0), Offset(w, 0), paint);
+    canvas.drawLine(Offset(w, 0), Offset(w, _cornerLength), paint);
+    canvas.drawLine(Offset(0, h - _cornerLength), Offset(0, h), paint);
+    canvas.drawLine(Offset(0, h), Offset(_cornerLength, h), paint);
+    canvas.drawLine(Offset(w - _cornerLength, h), Offset(w, h), paint);
+    canvas.drawLine(Offset(w, h), Offset(w, h - _cornerLength), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ViewfinderPainter oldDelegate) => false;
+}
+
+
