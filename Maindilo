@@ -1,0 +1,45 @@
+// find:
+  AppLogger().info(
+    'Main',
+    '初期化完了: 駅名=${initData.stationName}, 通信確認=${initData.connectionTestResult}',
+  );
+  // ── カメラアクセス確認 ────────────────────────────────
+
+  await _checkCameraAccessible();
+
+  // ── アプリ起動 ────────────────────────────────────────
+  // TcpServiceシングルトンに initData が保持されているため
+  // ProviderScope への override は不要
+  AppLogger().info('Main', 'ログインページ表示');
+  runApp(ProviderScope(child: MyApp()));
+}
+
+// replace:
+  AppLogger().info(
+    'Main',
+    '初期化完了: 駅名=${initData.stationName}, 通信確認=${initData.connectionTestResult}',
+  );
+  // ── カメラアクセス確認 ────────────────────────────────
+
+  await _checkCameraAccessible();
+
+  // ── アプリ起動 ────────────────────────────────────────
+  // TcpServiceシングルトンに initData が保持されているため
+  // ProviderScope への override は不要
+  AppLogger().info('Main', 'ログインページ表示');
+  runApp(ProviderScope(child: MyApp()));
+
+  // 0x0A81 応答がエラーの場合、ログイン画面表示後にエラーダイアログを表示
+  if (!initData.result) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        handleServerError(
+          context: context,
+          errKind: initData.errKind,
+          errCode: initData.errCode,
+        );
+      }
+    });
+  }
+}
