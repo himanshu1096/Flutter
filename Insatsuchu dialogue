@@ -1,0 +1,115 @@
+// find:
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// replace:
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+
+// find:
+  // 最後のQRデータ (0x1201再送用)
+  int _lastDesignation = 1;
+  List<int>? _lastRawData;
+  String? _lastQrNumber;
+
+// replace:
+  // 最後のQRデータ (0x1201再送用)
+  int _lastDesignation = 1;
+  List<int>? _lastRawData;
+  String? _lastQrNumber;
+
+  // 「処理中/印刷中」等、長時間待ちのブロッキングダイアログが開いているか
+  bool _blockingDialogOpen = false;
+  void setBlockingDialogOpen(bool open) => _blockingDialogOpen = open;
+
+
+// find:
+  void navigateToQrReading() => _navigateToQrReading();
+  void _navigateToQrReading() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    // データクリア
+
+// replace:
+  void navigateToQrReading() => _navigateToQrReading();
+  void _navigateToQrReading() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    // 「処理中/印刷中」等のブロッキングダイアログが残っていれば先に閉じる
+    // （通常のpopUntil(isFirst)だけでは取りこぼす場合があるため明示的に処理する）
+    if (_blockingDialogOpen) {
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).popUntil((route) => route is! DialogRoute);
+      _blockingDialogOpen = false;
+    }
+
+    // データクリア
+
+
+// find:
+                onPressed: () async {
+                  bool retry = true;
+                  while (retry) {
+                    retry = false;
+                    if (!context.mounted) return;
+                    showCustomAlertDialog(context: context, text: '印刷中');
+                    try {
+                      final response = await TcpService().sendPrintQrInfo(
+                        qrTicketNo.replaceAll(' ', ''),
+                      );
+                      if (context.mounted) Navigator.of(context).pop();
+                      if (response.result) {
+
+// replace:
+                onPressed: () async {
+                  bool retry = true;
+                  while (retry) {
+                    retry = false;
+                    if (!context.mounted) return;
+                    showCustomAlertDialog(context: context, text: '印刷中');
+                    TcpService().setBlockingDialogOpen(true);
+                    try {
+                      final response = await TcpService().sendPrintQrInfo(
+                        qrTicketNo.replaceAll(' ', ''),
+                      );
+                      TcpService().setBlockingDialogOpen(false);
+                      if (context.mounted) {
+                        try {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        } catch (_) {
+                          // 0xFB81により既にダイアログが閉じられている場合は何もしない
+                        }
+                      }
+                      if (response.result) {
+
+
+
+// find:
+                    } catch (e) {
+                      if (context.mounted) Navigator.of(context).pop();
+                      AppLogger().error('Print', '印刷エラー', e);
+
+// replace:
+                    } catch (e) {
+                      TcpService().setBlockingDialogOpen(false);
+                      if (context.mounted) {
+                        try {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        } catch (_) {
+                          // 0xFB81により既にダイアログが閉じられている場合は何もしない
+                        }
+                      }
+                      AppLogger().error('Print', '印刷エラー', e);
+
