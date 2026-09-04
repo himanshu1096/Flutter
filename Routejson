@@ -1,0 +1,6 @@
+{
+  "ROUTELIST": [
+    { "ROUTEID": 11, "SUBTEXT": "東京メトロ日比谷線・千代田線経由", "MAINTEXT": "北千住" },
+    { "ROUTEID": 12, "SUBTEXT": "東京メトロ半蔵門線経由", "MAINTEXT": "押上" }
+  ]
+}
