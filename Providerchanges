@@ -1,0 +1,86 @@
+// find:
+///【構造体class】
+///精算経路判定ボタン構造体
+class JudgeRouteInfo {
+  final int id;
+  final bool buttonvisible;
+  final int companypattern;
+  final int routepattern;
+  final int infopattern;
+
+  JudgeRouteInfo({
+    required this.id,
+    required this.buttonvisible,
+    required this.companypattern,
+    required this.routepattern,
+    required this.infopattern,
+  });
+
+  JudgeRouteInfo copyWith({
+    int? id,
+    bool? buttonvisible,
+    int? companypattern,
+    int? routepattern,
+    int? infopattern,
+  }) {
+    return JudgeRouteInfo(
+      id: id ?? this.id,
+      buttonvisible: buttonvisible ?? this.buttonvisible,
+      companypattern: companypattern ?? this.companypattern,
+      routepattern: routepattern ?? this.routepattern,
+      infopattern: infopattern ?? this.infopattern,
+    );
+  }
+}
+
+// replace:
+///【構造体class】
+///精算経路判定ボタン構造体
+/// ※本体制御側の外部ファイル(経路ラベル定義)対応に合わせ、
+/// 　表示テキストはRouteLabelServiceでrouteIdから取得する方式に変更。
+/// 　(companypattern/infopatternは廃止)
+class JudgeRouteInfo {
+  final int id;
+  final bool buttonvisible;
+  final int routeId;
+
+  JudgeRouteInfo({
+    required this.id,
+    required this.buttonvisible,
+    required this.routeId,
+  });
+
+  JudgeRouteInfo copyWith({int? id, bool? buttonvisible, int? routeId}) {
+    return JudgeRouteInfo(
+      id: id ?? this.id,
+      buttonvisible: buttonvisible ?? this.buttonvisible,
+      routeId: routeId ?? this.routeId,
+    );
+  }
+}
+
+
+
+  @override
+  List<JudgeRouteInfo> build() => [
+    for (int i = 1; i <= 6; i++)
+      JudgeRouteInfo(id: i, buttonvisible: false, routeId: 0),
+  ];
+
+  //ボタン状態更新(メインプロセスからの戻りを格納)
+  void updateItem(int targetId, bool newButtonvisible, int newRouteId) {
+    state =
+        state.map((item) {
+          if (item.id == targetId) {
+            return item.copyWith(
+              buttonvisible: newButtonvisible,
+              routeId: newRouteId,
+            );
+          }
+          return item;
+        }).toList();
+  }
+
+  int countVisibleButtons() {
+    return state.where((item) => item.buttonvisible).length;
+  }
