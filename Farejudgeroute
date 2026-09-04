@@ -1,0 +1,117 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_multidemo/app_color.dart';
+import 'package:qr_multidemo/provider/provider.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'package:qr_multidemo/service/route_label_service.dart';
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'package:qr_multidemo/utility/confirm_dialog.dart';
+import 'secondary_tab_content_unselected.dart';
+import '../component/pop_out_button.dart';
+
+const TextStyle _btnTextStyle = TextStyle(
+  fontSize: 24,
+  fontWeight: FontWeight.w700,
+);
+
+// 精算処理の固有部分（経路選択画面）
+class SeisanSyoriRoute extends ConsumerWidget {
+  const SeisanSyoriRoute({required this.onComplete, super.key});
+
+  final void Function(QrReadPageBtnKind pageKind) onComplete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final judgeRouteBtnList = ref.watch(judgeRouteListProvider);
+    final judgeRouteBtnIdNotifier = ref.watch(judgeRouteIdProvider.notifier);
+
+    final visibleItems =
+        judgeRouteBtnList.where((item) => item.buttonvisible).toList();
+
+    if (visibleItems.length <= 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(qrReadPageSelectedBtnProvider.notifier)
+            .changePage(QrReadPageBtnKind.seisanSyori);
+      });
+      return const SizedBox();
+    }
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 100,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '経路を選択してください',
+              style: TextStyle(fontSize: 45, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+        Wrap(
+          spacing: 40,
+          runSpacing: 30,
+          children: [
+            for (final item in visibleItems)
+              SizedBox(
+                width: 320,
+                height: 120,
+                child: PopOutButton(
+                  backgroundColors: orengeGradient,
+                  foregroundColor: Colors.black,
+                  onPressed: () async {
+                    judgeRouteBtnIdNotifier.set(item.id);
+                    await _sendFareJudgeAndNavigate(context, ref, item.routeId);
+                  },
+                  child: Center(
+                    child: Text(
+                      // 本体制御側の経路ラベルファイル未定義の間は routeId をフォールバック表示
+                      RouteLabelService().lookup(item.routeId) ??
+                          '経路${item.routeId}',
+                      style: _btnTextStyle,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 0x1301送信 → 0x1381受信 → 精算処理画面へ遷移
+Future<void> _sendFareJudgeAndNavigate(
+  BuildContext context,
+  WidgetRef ref,
+  int keiro,
+) async {
+  showCustomAlertDialog(context: context, text: '処理中');
+  try {
+    final amount = await TcpService().sendFareJudge(keiro);
+    ref.read(fareAmountProvider.notifier).set(amount);
+    if (context.mounted) Navigator.of(context).pop();
+    if (context.mounted) {
+      ref
+          .read(qrReadPageSelectedBtnProvider.notifier)
+          .changePage(QrReadPageBtnKind.seisanSyori);
+    }
+  } catch (e) {
+    if (context.mounted) Navigator.of(context).pop();
+    AppLogger().error('SeisanSyoriRoute', '再精算判定エラー', e);
+    if (context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => CustomConfirmDialog(
+              text: '通信エラーが発生しました',
+              trueBtnText: '確認',
+              hasFalseBtn: false,
+            ),
+      );
+    }
+  }
+}
