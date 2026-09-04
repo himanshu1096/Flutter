@@ -1,0 +1,25 @@
+// find:
+                    final displayData = ref.read(displayDataProvider);
+                    final cands = displayData?.routeCandidates ?? [];
+                    for (int i = 0; i < 6; i++) {
+                      final candValue = i < cands.length ? cands[i] : null;
+                      judgeRouteBtnNotifier.updateItem(
+                        i + 1,
+                        candValue != null,
+                        0,
+                        candValue ?? 0,
+                        0,
+                      );
+                    }
+
+// replace:
+                    final displayData = ref.read(displayDataProvider);
+                    final cands = displayData?.routeCandidates ?? [];
+                    for (int i = 0; i < 6; i++) {
+                      final candValue = i < cands.length ? cands[i] : null;
+                      judgeRouteBtnNotifier.updateItem(
+                        i + 1,
+                        candValue != null,
+                        candValue ?? 0,
+                      );
+                    }
