@@ -1,0 +1,68 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:qr_multidemo/config/tcp_config.dart';
+import 'package:qr_multidemo/model/route_label.dart';
+import 'app_logger.dart';
+
+/// 経路候補ラベル定義ファイルのルックアップサービス。
+/// 表示データ通知(0x1281)のROUTECAND1〜6の値(経路候補番号)をキーに
+/// ボタンに表示するテキストを取得する。
+///
+/// ※ファイル形式(JSON/XML)・パス・キー名は本体制御側との調整待ち。
+/// 　現状はKbaErrorMessage.json等と同様にJSON・ROUTELISTキーを想定して実装している。
+/// 　例:
+/// 　{ "ROUTELIST": [ { "ROUTEID": 11, "TEXT": "北千住" }, ... ] }
+class RouteLabelService {
+  static final RouteLabelService _instance = RouteLabelService._internal();
+  factory RouteLabelService() => _instance;
+  RouteLabelService._internal();
+
+  String get _path => TcpConfig().routeLabelPath;
+  static const String _tag = 'RouteLabelService';
+
+  // キャッシュ: { ROUTEID: RouteLabel }
+  final Map<int, RouteLabel> _cache = {};
+  bool _loaded = false;
+
+  /// 読み込み — アプリ起動時に一度だけ呼ぶ
+  Future<void> load() async {
+    if (_loaded) {
+      return;
+    }
+    try {
+      final file = File(_path);
+      final exists = await file.exists();
+
+      if (!exists) {
+        AppLogger().warn(_tag, '★ファイルが見つかりません: $_path');
+        return;
+      }
+
+      final contents = await file.readAsString();
+      final root = jsonDecode(contents) as Map<String, dynamic>;
+      final list = root['ROUTELIST'] as List<dynamic>? ?? [];
+
+      for (final item in list) {
+        final label = RouteLabel.fromJson(item as Map<String, dynamic>);
+        _cache[label.routeId] = label;
+      }
+      _loaded = true;
+      AppLogger().info(_tag, '経路ラベル読み込み完了: ${_cache.length}件');
+    } catch (e) {
+      AppLogger().error(_tag, '★経路ラベル読み込み失敗', e);
+    }
+  }
+
+  /// 経路候補番号(ROUTECAND1〜6の値)でルックアップ (見つからなければ null)
+  String? lookup(int routeId) {
+    final found = _cache[routeId];
+    if (found == null) {
+      AppLogger().warn(
+        _tag,
+        '経路ラベル定義なし: ROUTEID=$routeId (キャッシュ${_cache.length}件)',
+      );
+      return null;
+    }
+    return found.text;
+  }
+}
