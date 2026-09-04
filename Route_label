@@ -1,0 +1,15 @@
+/// 経路候補ラベル定義ファイルの1エントリ
+/// ROUTECAND1〜6の値(経路候補番号)をキーに、ボタンに表示するテキストを保持する
+class RouteLabel {
+  final int routeId;
+  final String text;
+
+  const RouteLabel({required this.routeId, required this.text});
+
+  factory RouteLabel.fromJson(Map<String, dynamic> json) {
+    return RouteLabel(
+      routeId: json['ROUTEID'] as int? ?? -1,
+      text: json['TEXT'] as String? ?? '',
+    );
+  }
+}
