@@ -1,0 +1,12 @@
+static const String _defaultRouteLabelPath =
+      'E:/NS/FK/App/dic/RouteLabel.json';
+
+String _routeLabelPath = _defaultRouteLabelPath;
+
+String get routeLabelPath => _routeLabelPath;
+
+
+ _routeLabelPath =
+          json['ROUTE_LABEL_PATH'] as String? ?? _defaultRouteLabelPath;
+
+await RouteLabelService().load();
