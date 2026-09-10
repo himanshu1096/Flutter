@@ -1,0 +1,204 @@
+// find:
+  // DATA
+  final String stationName;
+  final bool connectionTestResult;
+  final bool printConnResult;
+
+  const InitData({
+    required this.result,
+    required this.errCode,
+    required this.errKind,
+    required this.stationName,
+    required this.connectionTestResult,
+    required this.printConnResult,
+  });
+
+// replace:
+  // DATA
+  final String stationName;
+  final bool connectionTestResult;
+  final bool printConnResult;
+  final bool? totalSvConnResult;
+
+  const InitData({
+    required this.result,
+    required this.errCode,
+    required this.errKind,
+    required this.stationName,
+    required this.connectionTestResult,
+    required this.printConnResult,
+    required this.totalSvConnResult,
+  });
+
+
+// find:
+      connectionTestResult: data['CONNTESTRESULT'] as bool? ?? false,
+      printConnResult: data['PRINTCONNRESULT'] as bool? ?? false,
+    );
+  }
+
+// replace:
+      connectionTestResult: data['CONNTESTRESULT'] as bool? ?? false,
+      printConnResult: data['PRINTCONNRESULT'] as bool? ?? false,
+      // TOTALSVCONNRESULTはtrue/false/null(キー自体が無い場合を含む)の3値を取り得る。
+      // ここではnullをそのまま保持し、デフォルト値で潰さない。
+      totalSvConnResult: data['TOTALSVCONNRESULT'] as bool?,
+    );
+  }
+
+
+
+
+// find:
+/// 接続状態プロバイダー (0xF181)
+/// TOTALSERVER / QRMODULE / PRINTER → 1:接続 -1:未接続
+@Riverpod(keepAlive: true)
+class ConnectionStatus extends _$ConnectionStatus {
+  @override
+  Map<String, int> build() {
+    // TcpServiceのコールバックを設定 (build完了後に登録)
+    Future.microtask(() {
+      TcpService().onConnectionStatusChanged = (unit, status) {
+        state = {...state, unit: status};
+      };
+    });
+    return {'TOTALSERVER': -1, 'QRMODULE': -1, 'PRINTER': -1};
+  }
+
+  void update(String unit, int status) {
+    state = {...state, unit: status};
+  }
+}
+
+// replace:
+/// 接続状態プロバイダー (0xF181)
+/// TOTALSERVER / QRMODULE / PRINTER → 1:接続 -1:未接続 null:アイコン非表示
+@Riverpod(keepAlive: true)
+class ConnectionStatus extends _$ConnectionStatus {
+  @override
+  Map<String, int?> build() {
+    // TcpServiceのコールバックを設定 (build完了後に登録)
+    Future.microtask(() {
+      TcpService().onConnectionStatusChanged = (unit, status) {
+        state = {...state, unit: status};
+      };
+    });
+    // TOTALSERVERは0x0A81のTOTALSVCONNRESULTが届くまでnull(非表示)とする。
+    // 起動直後に赤アイコンが一瞬表示されてしまう問題も合わせて解消する。
+    return {'TOTALSERVER': null, 'QRMODULE': -1, 'PRINTER': -1};
+  }
+
+  void update(String unit, int? status) {
+    state = {...state, unit: status};
+  }
+}
+
+
+
+// find:
+  void Function(String unit, int status)? _onConnectionStatusChanged;
+
+// replace:
+  void Function(String unit, int? status)? _onConnectionStatusChanged;
+
+
+// find:
+  set onConnectionStatusChanged(void Function(String, int)? callback) {
+    _onConnectionStatusChanged = callback;
+  }
+
+// replace:
+  set onConnectionStatusChanged(void Function(String, int?)? callback) {
+    _onConnectionStatusChanged = callback;
+  }
+
+
+// find:
+  void Function(String, int)? get onConnectionStatusChanged =>
+      _onConnectionStatusChanged;
+
+// replace:
+  void Function(String, int?)? get onConnectionStatusChanged =>
+      _onConnectionStatusChanged;
+
+// find:
+  void _updateConnectionStatus(String unit, int status) {
+
+// replace:
+  void _updateConnectionStatus(String unit, int? status) {
+
+// find:
+          _updateConnectionStatus(
+            'QRMODULE',
+            initData.connectionTestResult ? 1 : -1,
+          );
+          _updateConnectionStatus('PRINTER', initData.printConnResult ? 1 : -1);
+
+// replace:
+          _updateConnectionStatus(
+            'QRMODULE',
+            initData.connectionTestResult ? 1 : -1,
+          );
+          _updateConnectionStatus('PRINTER', initData.printConnResult ? 1 : -1);
+          // TOTALSVCONNRESULTがnullの場合はnullのまま渡し、デ集アイコンを非表示にする
+          _updateConnectionStatus(
+            'TOTALSERVER',
+            initData.totalSvConnResult == null
+                ? null
+                : (initData.totalSvConnResult! ? 1 : -1),
+          );
+
+
+
+// find:
+    final status = ref.watch(connectionStatusProvider);
+
+    // 1=緑(正常) -1=赤(異常)
+    Color iconColor(String unit) =>
+        status[unit] == 1 ? Colors.green : Colors.red;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: SizedBox(
+        height: kToolbarHeight + 20,
+        child: Row(
+          children: [
+            // データ集計機接続状態 (TOTALSERVER)
+            FramedIcon(
+              borderColor: iconColor('TOTALSERVER'),
+              icon: Image.asset(
+                Assets.icon.dbWord.keyName,
+                width: 44,
+                height: 44,
+              ),
+            ),
+
+// replace:
+    final status = ref.watch(connectionStatusProvider);
+
+    // 1=緑(正常) -1=赤(異常)。null(未受信)の場合はそもそもアイコンを表示しない
+    Color iconColor(String unit) =>
+        status[unit] == 1 ? Colors.green : Colors.red;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: SizedBox(
+        height: kToolbarHeight + 20,
+        child: Row(
+          children: [
+            // データ集計機接続状態 (TOTALSERVER)
+            // TOTALSVCONNRESULTがnullの間（未受信）はアイコン自体を出さない
+            if (status['TOTALSERVER'] != null)
+              FramedIcon(
+                borderColor: iconColor('TOTALSERVER'),
+                icon: Image.asset(
+                  Assets.icon.dbWord.keyName,
+                  width: 44,
+                  height: 44,
+                ),
+              ),
+
+
+
+
+
