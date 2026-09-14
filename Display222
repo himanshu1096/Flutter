@@ -1,0 +1,79 @@
+// find:
+      case CardInfoEnum.kensyu3:
+        // 券種３: 9 (10進1桁)
+        return data.ticketType3?.toString() ?? '';
+
+// replace:
+      case CardInfoEnum.kensyu3:
+        // 券種３: X (16進1桁)。例: 15 → "F"
+        final t3 = data.ticketType3;
+        return t3 == null
+            ? ''
+            : t3.toRadixString(16).toUpperCase().padLeft(1, '0');
+
+
+// find:
+  /// 乗車月日フォーマット (MM/DD)
+  String get rideDateFormatted {
+
+// replace:
+  /// 普通券かどうか（MEDIATYPE 11/12）
+  bool get isNormalTicket => mediaType == 11 || mediaType == 12;
+
+  /// 乗車月日フォーマット (MM/DD)
+  String get rideDateFormatted {
+
+
+
+// find:
+  String get expiryDateFormatted {
+    if (expiryDateM == null || expiryDateD == null) {
+      return '';
+    }
+    final yy = expiryDateY?.toString().substring(
+      expiryDateY!.toString().length - 2,
+    );
+    final mm = expiryDateM!.toString().padLeft(2, '0');
+    final dd = expiryDateD!.toString().padLeft(2, '0');
+    final mmdd = '$mm/$dd';
+    if (expiryDateY == null) {
+      return mmdd;
+    }
+    return '$yy/$mmdd';
+  }
+
+// replace:
+  /// 有効終了日フォーマット
+  /// 普通券        : 99/99    （年なし）
+  /// 回数券・企画券 : 9/99/99  （年は1桁）例: 2026/12/31 → "6/12/31"
+  String get expiryDateFormatted {
+    if (expiryDateM == null || expiryDateD == null) {
+      return '';
+    }
+    final mm = expiryDateM!.toString().padLeft(2, '0');
+    final dd = expiryDateD!.toString().padLeft(2, '0');
+    final mmdd = '$mm/$dd';
+
+    if (isNormalTicket) {
+      return mmdd;
+    }
+    if (expiryDateY == null) {
+      return mmdd;
+    }
+    final y = (expiryDateY! % 10).toString();
+    return '$y/$mmdd';
+  }
+
+
+
+
+
+
+// find:
+    final yy = (startDateY! % 100).toString().padLeft(2, '0');
+    return '$yy/$mm/$dd';
+
+// replace:
+    // 仕様「9/Z9/Z9」＝年は1桁
+    final y = (startDateY! % 10).toString();
+    return '$y/$mm/$dd';
