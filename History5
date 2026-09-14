@@ -1,0 +1,993 @@
+import 'package:flutter/material.dart';
+import 'package:gradient_elevated_button/gradient_elevated_button.dart';
+
+import '../app_color.dart';
+import '../app_icon.dart';
+import '../component/pop_out_button.dart';
+import '../qr_process/secondary_tab_process_information.dart';
+import '../component/secondary_tab_content_core.dart';
+import '../utility/date_time_converter.dart';
+import 'related_process_common.dart';
+import 'package:qr_multidemo/component/text_field_shadow.dart';
+
+/// ページ送りの方向
+enum _PagerDirection { previous, next }
+
+/// 出力方法（印刷／外部媒体出力）の選択状態
+enum _OutputMethod { print, externalMedia }
+
+/// 1ページあたりの表示件数（実データ接続時にpage数の根拠となる。現状はモックデータに合わせた仮値）
+const int _itemsPerPage = 3;
+
+/// フッター部のボタン高さ。日付ボタン・印刷／外部媒体出力・実行で共通にし、
+/// 左右の列の高さが揃うようにする。
+const double _buttonHeight = 52;
+
+/// ページ送りボタンの高さ（固定＝必ず表示される）
+const double _pagerHeight = 44;
+
+/// タイトル・メッセージ欄の高さ（2行分。必要最小限に抑える）
+const double _titleHeight = 56;
+
+/// フッター部の高さ。右列（その他の日付＋印刷/外部媒体出力＋実行）が最も高いため、
+/// その高さを基準にする。
+const double _footerHeight = 196;
+
+/// データカードの枠（Cardのmargin・ListTileのpadding・カード見出し行）の概算高さ。
+/// 中身の高さを算出する際に差し引く。
+const double _cardChromeHeight = 96;
+
+final TextStyle _btnTextStyle = TextStyle(fontSize: fontSize);
+
+class CustomerServiceHistory extends StatefulWidget {
+  const CustomerServiceHistory({super.key});
+
+  @override
+  State<CustomerServiceHistory> createState() =>
+      _CustomerServiceHistoryState();
+}
+
+class _CustomerServiceHistoryState extends State<CustomerServiceHistory> {
+  // null = 未選択、0〜7 = 過去8日分のボタン、8 = 全接客履歴ボタン
+  int? _selectedDateIndex;
+  _OutputMethod? _selectedOutput;
+  int _currentPage = 0;
+
+  void _onSelectDate(int index) {
+    setState(() {
+      _selectedDateIndex = index;
+    });
+  }
+
+  void _onSelectOutput(_OutputMethod method) {
+    setState(() {
+      // 同じボタンを再度押した場合は選択解除（トグル）
+      _selectedOutput = _selectedOutput == method ? null : method;
+    });
+  }
+
+  void _onChangePage(int delta) {
+    setState(() {
+      _currentPage += delta;
+    });
+  }
+
+  // 外部媒体出力ボタンが有効になる条件。
+  // 本来は外部媒体（USBメモリ等）の接続検知結果を参照する想定だが、
+  // 現時点ではバックエンド未接続のためUI確認用にtrue固定としている。
+  bool get _externalMediaConnected => true;
+
+  @override
+  Widget build(BuildContext context) {
+    return PaddingForContent(
+      // 各部を固定高さにすると画面サイズによっては合計が画面を超え、
+      // フッターやデータが見切れてしまう。
+      // 実際に使える高さから、タイトル・フッター・カードの枠分を差し引いて
+      // データカードの高さを決定することで、常に画面内に収める。
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final available = constraints.maxHeight;
+          final cardContentHeight =
+              (available -
+                      _titleHeight -
+                      _footerHeight -
+                      _cardChromeHeight -
+                      16 // Column の spacing 8 × 2
+                      )
+                  .clamp(140.0, 420.0);
+
+          return Column(
+            spacing: 8,
+            children: [
+              SizedBox(height: _titleHeight, child: _TitleAndMessage()),
+              _HistoryView(
+                currentPage: _currentPage,
+                onChangePage: _onChangePage,
+                contentHeight: cardContentHeight,
+              ),
+              _FooterControllers(
+                selectedDateIndex: _selectedDateIndex,
+                onSelectDate: _onSelectDate,
+                selectedOutput: _selectedOutput,
+                onSelectOutput: _onSelectOutput,
+                externalMediaConnected: _externalMediaConnected,
+                // 実行ボタンは印刷／外部媒体出力のいずれかが選択されている場合のみ有効。
+                // バックエンド接続前のため、押下時の処理は現状空。
+                onExecute: _selectedOutput == null ? null : () {},
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// タイトル・メッセージ表示エリア（15.9.2 表示仕様に対応）
+class _TitleAndMessage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // 行間を詰め、メッセージは1段小さくして縦の占有を最小限にする
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '接客履歴処理をおこないます',
+          style: _btnTextStyle.merge(
+            TextStyle(fontWeight: FontWeight.w700, height: 1.1),
+          ),
+        ),
+        Text(
+          '日付を選択してから、［印刷］、［外部媒体出力］ボタンを選択して'
+          '［実行］ボタンを押下してください',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _btnTextStyle.merge(
+            TextStyle(fontSize: fontSize * 0.85, height: 1.1),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryView extends StatelessWidget {
+  final int currentPage;
+  final void Function(int delta) onChangePage;
+
+  /// 画面サイズから算出されたカード中身の高さ
+  final double contentHeight;
+
+  const _HistoryView({
+    required this.currentPage,
+    required this.onChangePage,
+    required this.contentHeight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fontColor = Theme.of(context).colorScheme.onSecondaryContainer;
+    final cardBackgroundColor =
+        Theme.of(context).colorScheme.secondaryContainer;
+    final cardOutlineColor = Theme.of(context).colorScheme.surfaceContainer;
+
+    final allItems = _makeHistoryItemList();
+    final totalPages = (allItems.length / _itemsPerPage).ceil().clamp(
+      1,
+      1 << 30,
+    );
+    final start = currentPage * _itemsPerPage;
+    final end = (start + _itemsPerPage).clamp(0, allItems.length);
+    final pageItems = start < allItems.length
+        ? allItems.sublist(start, end)
+        : <_HistoryItem>[];
+
+    return CardInfoBlock(
+      title: '接客履歴データ',
+      fontColor: fontColor,
+      cardBackgroundColor: cardBackgroundColor,
+      cardOutlineColor: cardOutlineColor,
+      icon: DualIconOverlay(
+        baseIcon: Icons.person_2_outlined,
+        topIcon: Icons.history_edu_outlined,
+        baseColor: fontColor,
+        topColor: fontColor,
+        topBackgroundColor: cardBackgroundColor,
+      ),
+      content: DefaultTextStyle(
+        style: TextStyle(fontSize: fontSize, color: Colors.black),
+        // CardInfoBlockの中身はListTile配下に置かれ、高さが無制限になる。
+        // その状態でFlexible/Expandedを使うと高さ0に潰れて中身が消えるため、
+        // ここで全体の高さを固定し、その内側でExpandedを使う。
+        child: SizedBox(
+          height: contentHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 残りの高さをすべてデータ表示に使う
+              Expanded(
+                child: GridView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 0,
+                  ),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 30,
+                    mainAxisExtent: 120,
+                  ),
+                  children: pageItems,
+                ),
+              ),
+              // ページ送りは高さを固定し、必ず表示されるようにする
+              SizedBox(
+                height: _pagerHeight,
+                child: _PagerBottons(
+                  currentPage: currentPage,
+                  totalPages: totalPages,
+                  onPrevious: currentPage > 0 ? () => onChangePage(-1) : null,
+                  onNext:
+                      currentPage < totalPages - 1
+                          ? () => onChangePage(1)
+                          : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<_HistoryItem> _makeHistoryItemList() {
+    final todayStr = DateTime.now().toStringWithFormat('M/d');
+    return [
+      _HistoryItem(
+        date: todayStr,
+        time: '6:37',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: '精算処理',
+        tableRows: [
+          TableRow(
+            children: [
+              TableTitleCell(title: '金額'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: '現金'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: '磁気ＳＦ'),
+              TableContentCell(text: '1,020', unit: '円'),
+            ],
+          ),
+        ],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:31',
+        number: '00007403',
+        ticketName: 'ＩＣＳＦ',
+        processName: '紛失再発',
+        tableRows: [
+          TableRow(
+            children: [
+              TableTitleCell(title: '金額'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: '手数料'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: 'デポ額'),
+              TableContentCell(text: '1,020', unit: '円'),
+            ],
+          ),
+          TableRow(
+            children: [
+              TableTitleCell(title: 'PB80B025020300400'),
+              TableContentCell(text: '000-05818-1701-00888'),
+            ],
+          ),
+        ],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:42',
+        number: '00007403',
+        ticketName: '企画券',
+        processName: '発売処理',
+        tableRows: [
+          TableRow(
+            children: [
+              TableTitleCell(title: '枚数'),
+              TableContentCell(text: '102', unit: '枚'),
+            ],
+          ),
+        ],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:59',
+        number: '00007403',
+        ticketName: '企画券',
+        processName: '発売処理',
+        tableRows: [
+          TableRow(
+            children: [
+              TableTitleCell(title: '枚数'),
+              TableContentCell(text: '102', unit: '枚'),
+            ],
+          ),
+        ],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '8:18',
+        number: '00007403',
+        ticketName: 'ＩＣ定期',
+        processName: '強制出場',
+        tableRows: [
+          TableRow(
+            children: [
+              TableTitleCell(title: 'PB80B025020300400'),
+              TableContentCell(text: '000-05818-1701-00888'),
+            ],
+          ),
+        ],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '8:37',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: '精算処理',
+        tableRows: [
+          TableRow(
+            children: [
+              TableTitleCell(title: '金額'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: '現金'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: '磁気ＳＦ'),
+              TableContentCell(text: '1,020', unit: '円'),
+            ],
+          ),
+        ],
+      ),
+    ];
+  }
+}
+
+class _HistoryItem extends StatelessWidget {
+  final String date;
+  final String time;
+  final String number;
+  final String ticketName;
+  final String processName;
+  final List<TableRow> tableRows;
+
+  const _HistoryItem({
+    required this.date,
+    required this.time,
+    required this.number,
+    required this.ticketName,
+    required this.processName,
+    required this.tableRows,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(child: FittedBox(child: Text(date))),
+            Flexible(child: FittedBox(child: Text(time))),
+            Flexible(child: FittedBox(child: Text(number))),
+            Flexible(child: FittedBox(child: Text(ticketName))),
+            Flexible(child: FittedBox(child: Text(processName))),
+          ],
+        ),
+        for (var row in tableRows) TableInContent(children: [row]),
+      ],
+    );
+  }
+}
+
+class _PagerBottons extends StatelessWidget {
+  final int currentPage;
+  final int totalPages;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  const _PagerBottons({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        spacing: 16,
+        children: [
+          _PagerBotton(
+            direction: _PagerDirection.previous,
+            onPressed: onPrevious,
+          ),
+          Text('${currentPage + 1}/$totalPages'),
+          _PagerBotton(direction: _PagerDirection.next, onPressed: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _PagerBotton extends StatelessWidget {
+  final _PagerDirection direction;
+  final VoidCallback? onPressed;
+
+  /// ページ送りボタン
+  const _PagerBotton({required this.direction, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    const btnRadius = Radius.circular(20);
+
+    Color foregroundCallBack(Set<WidgetState> states) =>
+        states.contains(WidgetState.disabled)
+            ? AppColor.grey.no300
+            : AppColor.grey.no700;
+
+    return GradientElevatedButton(
+      style: GradientButtonStyle(
+        padding: WidgetStateProperty.all(EdgeInsets.zero),
+        backgroundGradient: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.disabled)
+                  ? LinearGradient(
+                    colors: [AppColor.grey.no400, AppColor.grey.no400],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  )
+                  : LinearGradient(
+                    colors: AppColor.grey.gradientLightColors,
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(foregroundCallBack),
+        iconColor: WidgetStateProperty.resolveWith(foregroundCallBack),
+        shape: WidgetStateProperty.all(
+          BeveledRectangleBorder(
+            borderRadius: switch (direction) {
+              _PagerDirection.previous => BorderRadiusGeometry.only(
+                topLeft: btnRadius,
+                bottomLeft: btnRadius,
+              ),
+              _PagerDirection.next => BorderRadiusGeometry.only(
+                topRight: btnRadius,
+                bottomRight: btnRadius,
+              ),
+            },
+          ),
+        ),
+        side: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.disabled)
+                  ? null
+                  : BorderSide(color: Colors.grey[200]!, width: 1),
+        ),
+        shadowColor: WidgetStateProperty.all(Colors.black),
+        elevation: WidgetStateProperty.resolveWith<double>(
+          (states) => states.contains(WidgetState.disabled) ? 0 : 4,
+        ),
+      ),
+      onPressed: onPressed,
+      child: Padding(
+        // アイコンを中央寄せ
+        padding: switch (direction) {
+          _PagerDirection.previous => EdgeInsets.only(left: 16.0),
+          _PagerDirection.next => EdgeInsets.only(right: 16.0),
+        },
+        child: Icon(switch (direction) {
+          _PagerDirection.previous => Icons.arrow_back_ios,
+          _PagerDirection.next => Icons.arrow_forward_ios,
+        }, size: fontSize * 1.3),
+      ),
+    );
+  }
+}
+
+class _FooterControllers extends StatelessWidget {
+  final int? selectedDateIndex;
+  final void Function(int index) onSelectDate;
+  final _OutputMethod? selectedOutput;
+  final void Function(_OutputMethod method) onSelectOutput;
+  final bool externalMediaConnected;
+  final VoidCallback? onExecute;
+
+  const _FooterControllers({
+    required this.selectedDateIndex,
+    required this.onSelectDate,
+    required this.selectedOutput,
+    required this.onSelectOutput,
+    required this.externalMediaConnected,
+    required this.onExecute,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      // 左右の列を上端で揃える（中央揃えだと全接客履歴と印刷ボタンの行がずれる）
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 16,
+      children: [
+        Flexible(
+          fit: FlexFit.tight,
+          flex: 4,
+          child: _SelectDateBottons(
+            selectedIndex: selectedDateIndex,
+            onSelect: onSelectDate,
+          ),
+        ),
+        Flexible(
+          fit: FlexFit.tight,
+          flex: 3,
+          child: _AnotherDateAndOutputArea(
+            selectedOutput: selectedOutput,
+            onSelectOutput: onSelectOutput,
+            externalMediaConnected: externalMediaConnected,
+            onExecute: onExecute,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 接客履歴日時（過去8日分）＋全接客履歴の選択ボタン群
+class _SelectDateBottons extends StatelessWidget {
+  final int? selectedIndex;
+  final void Function(int index) onSelect;
+
+  const _SelectDateBottons({required this.selectedIndex, required this.onSelect});
+
+  // 過去8日分のボタンの後、全接客履歴ボタンのインデックスとして使用
+  static const int allHistoryIndex = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: [
+        // 全接客履歴ボタン（15.9.2：接客履歴日時ボタンとは別に選択可能）
+        // 高さを明示し、下の日付グリッドと重ならないようにする
+        SizedBox(
+          height: _buttonHeight,
+          child: _buildDateButton(
+            index: allHistoryIndex,
+            colors: AppColor.teal.gradientColors,
+            label: '全接客履歴',
+          ),
+        ),
+        // 日付ボタンは4列×2行。childAspectRatioでは幅に依存して高さが潰れるため、
+        // mainAxisExtentで高さを固定し、右側の［実行］ボタンと高さを揃える。
+        GridView(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            mainAxisExtent: _buttonHeight,
+          ),
+          children: [
+            _buildDateButton(
+              index: 0,
+              colors: AppColor.orange.gradientColors,
+              label: '当日',
+              foregroundColor: Colors.black,
+            ),
+            // 過去日一週間分のボタン
+            for (var i = 1; i < 8; i++)
+              _buildDateButton(
+                index: i,
+                colors: AppColor.blueGrey.gradientColors,
+                label: DateTime.now().add(Duration(days: -i)).toDateOnlyString(),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateButton({
+    required int index,
+    required List<Color> colors,
+    required String label,
+    Color foregroundColor = Colors.white,
+  }) {
+    final isSelected = selectedIndex == index;
+    final textWidget = Text(
+      label,
+      style: _btnTextStyle.merge(TextStyle(color: foregroundColor)),
+    );
+    // 選択中はSetBackButton（凹＝押下状態）、未選択はPopOutButton（凸）で表現。
+    // これはアプリ内の他のボタン（业務ボタン等）と同じ選択表現の慣習に合わせている。
+    if (isSelected) {
+      return SetBackButton(
+        backgroundColors: colors,
+        onPressed: () => onSelect(index),
+        child: textWidget,
+      );
+    }
+    return PopOutButton(
+      backgroundColors: colors,
+      onPressed: () => onSelect(index),
+      child: textWidget,
+    );
+  }
+}
+
+/// その他の日付（カレンダー入力）＋ 印刷／外部媒体出力の選択 ＋ 実行ボタン
+class _AnotherDateAndOutputArea extends StatefulWidget {
+  final _OutputMethod? selectedOutput;
+  final void Function(_OutputMethod method) onSelectOutput;
+  final bool externalMediaConnected;
+  final VoidCallback? onExecute;
+
+  const _AnotherDateAndOutputArea({
+    required this.selectedOutput,
+    required this.onSelectOutput,
+    required this.externalMediaConnected,
+    required this.onExecute,
+  });
+
+  @override
+  State<_AnotherDateAndOutputArea> createState() =>
+      _AnotherDateAndOutputAreaState();
+}
+
+class _AnotherDateAndOutputAreaState
+    extends State<_AnotherDateAndOutputArea> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showCalendarDialog() async {
+    final selected = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CalendarDialog(),
+    );
+    if (selected != null) {
+      setState(() {
+        _controller.text = selected.toStringWithFormat('yyyy/MM/dd');
+      });
+    }
+  }
+
+  Widget _outputToggle({
+    required _OutputMethod method,
+    required String label,
+    required bool enabled,
+  }) {
+    final isSelected = widget.selectedOutput == method;
+    // 高さは外側のSizedBoxで固定しているため、ここでは縦paddingを付けない
+    final content = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(label, style: _btnTextStyle),
+    );
+    if (!enabled) {
+      // 外部媒体未接続時等、押下不可の状態
+      return PopOutButton(
+        backgroundColors: [AppColor.grey.no300, AppColor.grey.no300],
+        onPressed: null,
+        child: content,
+      );
+    }
+    if (isSelected) {
+      return SetBackButton(
+        backgroundColors: completedGradient,
+        onPressed: () => widget.onSelectOutput(method),
+        child: content,
+      );
+    }
+    return PopOutButton(
+      backgroundColors: completedGradient,
+      onPressed: () => widget.onSelectOutput(method),
+      child: content,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('その他の日付', style: TextStyle(fontWeight: FontWeight.w700)),
+            TextFieldShadow(
+              topStops: [0.0, 0.15],
+              leftStops: [0.0, 0.04],
+              child: TextField(
+                controller: _controller,
+                readOnly: true,
+                onTap: _showCalendarDialog,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black),
+                    borderRadius: BorderRadius.circular(0),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(
+          height: _buttonHeight,
+          child: Row(
+            spacing: 10,
+            children: [
+              Expanded(
+                child: _outputToggle(
+                  method: _OutputMethod.print,
+                  label: '印刷',
+                  enabled: true,
+                ),
+              ),
+              Expanded(
+                child: _outputToggle(
+                  method: _OutputMethod.externalMedia,
+                  label: '外部媒体出力',
+                  enabled: widget.externalMediaConnected,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: _buttonHeight,
+          child: PopOutButton.icon(
+            icon: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: Icon(Icons.check_circle),
+            ),
+            iconSize: fontSize,
+            backgroundColors:
+                widget.onExecute == null
+                    ? [AppColor.grey.no300, AppColor.grey.no300]
+                    : AppColor.orange.gradientColors,
+            onPressed: widget.onExecute,
+            child: Text(
+              '実行',
+              style: _btnTextStyle.merge(
+                TextStyle(
+                  color:
+                      widget.onExecute == null
+                          ? AppColor.grey.no700
+                          : Colors.black,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CalendarDialog extends StatefulWidget {
+  const _CalendarDialog();
+
+  @override
+  State<_CalendarDialog> createState() => _CalendarDialogState();
+}
+
+class _CalendarDialogState extends State<_CalendarDialog> {
+  DateTime _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _selectedDate;
+
+  void _previousMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+  }
+
+  List<DateTime?> _getDaysInMonth() {
+    final firstDay = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final lastDay = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+    final List<DateTime?> days = [];
+
+    // Add empty slots for days before first day of month
+    for (int i = 0; i < firstDay.weekday % 7; i++) {
+      days.add(null);
+    }
+
+    // Add all days in month
+    for (int i = 1; i <= lastDay.day; i++) {
+      days.add(DateTime(_currentMonth.year, _currentMonth.month, i));
+    }
+
+    return days;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final days = _getDaysInMonth();
+    final weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with month navigation
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: _previousMonth,
+                  icon: Icon(Icons.arrow_back_ios),
+                ),
+                Text(
+                  '${_currentMonth.year}年${_currentMonth.month}月',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: _nextMonth,
+                  icon: Icon(Icons.arrow_forward_ios),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Weekday headers
+            Row(
+              children:
+                  weekDays
+                      .map(
+                        (d) => Expanded(
+                          child: Center(
+                            child: Text(
+                              d,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    d == '日'
+                                        ? Colors.red
+                                        : d == '土'
+                                        ? Colors.blue
+                                        : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ),
+            const SizedBox(height: 8),
+
+            // Calendar grid
+            GridView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                childAspectRatio: 1.2,
+              ),
+              itemCount: days.length,
+              itemBuilder: (context, index) {
+                final day = days[index];
+                if (day == null) return SizedBox.shrink();
+
+                final isSelected =
+                    _selectedDate != null &&
+                    _selectedDate!.year == day.year &&
+                    _selectedDate!.month == day.month &&
+                    _selectedDate!.day == day.day;
+
+                final isToday =
+                    DateTime.now().year == day.year &&
+                    DateTime.now().month == day.month &&
+                    DateTime.now().day == day.day;
+
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDate = day;
+                    });
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color:
+                          isSelected
+                              ? Colors.red
+                              : isToday
+                              ? Colors.orange.shade100
+                              : Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${day.day}',
+                        style: TextStyle(
+                          color:
+                              isSelected
+                                  ? Colors.white
+                                  : day.weekday == 7
+                                  ? Colors.red
+                                  : day.weekday == 6
+                                  ? Colors.blue
+                                  : Colors.black,
+                          fontWeight:
+                              isSelected || isToday
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 確定/取消 buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              spacing: 16,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('取消'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _selectedDate == null
+                          ? null
+                          : () => Navigator.of(context).pop(_selectedDate),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('確定'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
