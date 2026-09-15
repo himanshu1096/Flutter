@@ -1,0 +1,125 @@
+// find:
+/// ページ送りの方向
+enum _PagerDirection { previous, next }
+
+// replace:
+/// ページ送りの方向
+enum _PagerDirection { previous, next }
+
+/// 磁気券処理の種別（③磁気券処理 仕様に対応）
+/// データ行の有無は仕様で決まっており、精算処理のみデータ行あり。
+enum _MagneticProcess {
+  nyuzyou('入場処理', hasDataRow: false),
+  syutuzyou('出場処理', hasDataRow: false),
+  seisan('精算処理', hasDataRow: true),
+  nyusyutuzyouKakikae('入出場書換', hasDataRow: false),
+  renzokuBitKakikae('連続ビット書換', hasDataRow: false),
+  fuseiClear('不正クリア', hasDataRow: false);
+
+  const _MagneticProcess(this.label, {required this.hasDataRow});
+  final String label;
+  final bool hasDataRow;
+}
+
+
+// find:
+class _HistoryItem extends StatelessWidget {
+
+// replace:
+/// 精算処理のデータ行を生成する。
+/// IC金券利用      : 金額 / 現金 / ＩＣＳＦ
+/// IC金券利用以外  : 金額 / 現金 / 磁気ＳＦ
+/// ※ isIcKinken は本来バックエンドから取得する値。UI確認用に現状はモック。
+List<TableRow> _seisanDataRows({
+  required String amount,
+  required String cash,
+  required String sfAmount,
+  required bool isIcKinken,
+}) {
+  return [
+    TableRow(
+      children: [
+        TableTitleCell(title: '金額'),
+        TableContentCell(text: amount, unit: '円'),
+        TableTitleCell(title: '現金'),
+        TableContentCell(text: cash, unit: '円'),
+        TableTitleCell(title: isIcKinken ? 'ＩＣＳＦ' : '磁気ＳＦ'),
+        TableContentCell(text: sfAmount, unit: '円'),
+      ],
+    ),
+  ];
+}
+
+class _HistoryItem extends StatelessWidget {
+
+
+// find:
+      _HistoryItem(
+        date: todayStr,
+        time: '6:37',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: '精算処理',
+        tableRows: [
+          TableRow(
+            children: [
+              TableTitleCell(title: '金額'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: '現金'),
+              TableContentCell(text: '1,020', unit: '円'),
+              TableTitleCell(title: '磁気ＳＦ'),
+              TableContentCell(text: '1,020', unit: '円'),
+            ],
+          ),
+        ],
+      ),
+
+// replace:
+      // 精算処理：データ行あり（IC金券利用以外 → 磁気ＳＦ）
+      _HistoryItem(
+        date: todayStr,
+        time: '6:37',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.seisan.label,
+        tableRows: _seisanDataRows(
+          amount: '1,020',
+          cash: '1,020',
+          sfAmount: '1,020',
+          isIcKinken: false,
+        ),
+      ),
+      // 精算処理：IC金券利用 → ＩＣＳＦ
+      _HistoryItem(
+        date: todayStr,
+        time: '6:52',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.seisan.label,
+        tableRows: _seisanDataRows(
+          amount: '1,020',
+          cash: '1,020',
+          sfAmount: '1,020',
+          isIcKinken: true,
+        ),
+      ),
+      // 入場処理：データ行なし（1行目のヘッダのみ）
+      _HistoryItem(
+        date: todayStr,
+        time: '7:05',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.nyuzyou.label,
+        tableRows: const [],
+      ),
+      // 出場処理：データ行なし
+      _HistoryItem(
+        date: todayStr,
+        time: '7:18',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.syutuzyou.label,
+        tableRows: const [],
+      ),
+
+
