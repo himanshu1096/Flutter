@@ -1,0 +1,86 @@
+// find:
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 30,
+                  mainAxisExtent: 120,
+                ),
+                shrinkWrap: true,
+                children: _makeHistoryItemList(),
+
+// replace:
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 30,
+                  mainAxisExtent: 120,
+                ),
+                shrinkWrap: true,
+                // スクロールは行わず、収まらない分はページ送りで表示する
+                physics: const NeverScrollableScrollPhysics(),
+                children: _makeHistoryItemList(),
+
+
+
+// find:
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(child: FittedBox(child: Text(date))),
+            Flexible(child: FittedBox(child: Text(time))),
+            Flexible(child: FittedBox(child: Text(number))),
+            Flexible(child: FittedBox(child: Text(ticketName))),
+            Flexible(child: FittedBox(child: Text(processName))),
+          ],
+        ),
+        for (var row in tableRows) TableInContent(children: [row]),
+      ],
+    );
+  }
+
+// replace:
+  @override
+  Widget build(BuildContext context) {
+    final headerRow = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(child: FittedBox(child: Text(date))),
+        Flexible(child: FittedBox(child: Text(time))),
+        Flexible(child: FittedBox(child: Text(number))),
+        Flexible(child: FittedBox(child: Text(ticketName))),
+        Flexible(child: FittedBox(child: Text(processName))),
+      ],
+    );
+
+    // データ行なし（入場処理・出場処理など）の場合は、
+    // 1行だけを枠で囲んで表示する。データ行ありの項目と枠の体裁を揃え、
+    // 下部に不自然な空白が出ないようにする。
+    if (tableRows.isEmpty) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.blue.shade200),
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+          child: headerRow,
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        headerRow,
+        for (var row in tableRows) TableInContent(children: [row]),
+      ],
+    );
+  }
+
