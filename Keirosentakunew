@@ -1,0 +1,74 @@
+{
+  "ROUTELIST": [
+    {
+      "ROUTEID": 1,
+      "SUBTEXT": "東京メトロ日比谷線・千代田線経由",
+      "MAINTEXT": "北千住"
+    },
+    {
+      "ROUTEID": 2,
+      "SUBTEXT": "東京メトロ半蔵門線経由",
+      "MAINTEXT": "押上"
+    },
+    {
+      "ROUTEID": 3,
+      "SUBTEXT": "東急田園都市線より",
+      "MAINTEXT": "渋谷 → 北千住"
+    },
+    {
+      "ROUTEID": 4,
+      "SUBTEXT": "東急田園都市線より",
+      "MAINTEXT": "渋谷 → 押上"
+    },
+    {
+      "ROUTEID": 5,
+      "SUBTEXT": "東急 東横線より",
+      "MAINTEXT": "中目黒 → 北千住"
+    },
+    {
+      "ROUTEID": 6,
+      "SUBTEXT": "東急 東横線より",
+      "MAINTEXT": "中目黒 → 押上"
+    },
+    {
+      "ROUTEID": 7,
+      "SUBTEXT": "東急 目黒線より",
+      "MAINTEXT": "目黒 → 北千住"
+    },
+    {
+      "ROUTEID": 8,
+      "SUBTEXT": "東急 目黒線より",
+      "MAINTEXT": "目黒 → 押上"
+    },
+    {
+      "ROUTEID": 9,
+      "SUBTEXT": "",
+      "MAINTEXT": "東京メトロ"
+    },
+    {
+      "ROUTEID": 10,
+      "SUBTEXT": "東京メトロ・押上経由",
+      "MAINTEXT": "東武線"
+    },
+    {
+      "ROUTEID": 11,
+      "SUBTEXT": "",
+      "MAINTEXT": "都営 → 東京メトロ"
+    },
+    {
+      "ROUTEID": 12,
+      "SUBTEXT": "都営→東京メトロ・押上経由",
+      "MAINTEXT": "東武線"
+    },
+    {
+      "ROUTEID": 13,
+      "SUBTEXT": "",
+      "MAINTEXT": "東京メトロ"
+    },
+    {
+      "ROUTEID": 14,
+      "SUBTEXT": "",
+      "MAINTEXT": "都営 → 東京メトロ"
+    }
+  ]
+}
