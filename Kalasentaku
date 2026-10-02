@@ -1,0 +1,46 @@
+// find:
+          final data = packet.json['DATA'] as Map<String, dynamic>? ?? {};
+          final amount = data['ADJUSTAMOUNT'] as int? ?? 0;
+          AppLogger().info(_tag, '精算金額: $amount');
+          _fareCompleter?.complete(amount);
+
+// replace:
+          final common = packet.json['COMMON'] as Map<String, dynamic>? ?? {};
+          final result = common['RESULT'] as bool? ?? false;
+          if (!result) {
+            final errCode = common['ERRCODE'] as int? ?? 0;
+            final errKind = common['ERRKIND'] as int? ?? 0;
+            AppLogger().warn(
+              _tag,
+              '0x1381 再精算判定失敗: ERRKIND=$errKind ERRCODE=$errCode',
+            );
+            _fareCompleter?.completeError(
+              FareJudgeException(errKind: errKind, errCode: errCode),
+            );
+          } else {
+            final data = packet.json['DATA'] as Map<String, dynamic>? ?? {};
+            final amount = data['ADJUSTAMOUNT'] as int? ?? 0;
+            AppLogger().info(_tag, '精算金額: $amount');
+            _fareCompleter?.complete(amount);
+          }
+
+
+
+
+
+// find:
+class TcpService {
+
+// replace:
+/// 再精算判定要求(0x1301)が失敗した場合の例外
+class FareJudgeException implements Exception {
+  final int errKind;
+  final int errCode;
+  const FareJudgeException({required this.errKind, required this.errCode});
+
+  @override
+  String toString() =>
+      'FareJudgeException(ERRKIND=$errKind, ERRCODE=$errCode)';
+}
+
+class TcpService {
