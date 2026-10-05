@@ -1,0 +1,106 @@
+// find:
+  static const int _defaultCameraInterval = 500;
+  static const int _defaultResponseTimeoutSec = 180;
+  static const int _defaultPrintTimeoutSec = 180;
+
+// replace:
+  static const int _defaultCameraInterval = 500;
+  static const int _defaultResponseTimeoutSec = 180;
+  static const int _defaultPrintTimeoutSec = 180;
+
+  // 経路選択ボタンの表示設定（既定値）
+  // ※RouteLabel.jsonで経路ごとに個別指定した場合はそちらが優先される
+  static const double _defaultRouteBtnSubFontSize = 16;
+  static const double _defaultRouteBtnMainFontSize = 26;
+  static const double _defaultRouteBtnSubTopPadding = 0;
+  static const double _defaultRouteBtnMainTopPadding = 0;
+  static const String _defaultRouteBtnAlign = 'center';
+
+
+
+// find:
+  int _cameraInterval = _defaultCameraInterval;
+
+// replace:
+  int _cameraInterval = _defaultCameraInterval;
+  double _routeBtnSubFontSize = _defaultRouteBtnSubFontSize;
+  double _routeBtnMainFontSize = _defaultRouteBtnMainFontSize;
+  double _routeBtnSubTopPadding = _defaultRouteBtnSubTopPadding;
+  double _routeBtnMainTopPadding = _defaultRouteBtnMainTopPadding;
+  String _routeBtnAlign = _defaultRouteBtnAlign;
+
+
+
+// find:
+  int get cameraInterval => _cameraInterval;
+
+// replace:
+  int get cameraInterval => _cameraInterval;
+  double get routeBtnSubFontSize => _routeBtnSubFontSize;
+  double get routeBtnMainFontSize => _routeBtnMainFontSize;
+  double get routeBtnSubTopPadding => _routeBtnSubTopPadding;
+  double get routeBtnMainTopPadding => _routeBtnMainTopPadding;
+  String get routeBtnAlign => _routeBtnAlign;
+
+
+
+// find:
+      _printTimeoutSec =
+          json['PRINT_TIMEOUT_SEC'] as int? ?? _defaultPrintTimeoutSec;
+
+// replace:
+      _printTimeoutSec =
+          json['PRINT_TIMEOUT_SEC'] as int? ?? _defaultPrintTimeoutSec;
+
+      // 経路選択ボタンの表示設定
+      // 不正な値が設定された場合に画面が崩れないよう、範囲内に丸める
+      _routeBtnSubFontSize = _readSize(
+        json['ROUTE_BTN_SUB_FONT_SIZE'],
+        _defaultRouteBtnSubFontSize,
+      );
+      _routeBtnMainFontSize = _readSize(
+        json['ROUTE_BTN_MAIN_FONT_SIZE'],
+        _defaultRouteBtnMainFontSize,
+      );
+      _routeBtnSubTopPadding = _readPadding(
+        json['ROUTE_BTN_SUB_TOP_PADDING'],
+        _defaultRouteBtnSubTopPadding,
+      );
+      _routeBtnMainTopPadding = _readPadding(
+        json['ROUTE_BTN_MAIN_TOP_PADDING'],
+        _defaultRouteBtnMainTopPadding,
+      );
+      _routeBtnAlign =
+          json['ROUTE_BTN_ALIGN'] as String? ?? _defaultRouteBtnAlign;
+
+
+
+// find:
+    } catch (e) {
+      AppLogger().error(_tag, '設定ファイル読み込みエラー — デフォルト値を使用', e);
+    }
+  }
+}
+
+// replace:
+    } catch (e) {
+      AppLogger().error(_tag, '設定ファイル読み込みエラー — デフォルト値を使用', e);
+    }
+  }
+
+  /// フォントサイズを読み込む（8〜40pxに制限）
+  /// 数値以外・範囲外の場合は既定値を使用する
+  static double _readSize(dynamic value, double fallback) {
+    final v = (value is num) ? value.toDouble() : null;
+    if (v == null) return fallback;
+    return v.clamp(8.0, 40.0);
+  }
+
+  /// 余白を読み込む（-20〜40pxに制限）
+  static double _readPadding(dynamic value, double fallback) {
+    final v = (value is num) ? value.toDouble() : null;
+    if (v == null) return fallback;
+    return v.clamp(-20.0, 40.0);
+  }
+}
+
