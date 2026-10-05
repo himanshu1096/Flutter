@@ -1,0 +1,78 @@
+// find:
+class RouteLabel {
+  final int routeId;
+  final String subtext;
+  final String maintext;
+
+  const RouteLabel({
+    required this.routeId,
+    required this.subtext,
+    required this.maintext,
+  });
+
+  factory RouteLabel.fromJson(Map<String, dynamic> json) {
+    return RouteLabel(
+      routeId: json['ROUTEID'] as int? ?? -1,
+      subtext: json['SUBTEXT'] as String? ?? '',
+      maintext: json['MAINTEXT'] as String? ?? '',
+    );
+  }
+}
+
+// replace:
+class RouteLabel {
+  final int routeId;
+  final String subtext;
+  final String maintext;
+
+  // --- 以下は経路ごとの表示調整用（任意指定） ---
+  // 未指定(null)の場合はapp_config.jsonの既定値を使用する
+  /// 小さい文字のフォントサイズ
+  final double? subFontSize;
+
+  /// 大きい文字のフォントサイズ
+  final double? mainFontSize;
+
+  /// 小さい文字の上余白
+  final double? subTopPadding;
+
+  /// 大きい文字の上余白
+  final double? mainTopPadding;
+
+  /// 文字揃え ('left' / 'center' / 'right')
+  final String? align;
+
+  const RouteLabel({
+    required this.routeId,
+    required this.subtext,
+    required this.maintext,
+    this.subFontSize,
+    this.mainFontSize,
+    this.subTopPadding,
+    this.mainTopPadding,
+    this.align,
+  });
+
+  factory RouteLabel.fromJson(Map<String, dynamic> json) {
+    return RouteLabel(
+      routeId: json['ROUTEID'] as int? ?? -1,
+      subtext: json['SUBTEXT'] as String? ?? '',
+      maintext: json['MAINTEXT'] as String? ?? '',
+      subFontSize: _size(json['SUBFONTSIZE']),
+      mainFontSize: _size(json['MAINFONTSIZE']),
+      subTopPadding: _padding(json['SUBTOPPADDING']),
+      mainTopPadding: _padding(json['MAINTOPPADDING']),
+      align: json['ALIGN'] as String?,
+    );
+  }
+
+  /// フォントサイズ（8〜40pxに制限）。数値以外はnull（既定値を使用）
+  static double? _size(dynamic v) =>
+      (v is num) ? v.toDouble().clamp(8.0, 40.0) : null;
+
+  /// 余白（-20〜40pxに制限）。数値以外はnull（既定値を使用）
+  static double? _padding(dynamic v) =>
+      (v is num) ? v.toDouble().clamp(-20.0, 40.0) : null;
+}
+
+
