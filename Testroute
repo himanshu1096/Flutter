@@ -1,0 +1,79 @@
+// find:
+      _routeBtnAlign =
+          json['ROUTE_BTN_ALIGN'] as String? ?? _defaultRouteBtnAlign;
+
+// replace:
+      _routeBtnAlign =
+          json['ROUTE_BTN_ALIGN'] as String? ?? _defaultRouteBtnAlign;
+
+      // ===== デバッグ用（本体制御実装後は削除） =====
+      final cands = json['DEBUG_ROUTE_CANDS'];
+      _debugRouteCands = (cands is List)
+          ? cands.whereType<num>().map((e) => e.toInt()).toList()
+          : _defaultDebugRouteCands;
+      _debugSkipFareJudge =
+          json['DEBUG_SKIP_FARE_JUDGE'] as bool? ?? _defaultDebugSkipFareJudge;
+      _debugFareAmount =
+          json['DEBUG_FARE_AMOUNT'] as int? ?? _defaultDebugFareAmount;
+      if (_debugRouteCands.isNotEmpty || _debugSkipFareJudge) {
+        AppLogger().warn(
+          _tag,
+          '★デバッグモード有効: cands=$_debugRouteCands '
+          'skipFareJudge=$_debugSkipFareJudge',
+        );
+      }
+
+
+// find:
+                    final cands = displayData?.routeCandidates ?? [];
+
+// replace:
+                    // デバッグ用：app_config.jsonでDEBUG_ROUTE_CANDSが
+                    // 指定されている場合はそちらを使用する（本体制御実装後は削除）
+                    final debugCands = TcpConfig().debugRouteCands;
+                    final cands = debugCands.isNotEmpty
+                        ? debugCands
+                        : (displayData?.routeCandidates ?? []);
+
+
+// find:
+                    // 経路選択の要否はROUTEFLAG(経路選択有無)で判定する
+                    if (displayData?.needsRouteSelection ?? false) {
+
+// replace:
+                    // 経路選択の要否はROUTEFLAG(経路選択有無)で判定する
+                    // ※デバッグ指定がある場合は強制的に経路選択画面を表示する
+                    if (debugCands.isNotEmpty ||
+                        (displayData?.needsRouteSelection ?? false)) {
+
+
+// find:
+  showCustomAlertDialog(context: context, text: '処理中');
+  try {
+    final amount = await TcpService().sendFareJudge(keiro);
+
+// replace:
+  // デバッグ用：本体制御の再精算判定(0x1301/0x1381)が未実装のため、
+  // 送信せず固定金額で画面遷移する（本体制御実装後は削除）
+  if (TcpConfig().debugSkipFareJudge) {
+    AppLogger().warn(
+      'SeisanSyoriRoute',
+      '★デバッグモード: 0x1301を送信せず固定金額で遷移 ROUTENO=$keiro',
+    );
+    ref.read(fareAmountProvider.notifier).set(TcpConfig().debugFareAmount);
+    ref
+        .read(qrReadPageSelectedBtnProvider.notifier)
+        .changePage(QrReadPageBtnKind.seisanSyori);
+    return;
+  }
+
+  showCustomAlertDialog(context: context, text: '処理中');
+  try {
+    final amount = await TcpService().sendFareJudge(keiro);
+
+
+
+"DEBUG_ROUTE_CANDS": [1, 3, 5, 10, 12, 103],
+"DEBUG_SKIP_FARE_JUDGE": true,
+"DEBUG_FARE_AMOUNT": 1020
+
