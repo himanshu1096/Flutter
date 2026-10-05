@@ -1,0 +1,129 @@
+// find:
+const TextStyle _btnTextStyleSub = TextStyle(
+  fontSize: 16,
+  fontWeight: FontWeight.w500,
+);
+
+const TextStyle _btnTextStyleMain = TextStyle(
+  fontSize: 26,
+  fontWeight: FontWeight.w700,
+);
+
+// replace:
+// フォントサイズ・余白・文字揃えは app_config.json で既定値を指定し、
+// RouteLabel.json で経路ごとに個別上書きできる。
+// ※値はいずれも読み込み時に範囲内へ丸めている（tcp_config.dart / route_label.dart）
+
+/// 小さい文字（経由路線名など）のスタイル
+TextStyle _subStyle(RouteLabel? label) => TextStyle(
+  fontSize: label?.subFontSize ?? TcpConfig().routeBtnSubFontSize,
+  fontWeight: FontWeight.w500,
+);
+
+/// 大きい文字（駅名など）のスタイル
+TextStyle _mainStyle(RouteLabel? label) => TextStyle(
+  fontSize: label?.mainFontSize ?? TcpConfig().routeBtnMainFontSize,
+  fontWeight: FontWeight.w700,
+);
+
+/// 文字揃え（'left' / 'center' / 'right'）
+TextAlign _textAlign(RouteLabel? label) {
+  final v = label?.align ?? TcpConfig().routeBtnAlign;
+  switch (v) {
+    case 'left':
+      return TextAlign.left;
+    case 'right':
+      return TextAlign.right;
+    default:
+      return TextAlign.center;
+  }
+}
+
+/// Column内の横方向の寄せ（文字揃えに合わせる）
+CrossAxisAlignment _crossAlign(RouteLabel? label) {
+  switch (_textAlign(label)) {
+    case TextAlign.left:
+      return CrossAxisAlignment.start;
+    case TextAlign.right:
+      return CrossAxisAlignment.end;
+    default:
+      return CrossAxisAlignment.center;
+  }
+}
+
+
+
+// find:
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.subtext,
+          style: _btnTextStyleSub,
+          textAlign: TextAlign.center,
+        ),
+        Text(
+          label.maintext,
+          style: _btnTextStyleMain,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+
+// replace:
+    // ボタンは320×120px固定のため、行数を制限し収まらない分は省略(...)する
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: _crossAlign(label),
+      children: [
+        Padding(
+          padding: EdgeInsets.only(
+            top: label.subTopPadding ?? TcpConfig().routeBtnSubTopPadding,
+          ),
+          child: Text(
+            label.subtext,
+            style: _subStyle(label),
+            textAlign: _textAlign(label),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.only(
+            top: label.mainTopPadding ?? TcpConfig().routeBtnMainTopPadding,
+          ),
+          child: Text(
+            label.maintext,
+            style: _mainStyle(label),
+            textAlign: _textAlign(label),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+
+
+// find:
+      return Text(
+        '経路$routeId',
+        style: _btnTextStyleMain,
+        textAlign: TextAlign.center,
+      );
+
+// replace:
+      return Text(
+        '経路$routeId',
+        style: _mainStyle(null),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+
+
+"ROUTE_BTN_SUB_FONT_SIZE": 16,
+"ROUTE_BTN_MAIN_FONT_SIZE": 26,
+"ROUTE_BTN_SUB_TOP_PADDING": 0,
+"ROUTE_BTN_MAIN_TOP_PADDING": 0,
+"ROUTE_BTN_ALIGN": "center"
+
