@@ -1,0 +1,119 @@
+// find:
+import 'package:qr_multidemo/component/pop_out_button.dart';
+
+// replace:
+import 'package:qr_multidemo/component/pop_out_button.dart';
+
+// ── 経路選択ボタンのグリッド設定 ────────────────────────────
+// ROUTECAND1〜6（maxJudgeRouteCount=6）に対応する3列×2行の固定グリッド。
+// ボタン数が変わってもサイズ・位置は一切変化させない（データ無しのマスは空白）。
+const int _gridColumns = 3;
+const int _gridRows = 2;
+
+/// マス間に確保する最小の隙間
+const double _cellGap = 24;
+
+/// ボタンの固定サイズ（画面が狭い場合のみマスに合わせて縮小する）
+const double _btnMaxWidth = 386;
+const double _btnMaxHeight = 220;
+
+/// ボタン内の左右余白（文字が端に接触しないようにする）
+const double _btnTextPadding = 12;
+
+/// 利用可能サイズと上限の小さい方を返す
+double _fitSize(double available, double maxValue) {
+  if (available <= 0) return maxValue;
+  return available < maxValue ? available : maxValue;
+}
+
+// replace the entire return Column(...) block with:
+    // 3列×2行の固定グリッド。マスの数は常に6で、ボタン数によって変化しない。
+    // データが無いマスは空白のままとし、各ボタンの位置とサイズを固定する。
+    return Column(
+      children: [
+        SizedBox(
+          height: 100,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '経路を選択してください',
+              style: TextStyle(fontSize: 45, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 列数・行数が固定のため、ここで決まるサイズは常に同じ値になる
+              final double btnW = _fitSize(
+                constraints.maxWidth / _gridColumns - _cellGap,
+                _btnMaxWidth,
+              );
+              final double btnH = _fitSize(
+                constraints.maxHeight / _gridRows - _cellGap,
+                _btnMaxHeight,
+              );
+
+              return Column(
+                children: [
+                  for (var r = 0; r < _gridRows; r++)
+                    Expanded(
+                      child: Row(
+                        children: [
+                          for (var c = 0; c < _gridColumns; c++)
+                            Expanded(
+                              child: Center(
+                                child: SizedBox(
+                                  width: btnW,
+                                  height: btnH,
+                                  child: _routeSlot(
+                                    context,
+                                    ref,
+                                    judgeRouteBtnIdNotifier,
+                                    visibleItems,
+                                    r * _gridColumns + c,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+
+
+
+
+
+
+/// 指定位置のボタンを返す。該当データが無い場合は空白を返し、
+/// 他のボタンの位置・サイズには影響させない。
+Widget _routeSlot(
+  BuildContext context,
+  WidgetRef ref,
+  JudgeRouteId notifier,
+  List<JudgeRouteInfo> items,
+  int index,
+) {
+  if (index >= items.length) return const SizedBox.shrink();
+  final item = items[index];
+  return PopOutButton(
+    backgroundColors: orengeGradient,
+    foregroundColor: Colors.black,
+    onPressed: () async {
+      notifier.set(item.id);
+      await _sendFareJudgeAndNavigate(context, ref, item.routeId);
+    },
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _btnTextPadding),
+      child: Center(child: _RouteButtonLabel(routeId: item.routeId)),
+    ),
+  );
+}
+
