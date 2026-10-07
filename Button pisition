@@ -1,0 +1,63 @@
+// find:
+        Wrap(
+          spacing: 40,
+          runSpacing: 30,
+          children: [
+            for (final item in visibleItems)
+              SizedBox(
+                width: 320,
+                height: 120,
+                child: PopOutButton(
+                  backgroundColors: orengeGradient,
+                  foregroundColor: Colors.black,
+                  onPressed: () async {
+                    judgeRouteBtnIdNotifier.set(item.id);
+                    await _sendFareJudgeAndNavigate(context, ref, item.routeId);
+                  },
+                  child: Center(
+                    child: _RouteButtonLabel(routeId: item.routeId),
+                  ),
+                ),
+              ),
+          ],
+        ),
+
+// replace:
+        Wrap(
+          spacing: 40,
+          runSpacing: 30,
+          // 縦2段・列優先で配置する（1 3 5 / 2 4 6 の並び）
+          // 1列ぶん（最大2個）をColumnにまとめ、その列をWrapが左から並べる
+          children: [
+            for (var i = 0; i < visibleItems.length; i += 2)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var j = i; j < i + 2 && j < visibleItems.length; j++) ...[
+                    if (j > i) const SizedBox(height: 30),
+                    SizedBox(
+                      width: 320,
+                      height: 120,
+                      child: PopOutButton(
+                        backgroundColors: orengeGradient,
+                        foregroundColor: Colors.black,
+                        onPressed: () async {
+                          judgeRouteBtnIdNotifier.set(visibleItems[j].id);
+                          await _sendFareJudgeAndNavigate(
+                            context,
+                            ref,
+                            visibleItems[j].routeId,
+                          );
+                        },
+                        child: Center(
+                          child: _RouteButtonLabel(
+                            routeId: visibleItems[j].routeId,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+          ],
+        ),
