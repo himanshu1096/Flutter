@@ -1,0 +1,132 @@
+// find:
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20.0, top: 0.0),
+            child: SecondaryTabContent(onComplete: onComplete),
+          ),
+
+// replace:
+          // 経路選択画面のみ残りの余白をすべて使う（他画面は従来どおり内容分の高さ）
+          if (selectedBtn == QrReadPageBtnKind.seisanSyoriRoute)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 20.0, top: 0.0),
+                child: SecondaryTabContent(onComplete: onComplete),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20.0, top: 0.0),
+              child: SecondaryTabContent(onComplete: onComplete),
+            ),
+
+
+// find:
+import 'package:qr_multidemo/component/pop_out_button.dart';
+
+// replace:
+import 'package:qr_multidemo/component/pop_out_button.dart';
+
+/// 1行に並べるボタンの最大数
+const int _maxColumns = 3;
+
+/// 1マス（セル）に対するボタンの大きさの割合（残りが均等な余白になる）
+const double _btnWidthRatio = 0.88;
+const double _btnHeightRatio = 0.72;
+
+/// ボタンサイズの下限・上限
+const double _minBtnWidth = 280;
+const double _maxBtnWidth = 560;
+const double _minBtnHeight = 130;
+const double _maxBtnHeight = 190;
+
+/// doubleのclamp（num.clampはnumを返すため専用ヘルパーを使う）
+double _clampSize(double v, double lo, double hi) =>
+    v < lo ? lo : (v > hi ? hi : v);
+
+
+
+// find:
+    return Column(
+
+// ...through the end of the Wrap and the closing of this Column...
+
+// replace (whole block):
+    // ボタン数に応じて行数・列数を決める（1行最大3個／行優先で 1 2 3・4 5 6 の並び）
+    final int rowCount = (visibleItems.length / _maxColumns).ceil();
+    final int colCount = (visibleItems.length / rowCount).ceil();
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 100,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '経路を選択してください',
+              style: TextStyle(fontSize: 45, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+        // 残りの余白を行数×列数で均等に分割し、各マスの中央にボタンを配置する
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double btnW = _clampSize(
+                constraints.maxWidth / colCount * _btnWidthRatio,
+                _minBtnWidth,
+                _maxBtnWidth,
+              );
+              final double btnH = _clampSize(
+                constraints.maxHeight / rowCount * _btnHeightRatio,
+                _minBtnHeight,
+                _maxBtnHeight,
+              );
+
+              return Column(
+                children: [
+                  for (var r = 0; r < rowCount; r++)
+                    Expanded(
+                      child: Row(
+                        children: [
+                          for (var c = 0; c < colCount; c++)
+                            if (r * colCount + c < visibleItems.length)
+                              Expanded(
+                                child: Center(
+                                  child: SizedBox(
+                                    width: btnW,
+                                    height: btnH,
+                                    child: PopOutButton(
+                                      backgroundColors: orengeGradient,
+                                      foregroundColor: Colors.black,
+                                      onPressed: () async {
+                                        final item =
+                                            visibleItems[r * colCount + c];
+                                        judgeRouteBtnIdNotifier.set(item.id);
+                                        await _sendFareJudgeAndNavigate(
+                                          context,
+                                          ref,
+                                          item.routeId,
+                                        );
+                                      },
+                                      child: Center(
+                                        child: _RouteButtonLabel(
+                                          routeId:
+                                              visibleItems[r * colCount + c]
+                                                  .routeId,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+
