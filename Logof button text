@@ -1,0 +1,128 @@
+// find:
+  const TransitionButton({
+    super.key,
+    required this.onPressed,
+    required this.text,
+    this.isPushed = false,
+    this.btnColors = orengeGradient,
+    this.width = 170.0,
+    this.height = 60.0,
+    this.fontSize = 24.0,
+    this.iconData = FontAwesomeIcons.chevronRight,
+    this.iconAtStart = false,
+  });
+
+  final VoidCallback? onPressed;
+  final String text;
+  final bool isPushed;
+  final List<Color> btnColors;
+  final double width;
+  final double height;
+  final double fontSize;
+  final IconData iconData;
+  final bool iconAtStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColors = isPushed ? blueGradient : btnColors;
+    final foregroundColor = Colors.black;
+
+    final content = Text(
+      text,
+      style: TextStyle(fontWeight: FontWeight.w500, fontSize: fontSize),
+    );
+
+    final icon = Icon(iconData, color: Colors.black, size: 22.0);
+
+// replace:
+  const TransitionButton({
+    super.key,
+    required this.onPressed,
+    required this.text,
+    this.isPushed = false,
+    this.btnColors = orengeGradient,
+    this.width = 170.0,
+    this.height = 60.0,
+    this.fontSize = 24.0,
+    this.iconData = FontAwesomeIcons.chevronRight,
+    this.iconAtStart = false,
+    this.foregroundColor = Colors.black,
+    this.pushedForegroundColor = Colors.black,
+  });
+
+  final VoidCallback? onPressed;
+  final String text;
+  final bool isPushed;
+  final List<Color> btnColors;
+  final double width;
+  final double height;
+  final double fontSize;
+  final IconData iconData;
+  final bool iconAtStart;
+
+  /// 非選択時（btnColors表示時）の文字・アイコン色
+  final Color foregroundColor;
+
+  /// 選択時（blueGradient表示時）の文字・アイコン色
+  final Color pushedForegroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColors = isPushed ? blueGradient : btnColors;
+    final fgColor = isPushed ? pushedForegroundColor : foregroundColor;
+
+    final content = Text(
+      text,
+      style: TextStyle(
+        fontWeight: FontWeight.w500,
+        fontSize: fontSize,
+        color: fgColor,
+      ),
+    );
+
+    final icon = Icon(iconData, color: fgColor, size: 22.0);
+
+
+
+// find:
+              ? SetBackButton.icon(
+                backgroundColors: backgroundColors,
+                foregroundColor: foregroundColor,
+
+// replace:
+              ? SetBackButton.icon(
+                backgroundColors: backgroundColors,
+                foregroundColor: fgColor,
+
+// find:
+              : PopOutButton.icon(
+                backgroundColors: backgroundColors,
+                foregroundColor: foregroundColor,
+
+// replace:
+              : PopOutButton.icon(
+                backgroundColors: backgroundColors,
+                foregroundColor: fgColor,
+
+
+// find:
+                            btnColors:
+                                tabName == logoffTabName
+                                    ? completedGradient
+                                    : orengeGradient,
+                            width: 185,
+
+// replace:
+                            btnColors:
+                                tabName == logoffTabName
+                                    ? completedGradient
+                                    : orengeGradient,
+                            // ログオフは赤背景のため非選択時は白文字にする
+                            // 選択時は青背景になるため、他ボタンと同じ黒文字（既定値）
+                            foregroundColor:
+                                tabName == logoffTabName
+                                    ? Colors.white
+                                    : Colors.black,
+                            width: 185,
+
+
