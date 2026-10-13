@@ -1,0 +1,146 @@
+// find:
+class _CalendarDialogState extends State<_CalendarDialog> {
+  DateTime _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _selectedDate;
+
+  void _previousMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+  }
+
+// replace:
+class _CalendarDialogState extends State<_CalendarDialog> {
+  DateTime _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _selectedDate;
+
+  /// 選択可能な最古日（本日から30日前）
+  late final DateTime _minDate;
+
+  /// 選択可能な最新日（本日）
+  late final DateTime _maxDate;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _maxDate = DateTime(now.year, now.month, now.day);
+    _minDate = _maxDate.subtract(const Duration(days: 30));
+  }
+
+  /// 選択可能な日付か（本日から30日前〜本日）
+  bool _isSelectable(DateTime day) =>
+      !day.isBefore(_minDate) && !day.isAfter(_maxDate);
+
+  /// 前月へ移動できるか
+  bool get _canGoPrevious =>
+      _currentMonth.isAfter(DateTime(_minDate.year, _minDate.month));
+
+  /// 翌月へ移動できるか
+  bool get _canGoNext =>
+      _currentMonth.isBefore(DateTime(_maxDate.year, _maxDate.month));
+
+  void _previousMonth() {
+    if (!_canGoPrevious) return;
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+  }
+
+  void _nextMonth() {
+    if (!_canGoNext) return;
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+  }
+
+// find:
+                IconButton(
+                  onPressed: _previousMonth,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_back_ios),
+                ),
+
+// replace:
+                IconButton(
+                  onPressed: _canGoPrevious ? _previousMonth : null,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_back_ios),
+                ),
+
+
+// find:
+                IconButton(
+                  onPressed: _nextMonth,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_forward_ios),
+                ),
+
+// replace:
+                IconButton(
+                  onPressed: _canGoNext ? _nextMonth : null,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_forward_ios),
+                ),
+
+
+
+// find:
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDate = day;
+                    });
+                  },
+
+// replace:
+                final selectable = _isSelectable(day);
+
+                return GestureDetector(
+                  // 範囲外（30日より前・未来日）は選択不可
+                  onTap:
+                      selectable
+                          ? () {
+                            setState(() {
+                              _selectedDate = day;
+                            });
+                          }
+                          : null,
+
+
+
+// find:
+                          fontSize: 30,
+                          color:
+                              isSelected
+                                  ? Colors.white
+                                  : day.weekday == 7
+                                  ? Colors.red
+                                  : day.weekday == 6
+                                  ? Colors.blue
+                                  : Colors.black,
+
+// replace:
+                          fontSize: 30,
+                          color:
+                              !selectable
+                                  ? Colors.grey.shade400
+                                  : isSelected
+                                  ? Colors.white
+                                  : day.weekday == 7
+                                  ? Colors.red
+                                  : day.weekday == 6
+                                  ? Colors.blue
+                                  : Colors.black,
+
+
+
+
+
+
