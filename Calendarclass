@@ -1,0 +1,75 @@
+class _AnotherDateField extends StatefulWidget {
+  /// その他の日付入力欄（タップでカレンダーダイアログを開く）
+  /// グリッドの1マスに収めるため、印刷ボタンは持たない
+  /// （印刷ボタンは_SelectDateBottons内へ移動）
+  const _AnotherDateField();
+
+  @override
+  State<_AnotherDateField> createState() => _AnotherDateFieldState();
+}
+
+class _AnotherDateFieldState extends State<_AnotherDateField> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showCalendarDialog() async {
+    final selected = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CalendarDialog(),
+    );
+    if (selected != null) {
+      setState(() {
+        _controller.text = selected.toStringWithFormat('yyyy/MM/dd');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // マスの高さに引き伸ばされないようCenterで包む
+    return Center(
+      child: SizedBox(
+        width: double.infinity,
+        child: TextFieldShadow(
+          topStops: [0.0, 0.15],
+          leftStops: [0.0, 0.04],
+          child: TextField(
+            controller: _controller,
+            readOnly: true,
+            onTap: _showCalendarDialog,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: _dateFieldFontSize,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
+            decoration: InputDecoration(
+              // 未選択時は「その他の日付」、日付選択後はその日付が表示される
+              hintText: 'その他の日付',
+              hintStyle: TextStyle(
+                fontSize: _dateFieldFontSize,
+                fontWeight: FontWeight.w700,
+                color: Colors.black54,
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+              border: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.black),
+                borderRadius: BorderRadius.circular(0),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
