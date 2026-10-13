@@ -1,0 +1,191 @@
+// find:
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('その他の日付', style: TextStyle(fontWeight: FontWeight.w700)),
+            TextFieldShadow(
+              topStops: [0.0, 0.15],
+              leftStops: [0.0, 0.04],
+              child: TextField(
+                controller: _controller,
+                readOnly: true,
+                onTap: _showCalendarDialog,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black),
+                    borderRadius: BorderRadius.circular(0),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+// replace:
+        // 枠の外に出していたラベルを枠内のヒント文字に変更する
+        // 未選択時は「その他の日付」、日付選択後はその日付が表示される
+        TextFieldShadow(
+          topStops: [0.0, 0.15],
+          leftStops: [0.0, 0.04],
+          child: TextField(
+            controller: _controller,
+            readOnly: true,
+            onTap: _showCalendarDialog,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: _dateFieldFontSize,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
+            decoration: InputDecoration(
+              hintText: 'その他の日付',
+              hintStyle: TextStyle(
+                fontSize: _dateFieldFontSize,
+                fontWeight: FontWeight.w700,
+                color: Colors.black54,
+              ),
+              // 枠内の余白を詰めて文字を大きく表示できるようにする
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.black),
+                borderRadius: BorderRadius.circular(0),
+              ),
+            ),
+          ),
+        ),
+
+
+
+// find:
+                IconButton(
+                  onPressed: _previousMonth,
+                  icon: Icon(Icons.arrow_back_ios),
+                ),
+                Text(
+                  '${_currentMonth.year}年${_currentMonth.month}月',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: _nextMonth,
+                  icon: Icon(Icons.arrow_forward_ios),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+// replace:
+                IconButton(
+                  onPressed: _previousMonth,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_back_ios),
+                ),
+                Text(
+                  '${_currentMonth.year}年${_currentMonth.month}月',
+                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: _nextMonth,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_forward_ios),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+
+
+// find:
+                            child: Text(
+                              d,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    d == '日'
+                                        ? Colors.red
+                                        : d == '土'
+                                        ? Colors.blue
+                                        : Colors.black,
+                              ),
+                            ),
+
+// replace:
+                            child: Text(
+                              d,
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    d == '日'
+                                        ? Colors.red
+                                        : d == '土'
+                                        ? Colors.blue
+                                        : Colors.black,
+                              ),
+                            ),
+
+
+
+
+
+// find:
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                childAspectRatio: 1.2,
+              ),
+
+// replace:
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
+                // 1.0で正方形のマスにし、横だけでなく縦にも広げる
+                childAspectRatio: 1.0,
+              ),
+
+
+
+
+// find:
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('取消'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _selectedDate == null
+                          ? null
+                          : () => Navigator.of(context).pop(_selectedDate),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('確定'),
+                ),
+
+// replace:
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(140, 60),
+                  ),
+                  child: Text('取消', style: TextStyle(fontSize: 26)),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _selectedDate == null
+                          ? null
+                          : () => Navigator.of(context).pop(_selectedDate),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(140, 60),
+                  ),
+                  child: Text('確定', style: TextStyle(fontSize: 26)),
+                ),
