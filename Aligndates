@@ -1,0 +1,224 @@
+// find:
+class _FooterControllers extends StatelessWidget {
+  /// 画面下部のボタン
+  const _FooterControllers();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 16,
+      children: [
+        Flexible(fit: FlexFit.tight, flex: 4, child: _SelectDateButtons()),
+        Flexible(fit: FlexFit.tight, flex: 1, child: _ExportButtons()),
+      ],
+    );
+  }
+}
+
+// replace:
+class _FooterControllers extends StatelessWidget {
+  /// 画面下部のボタン
+  const _FooterControllers();
+
+  @override
+  Widget build(BuildContext context) {
+    // 日付ボタンと印刷ボタンを同一グリッドに入れ、
+    // ボタンのサイズと位置を完全に揃える（5列×2行）
+    return _SelectDateButtons();
+  }
+}
+
+
+
+// find:
+  @override
+  Widget build(BuildContext context) {
+    // 選択中ボタンのIndex
+    final selectedBtnIndex = useState(0);
+
+    return GridView.count(
+      crossAxisCount: 4,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      childAspectRatio: 4 / 1,
+      children: [
+        for (var i = 0; i < _historyDates.length; i++)
+          CloseTallyToggleBtn(
+            isSelected: i == selectedBtnIndex.value,
+            onPressed: () {
+              selectedBtnIndex.value = i;
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(4.0),
+              child: Text(
+                _historyDates[i].toStringWithFormat("yyyy/MM/dd HH:mm"),
+                style: TextStyle(fontSize: 24),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// replace:
+  @override
+  Widget build(BuildContext context) {
+    // 選択中ボタンのIndex
+    final selectedBtnIndex = useState(0);
+
+    // 5列×2行。5列目の1行目は空きマス、2行目に印刷ボタンを置く
+    return GridView.count(
+      padding: const EdgeInsets.only(top: 8, bottom: 0),
+      crossAxisCount: 5,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      childAspectRatio: 4 / 1,
+      children: [
+        // 1行目：履歴1〜4 ＋ 空きマス
+        for (var i = 0; i < 4; i++) _historyBtn(i, selectedBtnIndex),
+        const SizedBox.shrink(),
+        // 2行目：履歴5〜8 ＋ 印刷
+        for (var i = 4; i < 8; i++) _historyBtn(i, selectedBtnIndex),
+        CloseTallyPrintBtn(onPressed: () {}),
+      ],
+    );
+  }
+
+  /// 締切履歴1件分のボタン
+  Widget _historyBtn(int i, ValueNotifier<int> selectedBtnIndex) =>
+      CloseTallyToggleBtn(
+        isSelected: i == selectedBtnIndex.value,
+        onPressed: () {
+          selectedBtnIndex.value = i;
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: Text(
+            _historyDates[i].toStringWithFormat("yyyy/MM/dd HH:mm"),
+            style: TextStyle(fontSize: 24),
+          ),
+        ),
+      );
+}
+
+
+
+// find:
+class _ExportButtons extends StatelessWidget {
+  /// 出力ボタン
+  const _ExportButtons();
+
+// replace:
+// グリッドに統合したため未使用（印刷ボタンは_SelectDateButtons内へ移動）
+// ignore: unused_element
+class _ExportButtons extends StatelessWidget {
+  /// 出力ボタン
+  const _ExportButtons();
+
+
+// find:
+class _FooterControllers extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 16,
+      children: [
+        Flexible(fit: FlexFit.tight, flex: 4, child: _SelectDateBottons()),
+        Flexible(
+          fit: FlexFit.tight,
+          flex: 1,
+          child: _AnotherDateInputAndPrintBotton(),
+        ),
+      ],
+    );
+  }
+}
+
+// replace:
+class _FooterControllers extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // 日付ボタン・その他の日付・印刷を同一グリッドに入れ、
+    // ボタンのサイズと位置を完全に揃える（5列×2行）
+    return _SelectDateBottons();
+  }
+}
+
+
+
+// find:
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 4 / 1,
+      ),
+      children: [
+
+// replace:
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 4 / 1,
+      ),
+      children: [
+
+
+
+// find:
+        // 過去日一週間分のボタン
+        for (var i = 1; i < 8; i++)
+
+// replace:
+        // 過去日3日分（1行目）
+        for (var i = 1; i < 4; i++)
+
+
+// find:
+              style: _btnTextStyle,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// replace:
+              style: _btnTextStyle,
+            ),
+          ),
+        // 1行目5列目：その他の日付
+        const _AnotherDateField(),
+        // 過去日4日分（2行目）
+        for (var i = 4; i < 8; i++)
+          PopOutButton(
+            backgroundColors: orengeGradient,
+            foregroundColor: Colors.black,
+            onPressed: () {},
+            child: Text(
+              DateTime.now().add(Duration(days: -i)).toDateOnlyString(),
+              style: _btnTextStyle,
+            ),
+          ),
+        // 2行目5列目：印刷
+        PopOutButton.icon(
+          icon: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Icon(Icons.check_circle),
+          ),
+          iconSize: fontSize,
+          backgroundColors: completedGradient,
+          onPressed: () {},
+          child: Text('印刷', style: _btnTextStyle),
+        ),
+      ],
+    );
+  }
+}
+
+
+
