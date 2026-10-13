@@ -1,0 +1,100 @@
+// find:
+  /// 選択可能な最古日（本日から30日前）
+  late final DateTime _minDate;
+
+  /// 選択可能な最新日（本日）
+  late final DateTime _maxDate;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _maxDate = DateTime(now.year, now.month, now.day);
+    _minDate = _maxDate.subtract(const Duration(days: 30));
+  }
+
+  /// 選択可能な日付か（本日から30日前〜本日）
+  bool _isSelectable(DateTime day) =>
+      !day.isBefore(_minDate) && !day.isAfter(_maxDate);
+
+// replace:
+  /// 選択可能な最新日（本日・時刻を切り捨て）
+  DateTime get _maxDate {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  /// 選択可能な最古日（本日から30日前）
+  DateTime get _minDate => _maxDate.subtract(const Duration(days: 30));
+
+  /// 選択可能な日付か（本日から30日前〜本日）
+  /// 時刻の有無で判定がずれないよう、年月日だけで比較する
+  bool _isSelectable(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    return !d.isBefore(_minDate) && !d.isAfter(_maxDate);
+  }
+
+
+// find:
+              itemBuilder: (context, index) {
+                final day = days[index];
+                if (day == null) return SizedBox.shrink();
+
+// replace — and delete everything from here down to the matching `},` that closes itemBuilder:
+              itemBuilder: (context, index) {
+                final day = days[index];
+                if (day == null) return SizedBox.shrink();
+
+                // 選択可能な日付（本日から30日前〜本日）
+                final selectable = _isSelectable(day);
+
+                final isSelected =
+                    _selectedDate != null &&
+                    _selectedDate!.year == day.year &&
+                    _selectedDate!.month == day.month &&
+                    _selectedDate!.day == day.day;
+
+                // 選択可能：曜日に応じた色（1行目の曜日見出しと同色）
+                // 選択不可：グレー
+                final Color dayColor;
+                if (!selectable) {
+                  dayColor = Colors.grey.shade400;
+                } else if (isSelected) {
+                  dayColor = Colors.white;
+                } else if (day.weekday == DateTime.sunday) {
+                  dayColor = Colors.red;
+                } else if (day.weekday == DateTime.saturday) {
+                  dayColor = Colors.blue;
+                } else {
+                  dayColor = Colors.black;
+                }
+
+                return GestureDetector(
+                  // 範囲外は選択不可
+                  onTap:
+                      selectable
+                          ? () {
+                            setState(() {
+                              _selectedDate = day;
+                            });
+                          }
+                          : null,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.red : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${day.day}',
+                        style: TextStyle(
+                          fontSize: 30,
+                          color: dayColor,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
