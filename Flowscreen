@@ -1,0 +1,88 @@
+印刷 押下
+  → 「印刷中」ダイアログ
+  → 成功
+  → 「印刷が完了しました」
+  → 確認 押下
+  → 情報表示画面にそのまま留まる  ★画面移動なし
+
+結果	表示	確認押下後
+用紙切れ	エラーダイアログ	「印刷中」に戻って自動で再試行
+コマンド異常	エラーダイアログ	QR読取（待機）画面へ
+その他の定義済みエラー	エラーダイアログ	情報表示画面に留まる
+定義なしエラー	「印刷に失敗しました」	QR読取（待機）画面へ
+通信エラー・タイムアウト	「通信エラーが発生しました」	情報表示画面に留まる
+
+
+領収書発行 押下
+  → 「印刷中」ダイアログ
+  → 成功
+  → 「印刷が完了しました」
+  → 確認 押下
+  → QR読取（待機）画面へ戻る  ★画面移動あり
+
+
+
+結果	表示	確認押下後
+用紙切れ	エラーダイアログ	「印刷中」に戻って自動で再試行
+コマンド異常	エラーダイアログ	QR読取（待機）画面へ
+その他の定義済みエラー	エラーダイアログ	完了画面に留まる
+定義なしエラー	「印刷に失敗しました」	QR読取（待機）画面へ
+通信エラー・タイムアウト	「通信エラーが発生しました」	完了画面に留まる
+
+
+
+// find:
+              // 印刷中ダイアログ表示
+              if (context.mounted) {
+                showCustomAlertDialog(context: context, text: '印刷中');
+              }
+              try {
+                final response = await TcpService().sendPrintReceipt();
+                // 印刷中ダイアログを閉じる (rootNavigatorで確実に)
+                if (context.mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                }
+
+// replace:
+              // 印刷中ダイアログ表示
+              if (context.mounted) {
+                showCustomAlertDialog(context: context, text: '印刷中');
+              }
+              TcpService().setBlockingDialogOpen(true);
+              try {
+                final response = await TcpService().sendPrintReceipt();
+                TcpService().setBlockingDialogOpen(false);
+                // 印刷中ダイアログを閉じる (rootNavigatorで確実に)
+                if (context.mounted) {
+                  try {
+                    Navigator.of(context, rootNavigator: true).pop();
+                  } catch (_) {
+                    // 0xFB81により既にダイアログが閉じられている場合は何もしない
+                  }
+                }
+
+
+
+// find:
+              } catch (e) {
+                // 印刷中ダイアログを閉じる
+                if (context.mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                }
+                AppLogger().error('ProcessCompletedPrint', '領収書印刷エラー', e);
+
+// replace:
+              } catch (e) {
+                TcpService().setBlockingDialogOpen(false);
+                // 印刷中ダイアログを閉じる
+                if (context.mounted) {
+                  try {
+                    Navigator.of(context, rootNavigator: true).pop();
+                  } catch (_) {
+                    // 0xFB81により既にダイアログが閉じられている場合は何もしない
+                  }
+                }
+                AppLogger().error('ProcessCompletedPrint', '領収書印刷エラー', e);
+
+
+
