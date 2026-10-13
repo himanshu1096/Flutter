@@ -1,0 +1,65 @@
+class _AnotherDateField extends StatefulWidget {
+  /// その他の日付欄（タップでカレンダーダイアログを開く）
+  /// 入力欄ではなく選択結果を表示するだけのため、TextFieldは使用しない
+  /// （フォーカス枠・文字選択ハイライトなどテーマ由来の色が出ないようにするため）
+  const _AnotherDateField();
+
+  @override
+  State<_AnotherDateField> createState() => _AnotherDateFieldState();
+}
+
+class _AnotherDateFieldState extends State<_AnotherDateField> {
+  /// 選択中の日付（未選択はnull）
+  DateTime? _selectedDate;
+
+  Future<void> _showCalendarDialog() async {
+    final selected = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CalendarDialog(),
+    );
+    if (selected != null) {
+      setState(() {
+        _selectedDate = selected;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasDate = _selectedDate != null;
+
+    // 未選択時は「その他の日付」、日付選択後はその日付を表示する
+    final String label =
+        hasDate ? _selectedDate!.toStringWithFormat('yyyy/MM/dd') : 'その他の日付';
+
+    return TextFieldShadow(
+      topStops: [0.0, 0.15],
+      leftStops: [0.0, 0.04],
+      child: GestureDetector(
+        // 枠内のどこをタップしてもカレンダーを開く
+        behavior: HitTestBehavior.opaque,
+        onTap: _showCalendarDialog,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.black),
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: _dateFieldFontSize,
+              fontWeight: FontWeight.w700,
+              color: hasDate ? Colors.black : Colors.black54,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
