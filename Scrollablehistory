@@ -1,0 +1,44 @@
+  List<_HistoryItem> _makeHistoryItemList() {
+    final todayStr = DateTime.now().toStringWithFormat('M/d');
+
+    // スクロール確認用のモックデータ
+    // 5業務を順番に繰り返して生成する（実データ接続時に差し替える）
+    const processes = [
+      _MagneticProcess.seisan,
+      _MagneticProcess.nyuzyou,
+      _MagneticProcess.syutuzyou,
+      _MagneticProcess.haiken,
+      _MagneticProcess.hatuekiCancel,
+    ];
+
+    // 金額は桁数の異なる値を用意し、列幅が足りるか確認できるようにする
+    const amounts = ['1,020', '860', '2,340', '450', '12,600'];
+
+    final List<_HistoryItem> items = [];
+    // 6:37 から13分間隔で生成する
+    var minutes = 6 * 60 + 37;
+
+    for (var i = 0; i < _mockHistoryCount; i++) {
+      final process = processes[i % processes.length];
+      final hour = minutes ~/ 60;
+      final minute = minutes % 60;
+
+      items.add(
+        _HistoryItem(
+          date: todayStr,
+          time: '$hour:${minute.toString().padLeft(2, '0')}',
+          number: (7403 + i).toString().padLeft(8, '0'),
+          ticketName: '普通券',
+          processName: process.label,
+          tableRows:
+              process.hasDataRow
+                  ? _seisanDataRows(amount: amounts[i % amounts.length])
+                  : const [],
+        ),
+      );
+
+      minutes += 13;
+    }
+
+    return items;
+  }
