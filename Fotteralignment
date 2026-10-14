@@ -1,0 +1,152 @@
+// find:
+/// 締切関連のボタンのサイズ
+const double closeTallybtnSize = fontSize * 1.5;
+
+// replace:
+/// 締切関連のボタンのサイズ
+const double closeTallybtnSize = fontSize * 1.5;
+
+//==============================
+// 関連業務の画面下部（フッター）共通
+//==============================
+/// フッターボタンの共通サイズ
+/// ※日付ボタングリッドの1マス（約240×60px）に合わせる
+const double relatedFooterBtnWidth = 240.0;
+const double relatedFooterBtnHeight = 60.0;
+
+/// 日付ボタンを持たない画面（締切・締切速報）のフッター高さ
+/// 日付ボタン2行分と同じ高さを確保し、全画面で余白を揃える
+const double relatedFooterHeight = relatedFooterBtnHeight * 2 + 8;
+
+class RelatedProcessFooter extends StatelessWidget {
+  /// 関連業務の画面下部。ボタンを右下に固定サイズで配置し、
+  /// 日付ボタンを持つ画面と余白・位置・サイズを揃える
+  const RelatedProcessFooter({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: SizedBox(
+        height: relatedFooterHeight,
+        child: Align(
+          alignment: Alignment.bottomRight,
+          child: SizedBox(
+            width: relatedFooterBtnWidth,
+            height: relatedFooterBtnHeight,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// find:
+  const CloseTallyPrintBtn({
+    super.key,
+    required this.onPressed,
+    this.text = "印刷",
+  });
+
+  /// ボタン押下時の処理
+  final VoidCallback? onPressed;
+
+  /// ボタンに表示する文字列
+  final String text;
+
+// replace:
+  const CloseTallyPrintBtn({
+    super.key,
+    required this.onPressed,
+    this.text = "印刷",
+    this.backgroundColors = completedGradient,
+  });
+
+  /// ボタン押下時の処理
+  final VoidCallback? onPressed;
+
+  /// ボタンに表示する文字列
+  final String text;
+
+  /// 背景グラデーション（実行ボタンなど用途により変更する）
+  final List<Color> backgroundColors;
+
+
+// find:
+      iconSize: closeTallybtnSize,
+      backgroundColors: completedGradient,
+      onPressed: onPressed,
+      child: TextInCloseTallyBtn(text: text),
+
+// replace:
+      iconSize: fontSize,
+      backgroundColors: backgroundColors,
+      onPressed: onPressed,
+      // 60px高のフッターに収めるため、日付ボタンと同じ文字サイズにする
+      child: TextInCloseTallyBtn(text: text, fontSize: fontSize),
+
+
+
+// find:
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: SizedBox(height: 60, child: _FooterButtons()),
+          ),
+
+// replace:
+          RelatedProcessFooter(child: CloseTallyPrintBtn(onPressed: () {})),
+
+
+// find:
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: SizedBox(height: 60, child: Center(child: _ExecuteBtn())),
+          ),
+
+// replace:
+          RelatedProcessFooter(child: _ExecuteBtn()),
+
+
+
+// find:
+class _ExecuteBtn extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ActiveLargeButton(
+      text: "実行    ",
+      onPressed: () {
+
+// replace:
+class _ExecuteBtn extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // 印刷ボタンと同一部品・同一サイズにする（色のみ変更）
+    return CloseTallyPrintBtn(
+      text: "実行",
+      backgroundColors: orengeGradient,
+      onPressed: () {
+
+
+// find:
+          Flexible(
+            flex: 3,
+            child: SingleChildScrollView(child: CloseTallyMainContent()),
+          ),
+          Flexible(flex: 1, child: _FooterControllers()),
+
+// replace:
+          Expanded(
+            child: SingleChildScrollView(child: CloseTallyMainContent()),
+          ),
+          SizedBox(
+            height: relatedFooterHeight + 8,
+            child: _FooterControllers(),
+          ),
+
+
+
+
