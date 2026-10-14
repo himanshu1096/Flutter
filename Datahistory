@@ -1,0 +1,205 @@
+// find:
+class _HistoryViewState extends State<_HistoryView> {
+  /// 現在のページ（0始まり）
+  int _currentPage = 0;
+
+  /// 総ページ数（最低1ページ）
+  int get _totalPages {
+    final count = _makeHistoryItemList().length;
+    return count == 0 ? 1 : (count / _itemsPerPage).ceil();
+  }
+
+  /// 現在のページに表示する項目のみを切り出す
+  List<_HistoryItem> _currentPageItems() {
+    final all = _makeHistoryItemList();
+    final start = _currentPage * _itemsPerPage;
+    if (start >= all.length) return [];
+    final end = (start + _itemsPerPage).clamp(0, all.length);
+    return all.sublist(start, end);
+  }
+
+  @override
+
+// replace:
+class _HistoryViewState extends State<_HistoryView> {
+  @override
+
+// find:
+            SizedBox(
+              height: 250,
+              child: GridView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 0,
+                ),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 30,
+                  mainAxisExtent: 120,
+                ),
+                shrinkWrap: true,
+                // スクロールは行わず、収まらない分はページ送りで表示する
+                physics: const NeverScrollableScrollPhysics(),
+                children: _currentPageItems(),
+              ),
+            ),
+            _PageNumberButtons(
+              currentPage: _currentPage,
+              totalPages: _totalPages,
+              onSelected: (page) => setState(() => _currentPage = page),
+            ),
+
+// replace:
+            SizedBox(
+              height: _historyListHeight,
+              // 1列に上から順に並べ、収まらない分はスクロールで表示する
+              child: Builder(
+                builder: (context) {
+                  final items = _makeHistoryItemList();
+                  return ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 0,
+                    ),
+                    itemCount: items.length,
+                    separatorBuilder:
+                        (context, index) =>
+                            const SizedBox(height: _historyRowGap),
+                    itemBuilder: (context, index) => items[index],
+                  );
+                },
+              ),
+            ),
+
+
+    return [
+      // 精算処理（金額表あり）
+      _HistoryItem(
+        date: todayStr,
+        time: '6:37',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.seisan.label,
+        tableRows: _seisanDataRows(amount: '1,020'),
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '6:52',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.seisan.label,
+        tableRows: _seisanDataRows(amount: '1,020'),
+      ),
+      // 以下はデータ行なし（1行目のみ）
+      _HistoryItem(
+        date: todayStr,
+        time: '7:05',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.nyuzyou.label,
+        tableRows: const [],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:18',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.syutuzyou.label,
+        tableRows: const [],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:30',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.haiken.label,
+        tableRows: const [],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:45',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.hatuekiCancel.label,
+        tableRows: const [],
+      ),
+    ];
+
+
+// find:
+  seisan('精算処理', hasDataRow: true),
+  haiken('廃券処理', hasDataRow: false),
+  hatuekiCancel('発駅キャンセル', hasDataRow: false);
+
+// replace:
+  seisan('精算処理', hasDataRow: true),
+  haiken('廃券処理', hasDataRow: false),
+  // ※2 処理内容は4文字の略称。発駅キャンセルは「発キャン」
+  hatuekiCancel('発キャン', hasDataRow: false);
+
+
+// find:
+const double _colTicketWidth = 140.0;
+const double _colProcessWidth = 230.0;
+
+/// 金額表（精算処理のみ）の幅
+const double _amountTableWidth = 280.0;
+
+// replace:
+/// ※1 券種・※2 処理内容はいずれも4文字の略称（4文字 × 28px ＋ 余白）
+const double _colTicketWidth = 130.0;
+const double _colProcessWidth = 130.0;
+
+/// 精算金額表（精算処理のみ）の幅
+/// 「精算金額」4文字 ＋ 金額ZZZZZ9円（最大6桁）
+const double _amountTableWidth = 300.0;
+
+
+// find:
+/// 精算処理の金額行（磁気ＳＦ／ＩＣＳＦは表示しない）
+List<TableRow> _seisanDataRows({required String amount}) {
+  return [
+    TableRow(
+      children: [
+        TableTitleCell(title: '金額'),
+        TableContentCell(text: amount, unit: '円'),
+      ],
+    ),
+  ];
+}
+
+// replace:
+/// 精算処理のデータ行（※3）
+/// 「精算金額 ZZZZZ9円」＝最大6桁・ゼロサプレス
+/// 磁気ＳＦ／ＩＣＳＦは表示しない
+List<TableRow> _seisanDataRows({required String amount}) {
+  return [
+    TableRow(
+      children: [
+        TableTitleCell(title: '精算金額'),
+        TableContentCell(text: amount, unit: '円'),
+      ],
+    ),
+  ];
+}
+
+
+// find:
+          SizedBox(width: _colTicketWidth, child: Text(ticketName)),
+          SizedBox(width: _colProcessWidth, child: Text(processName)),
+
+// replace:
+          // 4文字の略称は中央寄せにして、全行で文字位置を揃える
+          SizedBox(
+            width: _colTicketWidth,
+            child: Text(ticketName, textAlign: TextAlign.center),
+          ),
+          SizedBox(
+            width: _colProcessWidth,
+            child: Text(processName, textAlign: TextAlign.center),
+          ),
+
+
+
+
