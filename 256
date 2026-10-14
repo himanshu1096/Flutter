@@ -1,0 +1,108 @@
+// find:
+/// 1ページあたりの表示件数（2列 × 2行）
+/// ※仕様上は12件/ページ・最大2ページ。実データ接続時に調整する。
+const int _itemsPerPage = 4;
+
+// replace:
+/// 接客履歴1件分の各列の幅
+/// ※列幅を固定することで、全行の文字が縦に揃うようにする
+const double _colDateWidth = 110.0;
+const double _colTimeWidth = 100.0;
+const double _colNumberWidth = 160.0;
+const double _colTicketWidth = 140.0;
+const double _colProcessWidth = 230.0;
+
+/// 金額表（精算処理のみ）の幅
+const double _amountTableWidth = 280.0;
+
+/// 1件分の高さと行間
+const double _historyRowHeight = 44.0;
+const double _historyRowGap = 14.0;
+
+/// 一覧の表示高さ（これを超える分はスクロールする）
+const double _historyListHeight = 320.0;
+
+
+// find:
+List<TableRow> _seisanDataRows({
+  required String amount,
+  required String sfAmount,
+  required bool isIcKinken,
+}) {
+  return [
+    TableRow(
+      children: [
+        TableTitleCell(title: '金額'),
+        TableContentCell(text: amount, unit: '円'),
+        TableTitleCell(title: isIcKinken ? 'ＩＣＳＦ' : '磁気ＳＦ'),
+        TableContentCell(text: sfAmount, unit: '円'),
+      ],
+    ),
+  ];
+}
+
+// replace:
+/// 精算処理の金額行（磁気ＳＦ／ＩＣＳＦは表示しない）
+List<TableRow> _seisanDataRows({required String amount}) {
+  return [
+    TableRow(
+      children: [
+        TableTitleCell(title: '金額'),
+        TableContentCell(text: amount, unit: '円'),
+      ],
+    ),
+  ];
+}
+
+
+
+// find:
+  @override
+  Widget build(BuildContext context) {
+    final headerRow = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(child: FittedBox(child: Text(date))),
+        Flexible(child: FittedBox(child: Text(time))),
+        Flexible(child: FittedBox(child: Text(number))),
+        Flexible(child: FittedBox(child: Text(ticketName))),
+        Flexible(child: FittedBox(child: Text(processName))),
+      ],
+    );
+
+    // データ行なし（入場処理・出場処理など）の場合は、
+    // ヘッダ行のみをそのまま表示する（枠・背景なし）
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        headerRow,
+        for (var row in tableRows) TableInContent(children: [row]),
+      ],
+    );
+  }
+
+// replace:
+  @override
+  Widget build(BuildContext context) {
+    // 各列を固定幅にして、全行の文字が縦に揃うようにする
+    // 金額表は精算処理のみ、同じ行の右側に表示する
+    return SizedBox(
+      height: _historyRowHeight,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(width: _colDateWidth, child: Text(date)),
+          SizedBox(width: _colTimeWidth, child: Text(time)),
+          SizedBox(width: _colNumberWidth, child: Text(number)),
+          SizedBox(width: _colTicketWidth, child: Text(ticketName)),
+          SizedBox(width: _colProcessWidth, child: Text(processName)),
+          if (tableRows.isNotEmpty)
+            SizedBox(
+              width: _amountTableWidth,
+              child: TableInContent(children: tableRows),
+            ),
+        ],
+      ),
+    );
+  }
+
