@@ -1,0 +1,714 @@
+import 'package:flutter/material.dart';
+
+import 'package:qr_multidemo/app_color.dart';
+import 'package:qr_multidemo/app_icon.dart';
+import 'package:qr_multidemo/component/pop_out_button.dart';
+import 'package:qr_multidemo/qr_process/secondary_tab_process_information.dart';
+import 'package:qr_multidemo/component/secondary_tab_content_core.dart';
+import 'package:qr_multidemo/utility/date_time_converter.dart';
+import 'related_process_common.dart';
+import 'package:qr_multidemo/component/text_field_shadow.dart';
+
+/// 磁気券処理の種別（③磁気券処理 仕様に対応）
+/// データ行の有無は仕様で決まっており、精算処理のみデータ行あり。
+/// ※2 処理内容はいずれも4文字の略称（発駅キャンセル → 発キャン）
+enum _MagneticProcess {
+  nyuzyou('入場処理', hasDataRow: false),
+  syutuzyou('出場処理', hasDataRow: false),
+  seisan('精算処理', hasDataRow: true),
+  haiken('廃券処理', hasDataRow: false),
+  hatuekiCancel('発キャン', hasDataRow: false);
+  // nyusyutuzyouKakikae('入出場書換', hasDataRow: false),
+  // renzokuBitKakikae('連続ビット書換', hasDataRow: false),
+  // fuseiClear('不正クリア', hasDataRow: false);
+
+  const _MagneticProcess(this.label, {required this.hasDataRow});
+  final String label;
+  final bool hasDataRow;
+}
+
+final TextStyle _btnTextStyle = TextStyle(fontSize: fontSize);
+
+/// 「その他の日付」欄の文字サイズ
+/// 日付ボタン（_btnTextStyle）と同じサイズにして見た目を揃える
+const double _dateFieldFontSize = 28;
+
+//==============================
+// 接客履歴一覧のレイアウト定数
+//==============================
+/// 接客履歴1件分の各列の幅
+/// ※列幅を固定することで、全行の文字が縦に揃うようにする
+const double _colDateWidth = 110.0;
+const double _colTimeWidth = 100.0;
+const double _colNumberWidth = 160.0;
+
+/// ※1 券種・※2 処理内容はいずれも4文字の略称（4文字 × 28px ＋ 余白）
+const double _colTicketWidth = 130.0;
+const double _colProcessWidth = 130.0;
+
+/// 精算金額表（精算処理のみ）の幅
+/// 「精算金額」4文字 ＋ 金額 ZZZZZ9円（最大6桁）
+const double _amountTableWidth = 300.0;
+
+/// 1件分の高さと行間
+const double _historyRowHeight = 44.0;
+const double _historyRowGap = 14.0;
+
+/// 一覧の表示高さ（これを超える分はスクロールする）
+const double _historyListHeight = 320.0;
+
+/// 画面下部（日付ボタン2行）の高さ
+/// ボタン高さ60 × 2行 ＋ 行間8 ＋ 上余白8
+const double _footerHeight = 60.0 * 2 + 8 + 8;
+
+class CustomerServiceHistory extends StatelessWidget {
+  const CustomerServiceHistory({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PaddingForContent(
+      child: Column(
+        spacing: 8,
+        children: [
+          Expanded(child: _HistoryView()),
+          // 他の関連業務画面と余白を揃えるため高さを固定する
+          SizedBox(height: _footerHeight, child: _FooterControllers()),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryView extends StatefulWidget {
+  @override
+  State<_HistoryView> createState() => _HistoryViewState();
+}
+
+class _HistoryViewState extends State<_HistoryView> {
+  @override
+  Widget build(BuildContext context) {
+    final fontColor = Theme.of(context).colorScheme.onSecondaryContainer;
+    final cardBackgroundColor =
+        Theme.of(context).colorScheme.secondaryContainer;
+    final cardOutlineColor = Theme.of(context).colorScheme.surfaceContainer;
+    return CardInfoBlock(
+      title: '接客履歴データ',
+      fontColor: fontColor,
+      cardBackgroundColor: cardBackgroundColor,
+      cardOutlineColor: cardOutlineColor,
+      icon: DualIconOverlay(
+        baseIcon: Icons.person_2_outlined,
+        topIcon: Icons.history_edu_outlined,
+        baseColor: fontColor,
+        topColor: fontColor,
+        topBackgroundColor: cardBackgroundColor,
+      ),
+      content: DefaultTextStyle(
+        style: TextStyle(fontSize: fontSize, color: Colors.black),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          spacing: 10.0,
+          children: [
+            SizedBox(
+              height: _historyListHeight,
+              // 1列に上から順に並べ、収まらない分はスクロールで表示する
+              child: Builder(
+                builder: (context) {
+                  final items = _makeHistoryItemList();
+                  return ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 0,
+                    ),
+                    itemCount: items.length,
+                    separatorBuilder:
+                        (context, index) =>
+                            const SizedBox(height: _historyRowGap),
+                    itemBuilder: (context, index) => items[index],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_HistoryItem> _makeHistoryItemList() {
+    final todayStr = DateTime.now().toStringWithFormat('M/d');
+    return [
+      // 精算処理（精算金額のデータ行あり）
+      _HistoryItem(
+        date: todayStr,
+        time: '6:37',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.seisan.label,
+        tableRows: _seisanDataRows(amount: '1,020'),
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '6:52',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.seisan.label,
+        tableRows: _seisanDataRows(amount: '1,020'),
+      ),
+      // 以下はデータ行なし（1行目のみ）
+      _HistoryItem(
+        date: todayStr,
+        time: '7:05',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.nyuzyou.label,
+        tableRows: const [],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:18',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.syutuzyou.label,
+        tableRows: const [],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:30',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.haiken.label,
+        tableRows: const [],
+      ),
+      _HistoryItem(
+        date: todayStr,
+        time: '7:45',
+        number: '00007403',
+        ticketName: '普通券',
+        processName: _MagneticProcess.hatuekiCancel.label,
+        tableRows: const [],
+      ),
+    ];
+  }
+}
+
+/// 精算処理のデータ行（※3）
+/// 「精算金額 ZZZZZ9円」＝最大6桁・ゼロサプレス
+/// 磁気ＳＦ／ＩＣＳＦは表示しない
+List<TableRow> _seisanDataRows({required String amount}) {
+  return [
+    TableRow(
+      children: [
+        TableTitleCell(title: '精算金額'),
+        TableContentCell(text: amount, unit: '円'),
+      ],
+    ),
+  ];
+}
+
+class _HistoryItem extends StatelessWidget {
+  final String date;
+  final String time;
+  final String number;
+  final String ticketName;
+  final String processName;
+  final List<TableRow> tableRows;
+
+  const _HistoryItem({
+    required this.date,
+    required this.time,
+    required this.number,
+    required this.ticketName,
+    required this.processName,
+    required this.tableRows,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 各列を固定幅にして、全行の文字が縦に揃うようにする
+    // 精算金額表は精算処理のみ、同じ行の右側に表示する
+    return SizedBox(
+      height: _historyRowHeight,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(width: _colDateWidth, child: Text(date)),
+          SizedBox(width: _colTimeWidth, child: Text(time)),
+          SizedBox(width: _colNumberWidth, child: Text(number)),
+          // 4文字の略称は中央寄せにして、全行で文字位置を揃える
+          SizedBox(
+            width: _colTicketWidth,
+            child: Text(ticketName, textAlign: TextAlign.center),
+          ),
+          SizedBox(
+            width: _colProcessWidth,
+            child: Text(processName, textAlign: TextAlign.center),
+          ),
+          if (tableRows.isNotEmpty)
+            SizedBox(
+              width: _amountTableWidth,
+              child: TableInContent(children: tableRows),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ページ番号ボタン
+///
+/// 現在はスクロール表示のため未使用。
+/// ページ送り方式に戻す場合に備えて残している。
+// ignore: unused_element
+class _PageNumberButtons extends StatelessWidget {
+  final int currentPage;
+  final int totalPages;
+  final void Function(int page) onSelected;
+
+  const _PageNumberButtons({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 1ページしかない場合は表示しない
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        spacing: 12,
+        children: [
+          for (int i = 0; i < totalPages; i++)
+            _PageNumberButton(
+              pageNo: i + 1,
+              selected: i == currentPage,
+              onPressed: i == currentPage ? null : () => onSelected(i),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _PageNumberButton extends StatelessWidget {
+  final int pageNo;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  const _PageNumberButton({
+    required this.pageNo,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
+      child: Text(
+        '$pageNo',
+        style: _btnTextStyle.merge(
+          TextStyle(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            color: selected ? Colors.black : AppColor.grey.no700,
+          ),
+        ),
+      ),
+    );
+
+    // 選択中は凹ボタン、未選択は凸ボタンで現在位置を表現する
+    if (selected) {
+      return SetBackButton(
+        backgroundColors: orengeGradient,
+        onPressed: null,
+        child: label,
+      );
+    }
+    return PopOutButton(
+      backgroundColors: AppColor.grey.gradientLightColors,
+      onPressed: onPressed,
+      child: label,
+    );
+  }
+}
+
+class _FooterControllers extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // 日付ボタン・その他の日付・印刷を同一グリッドに入れ、
+    // ボタンのサイズと位置を完全に揃える（5列×2行）
+    return _SelectDateBottons();
+  }
+}
+
+class _SelectDateBottons extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GridView(
+      padding: EdgeInsets.only(top: 8, bottom: 0),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 4 / 1,
+      ),
+      children: [
+        // アプリ共通のボタン配色に合わせる
+        // 選択中：blueGradient（水色）／未選択：orengeGradient（橙）／文字色は共に黒
+        SetBackButton(
+          backgroundColors: blueGradient,
+          foregroundColor: Colors.black,
+          onPressed: () {},
+          child: Text(
+            '当日',
+            style: _btnTextStyle.merge(TextStyle(color: Colors.black)),
+          ),
+        ),
+        // 過去日3日分（1行目）
+        for (var i = 1; i < 4; i++)
+          PopOutButton(
+            backgroundColors: orengeGradient,
+            foregroundColor: Colors.black,
+            onPressed: () {},
+            child: Text(
+              DateTime.now().add(Duration(days: -i)).toDateOnlyString(),
+              style: _btnTextStyle,
+            ),
+          ),
+        // 1行目5列目：その他の日付
+        const _AnotherDateField(),
+        // 過去日4日分（2行目）
+        for (var i = 4; i < 8; i++)
+          PopOutButton(
+            backgroundColors: orengeGradient,
+            foregroundColor: Colors.black,
+            onPressed: () {},
+            child: Text(
+              DateTime.now().add(Duration(days: -i)).toDateOnlyString(),
+              style: _btnTextStyle,
+            ),
+          ),
+        // 2行目5列目：印刷
+        PopOutButton.icon(
+          icon: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Icon(Icons.check_circle),
+          ),
+          iconSize: fontSize,
+          backgroundColors: completedGradient,
+          onPressed: () {},
+          child: Text('印刷', style: _btnTextStyle),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnotherDateField extends StatefulWidget {
+  /// その他の日付欄（タップでカレンダーダイアログを開く）
+  /// 入力欄ではなく選択結果を表示するだけのため、TextFieldは使用しない
+  /// （フォーカス枠・文字選択ハイライトなどテーマ由来の色が出ないようにするため）
+  const _AnotherDateField();
+
+  @override
+  State<_AnotherDateField> createState() => _AnotherDateFieldState();
+}
+
+class _AnotherDateFieldState extends State<_AnotherDateField> {
+  /// 選択中の日付（未選択はnull）
+  DateTime? _selectedDate;
+
+  Future<void> _showCalendarDialog() async {
+    final selected = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CalendarDialog(),
+    );
+    if (selected != null) {
+      setState(() {
+        _selectedDate = selected;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasDate = _selectedDate != null;
+
+    // 未選択時は「その他の日付」、日付選択後はその日付を表示する
+    final String label =
+        hasDate ? _selectedDate!.toStringWithFormat('yyyy/MM/dd') : 'その他の日付';
+
+    return TextFieldShadow(
+      topStops: [0.0, 0.15],
+      leftStops: [0.0, 0.04],
+      child: GestureDetector(
+        // 枠内のどこをタップしてもカレンダーを開く
+        behavior: HitTestBehavior.opaque,
+        onTap: _showCalendarDialog,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.black),
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: _dateFieldFontSize,
+              fontWeight: FontWeight.w700,
+              color: hasDate ? Colors.black : Colors.black54,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarDialog extends StatefulWidget {
+  const _CalendarDialog();
+
+  @override
+  State<_CalendarDialog> createState() => _CalendarDialogState();
+}
+
+class _CalendarDialogState extends State<_CalendarDialog> {
+  DateTime _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _selectedDate;
+
+  /// 選択可能な最新日（本日・時刻を切り捨て）
+  DateTime get _maxDate {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  /// 選択可能な最古日（本日から30日前）
+  DateTime get _minDate => _maxDate.subtract(const Duration(days: 30));
+
+  /// 選択可能な日付か（本日から30日前〜本日）
+  /// 時刻の有無で判定がずれないよう、年月日だけで比較する
+  bool _isSelectable(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    return !d.isBefore(_minDate) && !d.isAfter(_maxDate);
+  }
+
+  /// 前月へ移動できるか
+  bool get _canGoPrevious =>
+      _currentMonth.isAfter(DateTime(_minDate.year, _minDate.month));
+
+  /// 翌月へ移動できるか
+  bool get _canGoNext =>
+      _currentMonth.isBefore(DateTime(_maxDate.year, _maxDate.month));
+
+  void _previousMonth() {
+    if (!_canGoPrevious) return;
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+  }
+
+  void _nextMonth() {
+    if (!_canGoNext) return;
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+  }
+
+  List<DateTime?> _getDaysInMonth() {
+    final firstDay = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final lastDay = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+    final List<DateTime?> days = [];
+
+    // Add empty slots for days before first day of month
+    for (int i = 0; i < firstDay.weekday % 7; i++) {
+      days.add(null);
+    }
+
+    // Add all days in month
+    for (int i = 1; i <= lastDay.day; i++) {
+      days.add(DateTime(_currentMonth.year, _currentMonth.month, i));
+    }
+
+    return days;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final days = _getDaysInMonth();
+    final weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      child: Container(
+        // 日付を見やすく・押しやすくするため拡大（1マス 約72×72px）
+        width: 580,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with month navigation
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: _canGoPrevious ? _previousMonth : null,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_back_ios),
+                ),
+                Text(
+                  '${_currentMonth.year}年${_currentMonth.month}月',
+                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: _canGoNext ? _nextMonth : null,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_forward_ios),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Weekday headers
+            Row(
+              children:
+                  weekDays
+                      .map(
+                        (d) => Expanded(
+                          child: Center(
+                            child: Text(
+                              d,
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    d == '日'
+                                        ? Colors.red
+                                        : d == '土'
+                                        ? Colors.blue
+                                        : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ),
+            const SizedBox(height: 8),
+
+            // Calendar grid
+            GridView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
+                // 1.0で正方形のマスにし、横だけでなく縦にも広げる
+                childAspectRatio: 1.0,
+              ),
+              itemCount: days.length,
+              itemBuilder: (context, index) {
+                final day = days[index];
+                if (day == null) return SizedBox.shrink();
+
+                // 選択可能な日付（本日から30日前〜本日）
+                final selectable = _isSelectable(day);
+
+                final isSelected =
+                    _selectedDate != null &&
+                    _selectedDate!.year == day.year &&
+                    _selectedDate!.month == day.month &&
+                    _selectedDate!.day == day.day;
+
+                // 選択可能：曜日に応じた色（1行目の曜日見出しと同色）
+                // 選択不可：グレー
+                final Color dayColor;
+                if (!selectable) {
+                  dayColor = Colors.grey.shade400;
+                } else if (isSelected) {
+                  dayColor = Colors.white;
+                } else if (day.weekday == DateTime.sunday) {
+                  dayColor = Colors.red;
+                } else if (day.weekday == DateTime.saturday) {
+                  dayColor = Colors.blue;
+                } else {
+                  dayColor = Colors.black;
+                }
+
+                return GestureDetector(
+                  // 範囲外は選択不可
+                  onTap:
+                      selectable
+                          ? () {
+                            setState(() {
+                              _selectedDate = day;
+                            });
+                          }
+                          : null,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      // 当日のオレンジ強調は廃止し、選択中のみ色を付ける
+                      color: isSelected ? Colors.red : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${day.day}',
+                        style: TextStyle(
+                          fontSize: 30,
+                          color: dayColor,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 確定/取消 buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              spacing: 16,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(140, 60),
+                  ),
+                  child: Text('取消', style: TextStyle(fontSize: 26)),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _selectedDate == null
+                          ? null
+                          : () => Navigator.of(context).pop(_selectedDate),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(140, 60),
+                  ),
+                  child: Text('確定', style: TextStyle(fontSize: 26)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
