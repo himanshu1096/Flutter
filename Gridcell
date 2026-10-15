@@ -1,0 +1,913 @@
+import 'package:flutter/material.dart';
+
+import 'package:qr_multidemo/app_color.dart';
+import 'package:qr_multidemo/app_icon.dart';
+import 'package:qr_multidemo/component/pop_out_button.dart';
+// CardInfoBlock を使わなくなったため不要
+// import 'package:qr_multidemo/qr_process/secondary_tab_process_information.dart';
+import 'package:qr_multidemo/utility/constant.dart';
+import 'package:qr_multidemo/component/secondary_tab_content_core.dart';
+import 'package:qr_multidemo/utility/date_time_converter.dart';
+import 'related_process_common.dart';
+import 'package:qr_multidemo/component/text_field_shadow.dart';
+
+/// 磁気券処理の種別（③磁気券処理 仕様に対応）
+/// データ行の有無は仕様で決まっており、精算処理のみデータ行あり。
+/// ※2 処理内容はいずれも4文字の略称（発駅キャンセル → 発キャン）
+enum _MagneticProcess {
+  nyuzyou('入場処理', hasDataRow: false),
+  syutuzyou('出場処理', hasDataRow: false),
+  seisan('精算処理', hasDataRow: true),
+  haiken('廃券処理', hasDataRow: false),
+  hatuekiCancel('発キャン', hasDataRow: false);
+  // nyusyutuzyouKakikae('入出場書換', hasDataRow: false),
+  // renzokuBitKakikae('連続ビット書換', hasDataRow: false),
+  // fuseiClear('不正クリア', hasDataRow: false);
+
+  const _MagneticProcess(this.label, {required this.hasDataRow});
+  final String label;
+  final bool hasDataRow;
+}
+
+final TextStyle _btnTextStyle = TextStyle(fontSize: fontSize);
+
+/// 「その他の日付」欄の文字サイズ
+/// 日付ボタン（_btnTextStyle）と同じサイズにして見た目を揃える
+const double _dateFieldFontSize = 28;
+
+//==============================
+// 接客履歴一覧のレイアウト定数
+//==============================
+/// 接客履歴1件分の各列の幅
+/// ※列幅を固定することで、全行の文字が縦に揃うようにする
+const double _colDateWidth = 110.0;
+const double _colTimeWidth = 100.0;
+const double _colNumberWidth = 160.0;
+
+/// ※1 券種・※2 処理内容はいずれも4文字の略称
+/// 4文字 × 28px ＋ セル左右の余白20px ＝ 132px のため、130pxでは2行に折り返す
+/// → 処理内容は余裕を持たせて160pxとする
+const double _colTicketWidth = 130.0;
+const double _colProcessWidth = 160.0;
+
+/// 精算金額（精算処理のみ）の表示幅
+/// 「精算金額」4文字 ＋ 金額 ZZZZZ9円（最大6桁）
+/// ※幅を固定し金額を右寄せにすることで、全行で金額の桁位置を揃える
+const double _amountWidth = 300.0;
+
+/// 1行分の最小の高さ
+/// ※実際の行の高さは、枠内の高さを行数で割り切れるよう少し広げる
+///   （最後の行が途中で切れず、枠の下端までちょうど埋まるようにするため）
+const double _historyMinRowHeight = 60.0;
+
+/// 見出し行の高さ
+const double _historyHeaderHeight = 44.0;
+
+/// タイトルの下線とグリッドの間の余白
+const double _gridTopGap = 10.0;
+
+/// スクロール動作確認用のモックデータ件数
+/// ※実データ接続時に削除する
+const int _mockHistoryCount = 20;
+
+//==============================
+// Excel風グリッドの配色
+// ※精算金額表（TableTitleCell／TableContentCell）と同じ色に揃える
+//==============================
+/// 罫線の色（精算金額表の枠線と同じ水色）
+const Color _gridLineColor = Color(0xFF03A9F4);
+
+/// 罫線の太さ
+const double _gridLineWidth = 1.5;
+
+/// 見出し行の背景色（精算金額表の「精算金額」セルと同じ薄い水色）
+const Color _gridHeaderColor = Color(0xFFE1F5FE);
+
+/// データ行の背景色
+const Color _gridRowColor = Colors.white;
+
+/// 画面下部（日付ボタン2行）の高さ
+/// ボタン高さ60 × 2行 ＋ 行間8 ＋ 上余白8
+const double _footerHeight = 60.0 * 2 + 8 + 8;
+
+class CustomerServiceHistory extends StatelessWidget {
+  const CustomerServiceHistory({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PaddingForContent(
+      child: Column(
+        spacing: 8,
+        children: [
+          Expanded(child: _HistoryView()),
+          // 他の関連業務画面と余白を揃えるため高さを固定する
+          SizedBox(height: _footerHeight, child: _FooterControllers()),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryView extends StatefulWidget {
+  @override
+  State<_HistoryView> createState() => _HistoryViewState();
+}
+
+class _HistoryViewState extends State<_HistoryView> {
+  @override
+  Widget build(BuildContext context) {
+    final fontColor = Theme.of(context).colorScheme.onSecondaryContainer;
+    final cardBackgroundColor =
+        Theme.of(context).colorScheme.secondaryContainer;
+    final cardOutlineColor = Theme.of(context).colorScheme.surfaceContainer;
+    // ※共通部品 CardInfoBlock は ListTile のため左右に余白が入り、
+    //   高さも内容に合わせて縮むので、グリッドを枠いっぱいに表示できない。
+    //   そのため接客履歴のみ、同じ見た目の枠をこの画面内で組み立てる。
+    return _HistoryCard(
+      title: '接客履歴データ',
+      fontColor: fontColor,
+      cardBackgroundColor: cardBackgroundColor,
+      cardOutlineColor: cardOutlineColor,
+      icon: DualIconOverlay(
+        baseIcon: Icons.person_2_outlined,
+        topIcon: Icons.history_edu_outlined,
+        baseColor: fontColor,
+        topColor: fontColor,
+        topBackgroundColor: cardBackgroundColor,
+      ),
+      child: DefaultTextStyle(
+        style: TextStyle(fontSize: fontSize, color: Colors.black),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 見出し行（スクロールしても常に表示）
+            const _HistoryHeader(),
+            // 一覧：枠の下端までの残りの高さをすべて使う
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final items = _makeHistoryItemList();
+
+                  // 枠内に収まる行数を求め、行の高さを少し広げて
+                  // 下端までちょうど埋める（最後の行が途中で切れないようにする）
+                  final available = constraints.maxHeight;
+                  final rows = (available / _historyMinRowHeight).floor();
+                  final rowHeight =
+                      rows > 0 ? available / rows : _historyMinRowHeight;
+
+                  return Scrollbar(
+                    thumbVisibility: true,
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemExtent: rowHeight,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) => items[index],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_HistoryItem> _makeHistoryItemList() {
+    final todayStr = DateTime.now().toStringWithFormat('M/d');
+
+    // スクロール確認用のモックデータ
+    // 5業務を順番に繰り返して生成する（実データ接続時に差し替える）
+    const processes = [
+      _MagneticProcess.seisan,
+      _MagneticProcess.nyuzyou,
+      _MagneticProcess.syutuzyou,
+      _MagneticProcess.haiken,
+      _MagneticProcess.hatuekiCancel,
+    ];
+
+    // 金額は桁数の異なる値を用意し、列幅が足りるか確認できるようにする
+    const amounts = ['1,020', '860', '2,340', '450', '12,600'];
+
+    final List<_HistoryItem> items = [];
+    // 6:37 から13分間隔で生成する
+    var minutes = 6 * 60 + 37;
+
+    for (var i = 0; i < _mockHistoryCount; i++) {
+      final process = processes[i % processes.length];
+      final hour = minutes ~/ 60;
+      final minute = minutes % 60;
+
+      items.add(
+        _HistoryItem(
+          date: todayStr,
+          time: '$hour:${minute.toString().padLeft(2, '0')}',
+          number: (7403 + i).toString().padLeft(8, '0'),
+          ticketName: '普通券',
+          processName: process.label,
+          // 精算処理のみ精算金額を表示する（※3）
+          amount:
+              process.hasDataRow ? amounts[i % amounts.length] : null,
+        ),
+      );
+
+      minutes += 13;
+    }
+
+    return items;
+  }
+}
+
+/// 接客履歴データの枠
+/// 共通部品 CardInfoBlock と同じ見た目（背景色・枠線・角丸・影・タイトル・下線）で、
+/// タイトルの下線より下をすべて [child] に使わせる
+/// （CardInfoBlock は ListTile のため左右に余白が入り、高さも内容に合わせて縮む）
+class _HistoryCard extends StatelessWidget {
+  const _HistoryCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+    required this.fontColor,
+    required this.cardBackgroundColor,
+    required this.cardOutlineColor,
+  });
+
+  final String title;
+  final Widget icon;
+  final Widget child;
+  final Color fontColor;
+  final Color cardBackgroundColor;
+  final Color cardOutlineColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = titleTextStyle.copyWith(color: fontColor, height: 1.0);
+    return Card.outlined(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Layouts.dialogRadius),
+        side: BorderSide(color: cardOutlineColor, width: 2.0),
+      ),
+      color: cardBackgroundColor,
+      elevation: 5.0,
+      // グリッドの角を枠の角丸に合わせて切り取る
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // タイトル行（アイコン＋タイトル）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 24, 0),
+            child: Row(
+              children: [
+                icon,
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text(title, style: textStyle),
+                ),
+              ],
+            ),
+          ),
+          // タイトルの下線
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 12, thickness: 1.5, color: fontColor),
+          ),
+          // 下線とグリッドの間の余白
+          const SizedBox(height: _gridTopGap),
+          // 下線より下はすべてグリッドに使う（左右・下の余白なし）
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryItem extends StatelessWidget {
+  final String date;
+  final String time;
+  final String number;
+  final String ticketName;
+  final String processName;
+  /// 精算金額（精算処理のみ。それ以外は null）
+  /// 「精算金額 ZZZZZ9円」＝最大6桁・ゼロサプレス（※3）
+  /// 磁気ＳＦ／ＩＣＳＦは表示しない
+  final String? amount;
+
+  const _HistoryItem({
+    required this.date,
+    required this.time,
+    required this.number,
+    required this.ticketName,
+    required this.processName,
+    this.amount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Excel風のグリッド：白背景のセルを罫線で区切る（枠の左右いっぱいに表示）
+    // 各列は見出し行と同じ固定幅、行の高さは一覧側（itemExtent）で決めている
+    // ※左端・右端の罫線は枠線と重なるため引かない
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _GridCell(width: _colDateWidth, child: Text(date)),
+        _GridCell(width: _colTimeWidth, child: Text(time)),
+        _GridCell(width: _colNumberWidth, child: Text(number)),
+        // 4文字の略称は中央寄せにして、全行で文字位置を揃える
+        _GridCell(
+          width: _colTicketWidth,
+          alignment: Alignment.center,
+          child: Text(ticketName),
+        ),
+        _GridCell(
+          width: _colProcessWidth,
+          alignment: Alignment.center,
+          child: Text(processName),
+        ),
+        // 最終列：残りの幅すべてを使うセル
+        // 精算処理のみ、セルの中央に「精算金額　1,020円」を文字だけで表示する（枠なし）
+        // （それ以外の行は空白セルとして罫線のみ表示する）
+        Expanded(
+          child: _GridCell(
+            alignment: Alignment.center,
+            isLastColumn: true,
+            child:
+                amount == null
+                    ? const SizedBox.shrink()
+                    : SizedBox(
+                      width: _amountWidth,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('精算金額'),
+                          Text('$amount円'),
+                        ],
+                      ),
+                    ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 接客履歴の見出し行（Excel風グリッドの1行目）
+/// ※文字は一覧の行と同じ見た目（同サイズ・同色・標準の太さ）とし、
+///   背景色（薄い水色）で一覧と区別する
+/// ※精算金額は表内に「精算金額」と表示されるため、見出しは付けない
+class _HistoryHeader extends StatelessWidget {
+  const _HistoryHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: _historyHeaderHeight,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _GridCell(width: _colDateWidth, isHeader: true, child: Text('日付')),
+          _GridCell(width: _colTimeWidth, isHeader: true, child: Text('時刻')),
+          _GridCell(
+            width: _colNumberWidth,
+            isHeader: true,
+            child: Text('取扱番号'),
+          ),
+          _GridCell(
+            width: _colTicketWidth,
+            isHeader: true,
+            alignment: Alignment.center,
+            child: Text('券種'),
+          ),
+          _GridCell(
+            width: _colProcessWidth,
+            isHeader: true,
+            alignment: Alignment.center,
+            child: Text('処理'),
+          ),
+          // 最終列（精算金額表の列）：見出しは空白
+          Expanded(
+            child: _GridCell(
+              isHeader: true,
+              isLastColumn: true,
+              child: SizedBox.shrink(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Excel風グリッドの1セル
+/// 罫線は右・下を基本とし、見出し行のみ上にも引く
+/// （隣り合うセルで罫線が二重にならないようにするため）
+/// ※グリッドは枠の左右いっぱいに表示するため、左端の罫線は引かず、
+///   最終列は右側の罫線も引かない（枠線と重ならないようにする）
+class _GridCell extends StatelessWidget {
+  const _GridCell({
+    this.width,
+    required this.child,
+    this.alignment = Alignment.centerLeft,
+    this.isLastColumn = false,
+    this.isHeader = false,
+  });
+
+  /// セルの幅
+  /// ※null の場合は親（Expanded）の幅に合わせる（最終列で使用）
+  final double? width;
+
+  /// セル内の表示内容
+  final Widget child;
+
+  /// セル内の配置（既定は左寄せ・上下中央）
+  final Alignment alignment;
+
+  /// 最終列か（右側の罫線を引かない）
+  final bool isLastColumn;
+
+  /// 見出し行か（背景色を変え、上側の罫線を引く）
+  final bool isHeader;
+
+  @override
+  Widget build(BuildContext context) {
+    const line = BorderSide(color: _gridLineColor, width: _gridLineWidth);
+    return Container(
+      width: width,
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isHeader ? _gridHeaderColor : _gridRowColor,
+        border: Border(
+          top: isHeader ? line : BorderSide.none,
+          right: isLastColumn ? BorderSide.none : line,
+          bottom: line,
+        ),
+      ),
+      // 文字は必ず1行で表示する
+      // （列幅が足りない場合は折り返さず、収まるよう少しだけ縮小する）
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: alignment,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// ページ番号ボタン
+///
+/// 現在はスクロール表示のため未使用。
+/// ページ送り方式に戻す場合に備えて残している。
+// ignore: unused_element
+class _PageNumberButtons extends StatelessWidget {
+  final int currentPage;
+  final int totalPages;
+  final void Function(int page) onSelected;
+
+  const _PageNumberButtons({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 1ページしかない場合は表示しない
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        spacing: 12,
+        children: [
+          for (int i = 0; i < totalPages; i++)
+            _PageNumberButton(
+              pageNo: i + 1,
+              selected: i == currentPage,
+              onPressed: i == currentPage ? null : () => onSelected(i),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _PageNumberButton extends StatelessWidget {
+  final int pageNo;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  const _PageNumberButton({
+    required this.pageNo,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
+      child: Text(
+        '$pageNo',
+        style: _btnTextStyle.merge(
+          TextStyle(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            color: selected ? Colors.black : AppColor.grey.no700,
+          ),
+        ),
+      ),
+    );
+
+    // 選択中は凹ボタン、未選択は凸ボタンで現在位置を表現する
+    if (selected) {
+      return SetBackButton(
+        backgroundColors: orengeGradient,
+        onPressed: null,
+        child: label,
+      );
+    }
+    return PopOutButton(
+      backgroundColors: AppColor.grey.gradientLightColors,
+      onPressed: onPressed,
+      child: label,
+    );
+  }
+}
+
+class _FooterControllers extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // 日付ボタン・その他の日付・印刷を同一グリッドに入れ、
+    // ボタンのサイズと位置を完全に揃える（5列×2行）
+    return _SelectDateBottons();
+  }
+}
+
+class _SelectDateBottons extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GridView(
+      padding: EdgeInsets.only(top: 8, bottom: 0),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 4 / 1,
+      ),
+      children: [
+        // アプリ共通のボタン配色に合わせる
+        // 選択中：blueGradient（水色）／未選択：orengeGradient（橙）／文字色は共に黒
+        SetBackButton(
+          backgroundColors: blueGradient,
+          foregroundColor: Colors.black,
+          onPressed: () {},
+          child: Text(
+            '当日',
+            style: _btnTextStyle.merge(TextStyle(color: Colors.black)),
+          ),
+        ),
+        // 過去日3日分（1行目）
+        for (var i = 1; i < 4; i++)
+          PopOutButton(
+            backgroundColors: orengeGradient,
+            foregroundColor: Colors.black,
+            onPressed: () {},
+            child: Text(
+              DateTime.now().add(Duration(days: -i)).toDateOnlyString(),
+              style: _btnTextStyle,
+            ),
+          ),
+        // 1行目5列目：その他の日付
+        const _AnotherDateField(),
+        // 過去日4日分（2行目）
+        for (var i = 4; i < 8; i++)
+          PopOutButton(
+            backgroundColors: orengeGradient,
+            foregroundColor: Colors.black,
+            onPressed: () {},
+            child: Text(
+              DateTime.now().add(Duration(days: -i)).toDateOnlyString(),
+              style: _btnTextStyle,
+            ),
+          ),
+        // 2行目5列目：印刷
+        PopOutButton.icon(
+          icon: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Icon(Icons.check_circle),
+          ),
+          iconSize: fontSize,
+          backgroundColors: completedGradient,
+          onPressed: () {},
+          child: Text('印刷', style: _btnTextStyle),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnotherDateField extends StatefulWidget {
+  /// その他の日付欄（タップでカレンダーダイアログを開く）
+  /// 入力欄ではなく選択結果を表示するだけのため、TextFieldは使用しない
+  /// （フォーカス枠・文字選択ハイライトなどテーマ由来の色が出ないようにするため）
+  const _AnotherDateField();
+
+  @override
+  State<_AnotherDateField> createState() => _AnotherDateFieldState();
+}
+
+class _AnotherDateFieldState extends State<_AnotherDateField> {
+  /// 選択中の日付（未選択はnull）
+  DateTime? _selectedDate;
+
+  Future<void> _showCalendarDialog() async {
+    final selected = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CalendarDialog(),
+    );
+    if (selected != null) {
+      setState(() {
+        _selectedDate = selected;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasDate = _selectedDate != null;
+
+    // 未選択時は「その他の日付」、日付選択後はその日付を表示する
+    final String label =
+        hasDate ? _selectedDate!.toStringWithFormat('yyyy/MM/dd') : 'その他の日付';
+
+    return TextFieldShadow(
+      topStops: [0.0, 0.15],
+      leftStops: [0.0, 0.04],
+      child: GestureDetector(
+        // 枠内のどこをタップしてもカレンダーを開く
+        behavior: HitTestBehavior.opaque,
+        onTap: _showCalendarDialog,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.black),
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            // 隣の日付ボタンと同じく、標準の太さ・黒文字で表示する
+            style: const TextStyle(
+              fontSize: _dateFieldFontSize,
+              color: Colors.black,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarDialog extends StatefulWidget {
+  const _CalendarDialog();
+
+  @override
+  State<_CalendarDialog> createState() => _CalendarDialogState();
+}
+
+class _CalendarDialogState extends State<_CalendarDialog> {
+  DateTime _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _selectedDate;
+
+  /// 選択可能な最新日（本日・時刻を切り捨て）
+  DateTime get _maxDate {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  /// 選択可能な最古日（本日から30日前）
+  DateTime get _minDate => _maxDate.subtract(const Duration(days: 30));
+
+  /// 選択可能な日付か（本日から30日前〜本日）
+  /// 時刻の有無で判定がずれないよう、年月日だけで比較する
+  bool _isSelectable(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    return !d.isBefore(_minDate) && !d.isAfter(_maxDate);
+  }
+
+  /// 前月へ移動できるか
+  bool get _canGoPrevious =>
+      _currentMonth.isAfter(DateTime(_minDate.year, _minDate.month));
+
+  /// 翌月へ移動できるか
+  bool get _canGoNext =>
+      _currentMonth.isBefore(DateTime(_maxDate.year, _maxDate.month));
+
+  void _previousMonth() {
+    if (!_canGoPrevious) return;
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+  }
+
+  void _nextMonth() {
+    if (!_canGoNext) return;
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+  }
+
+  List<DateTime?> _getDaysInMonth() {
+    final firstDay = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final lastDay = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+    final List<DateTime?> days = [];
+
+    // Add empty slots for days before first day of month
+    for (int i = 0; i < firstDay.weekday % 7; i++) {
+      days.add(null);
+    }
+
+    // Add all days in month
+    for (int i = 1; i <= lastDay.day; i++) {
+      days.add(DateTime(_currentMonth.year, _currentMonth.month, i));
+    }
+
+    return days;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final days = _getDaysInMonth();
+    final weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      child: Container(
+        // 日付を見やすく・押しやすくするため拡大（1マス 約72×72px）
+        width: 580,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with month navigation
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: _canGoPrevious ? _previousMonth : null,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_back_ios),
+                ),
+                Text(
+                  '${_currentMonth.year}年${_currentMonth.month}月',
+                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: _canGoNext ? _nextMonth : null,
+                  iconSize: 32,
+                  icon: Icon(Icons.arrow_forward_ios),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Weekday headers
+            Row(
+              children:
+                  weekDays
+                      .map(
+                        (d) => Expanded(
+                          child: Center(
+                            child: Text(
+                              d,
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    d == '日'
+                                        ? Colors.red
+                                        : d == '土'
+                                        ? Colors.blue
+                                        : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ),
+            const SizedBox(height: 8),
+
+            // Calendar grid
+            GridView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
+                // 1.0で正方形のマスにし、横だけでなく縦にも広げる
+                childAspectRatio: 1.0,
+              ),
+              itemCount: days.length,
+              itemBuilder: (context, index) {
+                final day = days[index];
+                if (day == null) return SizedBox.shrink();
+
+                // 選択可能な日付（本日から30日前〜本日）
+                final selectable = _isSelectable(day);
+
+                final isSelected =
+                    _selectedDate != null &&
+                    _selectedDate!.year == day.year &&
+                    _selectedDate!.month == day.month &&
+                    _selectedDate!.day == day.day;
+
+                // 選択可能：曜日に応じた色（1行目の曜日見出しと同色）
+                // 選択不可：グレー
+                final Color dayColor;
+                if (!selectable) {
+                  dayColor = Colors.grey.shade400;
+                } else if (isSelected) {
+                  dayColor = Colors.white;
+                } else if (day.weekday == DateTime.sunday) {
+                  dayColor = Colors.red;
+                } else if (day.weekday == DateTime.saturday) {
+                  dayColor = Colors.blue;
+                } else {
+                  dayColor = Colors.black;
+                }
+
+                return GestureDetector(
+                  // 範囲外は選択不可
+                  onTap:
+                      selectable
+                          ? () {
+                            setState(() {
+                              _selectedDate = day;
+                            });
+                          }
+                          : null,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      // 当日のオレンジ強調は廃止し、選択中のみ色を付ける
+                      color: isSelected ? Colors.red : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${day.day}',
+                        style: TextStyle(
+                          fontSize: 30,
+                          color: dayColor,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 確定/取消 buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              spacing: 16,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(140, 60),
+                  ),
+                  child: Text('取消', style: TextStyle(fontSize: 26)),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _selectedDate == null
+                          ? null
+                          : () => Navigator.of(context).pop(_selectedDate),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(140, 60),
+                  ),
+                  child: Text('確定', style: TextStyle(fontSize: 26)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
