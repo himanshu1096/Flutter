@@ -1,0 +1,74 @@
+const closeTallyBtnPadding = fontSize / 1.5;
+
+
+//==============================
+// 関連業務画面の下部（フッター）共通
+// ※全タブで高さ・ボタンサイズ・位置を揃えるため、各画面はこれを使う
+//==============================
+/// フッターのボタン1つの高さ
+const double relatedFooterBtnHeight = 60.0;
+
+/// フッターのボタン間の余白（縦横共通）・上余白
+const double relatedFooterSpacing = 8.0;
+
+/// フッターの列数
+const int relatedFooterColumns = 5;
+
+/// フッター全体の高さ（2行固定）
+/// ボタン高さ60 × 2行 ＋ 行間8 ＋ 上余白8
+const double relatedFooterHeight =
+    relatedFooterBtnHeight * 2 + relatedFooterSpacing + relatedFooterSpacing;
+
+class RelatedProcessFooter extends StatelessWidget {
+  /// 関連業務画面の下部（5列×2行のグリッド）
+  /// [cells] は左上から順に最大10個。null は空きマス
+  const RelatedProcessFooter({super.key, required this.cells})
+    : bottomCenter = null;
+
+  /// 関連業務画面の下部（2行目の中央にボタンを1つ置く）
+  /// ※締切の実行ボタン用。ボタンは自身のサイズのまま中央に表示する
+  const RelatedProcessFooter.bottomCenter({
+    super.key,
+    required Widget this.bottomCenter,
+  }) : cells = null;
+
+  final List<Widget?>? cells;
+  final Widget? bottomCenter;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: relatedFooterHeight,
+      child:
+          cells != null
+              ? GridView(
+                padding: const EdgeInsets.only(top: relatedFooterSpacing),
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: relatedFooterColumns,
+                  crossAxisSpacing: relatedFooterSpacing,
+                  mainAxisSpacing: relatedFooterSpacing,
+                  // 画面幅に関係なくボタンの高さを固定する
+                  mainAxisExtent: relatedFooterBtnHeight,
+                ),
+                children: [
+                  for (final cell in cells!) cell ?? const SizedBox.shrink(),
+                ],
+              )
+              : Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  SizedBox(
+                    height: relatedFooterBtnHeight,
+                    child: Center(child: bottomCenter),
+                  ),
+                ],
+              ),
+    );
+  }
+}
+
+const closeTallyBtnPadding = fontSize / 1.5;
+
+
+
