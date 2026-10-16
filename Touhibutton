@@ -1,0 +1,114 @@
+class _SelectDateBottons extends StatefulWidget {
+  @override
+  State<_SelectDateBottons> createState() => _SelectDateBottonsState();
+}
+
+class _SelectDateBottonsState extends State<_SelectDateBottons> {
+  /// 今日（時刻なし）
+  final DateTime _today = DateUtils.dateOnly(DateTime.now());
+
+  /// 選択中の日付（初期表示は当日）
+  /// ※フッターのボタンは、この日付と同じ日のものが選択中（青）になる
+  late DateTime _selectedDate = _today;
+
+  /// カレンダーで選択した日付（その他の日付欄に表示する。未選択は null）
+  DateTime? _calendarDate;
+
+  /// フッターの日付ボタン押下
+  /// その日付を選択中にし、その他の日付欄は「その他の日付」に戻す
+  /// （ボタン押下ではその他の日付欄に日付を入れない）
+  void _onDateButtonPressed(DateTime date) {
+    setState(() {
+      _selectedDate = date;
+      _calendarDate = null;
+    });
+  }
+
+  /// カレンダーで日付を選択
+  /// その他の日付欄に表示し、同じ日付のボタンがフッターにあればそのボタンも選択中にする
+  void _onCalendarSelected(DateTime date) {
+    final dateOnly = DateUtils.dateOnly(date);
+    setState(() {
+      _selectedDate = dateOnly;
+      _calendarDate = dateOnly;
+    });
+  }
+
+  /// フッターの日付ボタン（[daysAgo] 日前。0 は当日）
+  /// 選択中：blueGradient（水色）／未選択：orengeGradient（橙）／文字色は共に黒
+  Widget _dateButton(int daysAgo) {
+    final date = DateTime(_today.year, _today.month, _today.day - daysAgo);
+    return CloseTallyToggleBtn(
+      isSelected: DateUtils.isSameDay(date, _selectedDate),
+      onPressed: () => _onDateButtonPressed(date),
+      child: Text(
+        daysAgo == 0 ? '当日' : date.toDateOnlyString(),
+        style: _btnTextStyle,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RelatedProcessFooter(
+      cells: [
+        // 1行目：当日＋過去日3日分
+        for (var i = 0; i < 4; i++) _dateButton(i),
+        // 1行目5列目：その他の日付
+        _AnotherDateField(
+          date: _calendarDate,
+          onSelected: _onCalendarSelected,
+        ),
+        // 2行目：過去日4日分
+        for (var i = 4; i < 8; i++) _dateButton(i),
+        // 2行目5列目：印刷
+        PopOutButton.icon(
+          icon: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Icon(Icons.check_circle),
+          ),
+          iconSize: fontSize,
+          backgroundColors: completedGradient,
+          onPressed: () {},
+          child: Text('印刷', style: _btnTextStyle),
+        ),
+      ],
+    );
+  }
+}
+
+
+class _AnotherDateField extends StatelessWidget {
+  /// その他の日付欄（タップでカレンダーダイアログを開く）
+  /// 入力欄ではなく選択結果を表示するだけのため、TextFieldは使用しない
+  /// （フォーカス枠・文字選択ハイライトなどテーマ由来の色が出ないようにするため）
+  /// ※表示する日付は親（_SelectDateBottons）が管理する
+  ///   （フッターの日付ボタン押下時に「その他の日付」へ戻すため）
+  const _AnotherDateField({required this.date, required this.onSelected});
+
+  /// 表示する日付（カレンダーで選択した日付。未選択は null）
+  final DateTime? date;
+
+  /// カレンダーで日付が選択された時の処理
+  final ValueChanged<DateTime> onSelected;
+
+  Future<void> _showCalendarDialog(BuildContext context) async {
+    final selected = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CalendarDialog(),
+    );
+    if (selected != null) {
+      onSelected(selected);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasDate = date != null;
+
+    // 未選択時は「その他の日付」、日付選択後はその日付を表示する
+    final String label =
+        hasDate ? date!.toStringWithFormat('yyyy/MM/dd') : 'その他の日付';
+
+
