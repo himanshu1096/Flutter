@@ -1,0 +1,68 @@
+        child:
+            isTextCentered
+                // 文字はボタンの中央、＞アイコンは右端に表示する
+                // ※ボタン全体の大きさで重ねるため SizedBox.expand で広げる
+                ? SizedBox.expand(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Text(
+                        text,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: btnIconSize,
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: EdgeInsets.only(right: btnPadding.right),
+                          child: Icon(
+                            FontAwesomeIcons.chevronRight,
+                            color: Colors.black,
+                            size: btnIconSize,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+                // 従来どおり（文字と＞を右寄せ）
+                : Padding(
+                  padding: btnPadding,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        text,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: btnIconSize,
+                        ),
+                      ),
+                      Icon(
+                        FontAwesomeIcons.chevronRight,
+                        color: Colors.black,
+                        size: btnIconSize,
+                      ),
+                    ],
+                  ),
+                ),
+      ),
+    );
+
+
+    this.btnPadding = const EdgeInsets.only(right: 24.0),
+    this.isTextCentered = false,
+    super.key,
+
+  final EdgeInsets btnPadding;
+
+  /// 文字をボタンの中央に表示するか（＞アイコンは右端のまま）
+  /// ※既定は false（従来どおり文字と＞を右寄せ）
+  final bool isTextCentered;
+
+
+
+
