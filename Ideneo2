@@ -1,0 +1,221 @@
+import 'package:flutter/material.dart';
+
+import 'package:qr_multidemo/component/secondary_tab_content_core.dart';
+import 'package:qr_multidemo/utility/constant.dart';
+import 'related_process_common.dart';
+
+//==============================
+// 接続状態画面
+// ※現在はダミー表示のみ（iDONEOとの接続処理は未実装）
+//   実データ接続時は _dummyItems を差し替える
+//==============================
+
+/// 接続中の色（左端の色帯）
+const Color _connectedColor = Color(0xFF2FB34D);
+
+/// 未接続の色（左端の色帯）
+const Color _disconnectedColor = Color(0xFFE53935);
+
+/// 接続中の文字・アイコン色
+const Color _connectedTextColor = Color(0xFF1B8A3A);
+
+/// 未接続の文字・アイコン色
+const Color _disconnectedTextColor = Color(0xFFC62828);
+
+/// 状態アイコンのサイズ
+const double _statusIconSize = 48.0;
+
+/// 1行に並べるカードの数
+const int _cardColumns = 2;
+
+/// 接続先1件分の状態
+class _ConnectionItem {
+  const _ConnectionItem({required this.name, required this.isConnected});
+
+  /// 接続先名
+  final String name;
+
+  /// 接続中か
+  final bool isConnected;
+}
+
+/// ダミーの接続状態（接続中・未接続の表示確認用）
+/// ※実データ接続時に差し替える
+const List<_ConnectionItem> _dummyItems = [
+  _ConnectionItem(name: 'iDONEO', isConnected: true),
+  _ConnectionItem(name: 'iDONEO', isConnected: false),
+];
+
+class ConnectionStatusScreen extends StatelessWidget {
+  /// 接続状態画面
+  const ConnectionStatusScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // ボタンが無いため、枠を下端まで広げる
+    return PaddingForContent(
+      child: _ConnectionCard(items: _dummyItems),
+    );
+  }
+}
+
+/// 接続状態の枠（接客履歴の枠と同じ見た目）
+class _ConnectionCard extends StatelessWidget {
+  const _ConnectionCard({required this.items});
+
+  final List<_ConnectionItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final fontColor = Theme.of(context).colorScheme.onSecondaryContainer;
+    final cardBackgroundColor =
+        Theme.of(context).colorScheme.secondaryContainer;
+    final cardOutlineColor = Theme.of(context).colorScheme.surfaceContainer;
+    final textStyle = titleTextStyle.copyWith(color: fontColor, height: 1.0);
+
+    return Card.outlined(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Layouts.dialogRadius),
+        side: BorderSide(color: cardOutlineColor, width: 2.0),
+      ),
+      color: cardBackgroundColor,
+      elevation: 5.0,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // タイトル行（アイコン＋タイトル）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 24, 0),
+            child: Row(
+              children: [
+                Icon(Icons.lan_outlined, color: fontColor, size: 32),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text('接続状態', style: textStyle),
+                ),
+              ],
+            ),
+          ),
+          // タイトルの下線
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 12, thickness: 1.5, color: fontColor),
+          ),
+          // 下線より下はすべてカード一覧に使う
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: _StatusTiles(items: items),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 接続先のカード一覧（[_cardColumns] 列ずつ並べ、枠の高さいっぱいに広げる）
+class _StatusTiles extends StatelessWidget {
+  const _StatusTiles({required this.items});
+
+  final List<_ConnectionItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = (items.length / _cardColumns).ceil();
+    return Column(
+      spacing: 16,
+      children: [
+        for (var r = 0; r < rows; r++)
+          Expanded(
+            child: Row(
+              spacing: 16,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var c = 0; c < _cardColumns; c++)
+                  Expanded(
+                    child:
+                        r * _cardColumns + c < items.length
+                            ? _StatusTile(item: items[r * _cardColumns + c])
+                            : const SizedBox.shrink(),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 接続先1件分のカード
+/// 左端の色帯（緑／赤）＋接続先名＋状態アイコン・状態文字
+class _StatusTile extends StatelessWidget {
+  const _StatusTile({required this.item});
+
+  final _ConnectionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final barColor = item.isConnected ? _connectedColor : _disconnectedColor;
+    final textColor =
+        item.isConnected ? _connectedTextColor : _disconnectedTextColor;
+
+    // ※角丸と片側だけの枠線は同時に指定できないため、
+    //   角丸で切り取った中に左端の色帯を並べて表示する
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        color: Colors.white,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 左端の色帯で状態を示す
+            Container(width: 14, color: barColor),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 8,
+                  children: [
+                    // 接続先名
+                    Text(
+                      item.name,
+                      style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    // 状態（接続中：リンク／未接続：リンク切れ）
+                    Row(
+                      spacing: 12,
+                      children: [
+                        Icon(
+                          item.isConnected ? Icons.link : Icons.link_off,
+                          color: textColor,
+                          size: _statusIconSize,
+                        ),
+                        Text(
+                          item.isConnected ? '接続中' : '未接続',
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w700,
+                            color: textColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
