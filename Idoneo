@@ -1,0 +1,418 @@
+import 'package:flutter/material.dart';
+
+import 'package:qr_multidemo/app_color.dart';
+import 'package:qr_multidemo/component/pop_out_button.dart';
+import 'package:qr_multidemo/component/secondary_tab_content_core.dart';
+import 'package:qr_multidemo/utility/constant.dart';
+import 'package:qr_multidemo/utility/date_time_converter.dart';
+import 'related_process_common.dart';
+
+//==============================
+// 接続状態画面
+// ※現在はダミー表示のみ（iDONEO等との接続処理は未実装）
+//   実データ接続時は _makeDummyItems() を差し替える
+//==============================
+
+/// 表示パターン
+enum _ConnectionLayout {
+  /// 案A：iDONEOのみ大きく表示
+  big,
+
+  /// 案B：iDONEO＋他機器をカードで一覧表示
+  cards,
+}
+
+/// 表示パターンの切り替え（確認用）
+/// ※どちらの案にするか決定後、不要な方は削除する
+const _ConnectionLayout _layout = _ConnectionLayout.cards;
+
+/// 接続中の色
+const Color _connectedColor = Color(0xFF2FB34D);
+
+/// 未接続の色
+const Color _disconnectedColor = Color(0xFFE53935);
+
+/// 接続中の文字色（緑の背景・白地どちらでも読める濃さ）
+const Color _connectedTextColor = Color(0xFF1B8A3A);
+
+/// 未接続の文字色
+const Color _disconnectedTextColor = Color(0xFFC62828);
+
+/// 接続先1件分の状態
+class _ConnectionItem {
+  const _ConnectionItem({
+    required this.name,
+    required this.isConnected,
+    required this.changedAt,
+  });
+
+  /// 接続先名
+  final String name;
+
+  /// 接続中か
+  final bool isConnected;
+
+  /// 最後に状態が変わった日時（接続中＝接続開始／未接続＝切断）
+  final DateTime changedAt;
+}
+
+class ConnectionStatusScreen extends StatefulWidget {
+  /// 接続状態画面
+  const ConnectionStatusScreen({super.key});
+
+  @override
+  State<ConnectionStatusScreen> createState() => _ConnectionStatusScreenState();
+}
+
+class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
+  /// 最終確認日時
+  DateTime _checkedAt = DateTime.now();
+
+  /// 表示する接続状態
+  late List<_ConnectionItem> _items = _makeDummyItems();
+
+  /// ダミーの接続状態（実データ接続時に差し替える）
+  List<_ConnectionItem> _makeDummyItems() {
+    final today = DateUtils.dateOnly(DateTime.now());
+    return [
+      _ConnectionItem(
+        name: 'iDONEO',
+        isConnected: true,
+        changedAt: today.add(const Duration(hours: 8, minutes: 59, seconds: 12)),
+      ),
+      _ConnectionItem(
+        name: 'データ集計機',
+        isConnected: false,
+        changedAt: today.add(
+          const Duration(hours: 12, minutes: 41, seconds: 30),
+        ),
+      ),
+      _ConnectionItem(
+        name: 'QRサーバ',
+        isConnected: true,
+        changedAt: today.add(const Duration(hours: 8, minutes: 59, seconds: 10)),
+      ),
+      _ConnectionItem(
+        name: 'プリンタ',
+        isConnected: true,
+        changedAt: today.add(const Duration(hours: 8, minutes: 59, seconds: 11)),
+      ),
+    ];
+  }
+
+  /// 再確認ボタン押下
+  /// ※現在はダミーのため、最終確認日時のみ更新する
+  void _onRecheckPressed() {
+    setState(() {
+      _checkedAt = DateTime.now();
+      _items = _makeDummyItems();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PaddingForContent(
+      child: Column(
+        spacing: 8,
+        children: [
+          Expanded(
+            child: _ConnectionCard(
+              title:
+                  _layout == _ConnectionLayout.big ? 'iDONEO 接続状態' : '接続状態',
+              checkedAt: _checkedAt,
+              child:
+                  _layout == _ConnectionLayout.big
+                      ? _BigStatusView(item: _items.first)
+                      : _CardsStatusView(items: _items),
+            ),
+          ),
+          // 他の関連業務画面と高さ・ボタン位置を揃える（再確認は2行目5列目）
+          RelatedProcessFooter(
+            cells: [
+              for (var i = 0; i < 9; i++) null,
+              PopOutButton.icon(
+                icon: const Padding(
+                  padding: EdgeInsets.only(left: 8.0),
+                  child: Icon(Icons.refresh),
+                ),
+                iconSize: fontSize,
+                backgroundColors: orengeGradient,
+                foregroundColor: Colors.black,
+                onPressed: _onRecheckPressed,
+                child: const Text('再確認', style: TextStyle(fontSize: fontSize)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 接続状態の枠（接客履歴の枠と同じ見た目）
+/// タイトル行の右端に最終確認日時を表示する
+class _ConnectionCard extends StatelessWidget {
+  const _ConnectionCard({
+    required this.title,
+    required this.checkedAt,
+    required this.child,
+  });
+
+  final String title;
+  final DateTime checkedAt;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final fontColor = Theme.of(context).colorScheme.onSecondaryContainer;
+    final cardBackgroundColor =
+        Theme.of(context).colorScheme.secondaryContainer;
+    final cardOutlineColor = Theme.of(context).colorScheme.surfaceContainer;
+    final textStyle = titleTextStyle.copyWith(color: fontColor, height: 1.0);
+
+    return Card.outlined(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Layouts.dialogRadius),
+        side: BorderSide(color: cardOutlineColor, width: 2.0),
+      ),
+      color: cardBackgroundColor,
+      elevation: 5.0,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // タイトル行（アイコン＋タイトル＋最終確認日時）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 24, 0),
+            child: Row(
+              children: [
+                Icon(Icons.lan_outlined, color: fontColor, size: 32),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text(title, style: textStyle),
+                ),
+                const Spacer(),
+                Text(
+                  '最終確認 ${checkedAt.toStringWithFormat('yyyy/MM/dd HH:mm:ss')}',
+                  style: TextStyle(fontSize: 22, color: fontColor),
+                ),
+              ],
+            ),
+          ),
+          // タイトルの下線
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 12, thickness: 1.5, color: fontColor),
+          ),
+          // 下線より下はすべて内容に使う
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 案A：iDONEOのみ大きく表示
+class _BigStatusView extends StatelessWidget {
+  const _BigStatusView({required this.item});
+
+  final _ConnectionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.isConnected ? _connectedColor : _disconnectedColor;
+    final textColor =
+        item.isConnected ? _connectedTextColor : _disconnectedTextColor;
+    const infoStyle = TextStyle(fontSize: 34, color: Colors.black);
+
+    // 接続中は経過時間、未接続は切断日時を表示する
+    final elapsed = DateTime.now().difference(item.changedAt);
+    final elapsedText =
+        '${elapsed.inHours}時間${elapsed.inMinutes.remainder(60)}分';
+
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 60,
+        children: [
+          // 状態の丸
+          Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 12,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              item.isConnected ? '接続中' : '未接続',
+              style: const TextStyle(
+                fontSize: 48,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          // 詳細
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 16,
+            children: [
+              Row(
+                spacing: 24,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(item.name, style: infoStyle),
+                  Text(
+                    item.isConnected ? '正常' : '異常',
+                    style: TextStyle(
+                      fontSize: 50,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                  ),
+                ],
+              ),
+              if (item.isConnected) ...[
+                Text(
+                  '接続開始　${item.changedAt.toStringWithFormat('HH:mm:ss')}',
+                  style: infoStyle,
+                ),
+                Text('継続時間　$elapsedText', style: infoStyle),
+              ] else
+                Text(
+                  '切断　${item.changedAt.toStringWithFormat('HH:mm:ss')}',
+                  style: infoStyle,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 案B：iDONEO＋他機器をカードで一覧表示（2列×2行）
+class _CardsStatusView extends StatelessWidget {
+  const _CardsStatusView({required this.items});
+
+  final List<_ConnectionItem> items;
+
+  /// 列数
+  static const int _columns = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = (items.length / _columns).ceil();
+    return Column(
+      spacing: 16,
+      children: [
+        for (var r = 0; r < rows; r++)
+          Expanded(
+            child: Row(
+              spacing: 16,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var c = 0; c < _columns; c++)
+                  Expanded(
+                    child:
+                        r * _columns + c < items.length
+                            ? _StatusTile(item: items[r * _columns + c])
+                            : const SizedBox.shrink(),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 案Bのカード1枚分
+class _StatusTile extends StatelessWidget {
+  const _StatusTile({required this.item});
+
+  final _ConnectionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.isConnected ? _connectedColor : _disconnectedColor;
+    final textColor =
+        item.isConnected ? _connectedTextColor : _disconnectedTextColor;
+    final time = item.changedAt.toStringWithFormat('HH:mm:ss');
+
+    // ※角丸と片側だけの枠線は同時に指定できないため、
+    //   角丸で切り取った中に左端の色帯を並べて表示する
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        color: Colors.white,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 左端の色帯で状態を示す
+            Container(width: 14, color: color),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: _tileBody(textColor, time),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// カードの中身（接続先名・状態・日時）
+  Widget _tileBody(Color textColor, String time) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 6,
+      children: [
+        Text(
+          item.name,
+          style: const TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w700,
+            color: Colors.black,
+          ),
+        ),
+        Row(
+          spacing: 10,
+          children: [
+            Icon(Icons.circle, color: textColor, size: 30),
+            Text(
+              item.isConnected ? '接続中' : '未接続',
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w700,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+        Text(
+          item.isConnected ? '接続開始 $time' : '切断 $time',
+          style: const TextStyle(fontSize: 22, color: Colors.black87),
+        ),
+      ],
+    );
+  }
+}
