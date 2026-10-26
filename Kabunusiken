@@ -1,0 +1,358 @@
+  /// 企画券(小人)
+  static const int projectChild = 32;
+
+  /// 株主優待乗車証
+  static const int kabuYutai = 41;
+
+
+
+  /// 企画券かどうか
+  static bool isProject(int? type) =>
+      type == projectAdult || type == projectChild;
+
+  /// 株主優待乗車証かどうか
+  static bool isKabuYutai(int? type) => type == kabuYutai;
+}
+
+
+  final int? routeCand6;
+
+  // 株主優待乗車証（MEDIATYPE=41）
+  // ※既存キーと意味合いが異なる項目は別キーで受け取る
+  /// 有効開始時間
+  final int? startTimeH;
+  final int? startTimeM;
+  final int? startTimeS;
+
+  /// 有効終了時間
+  final int? expiryTimeH;
+  final int? expiryTimeM;
+  final int? expiryTimeS;
+
+  /// 利用駅（最終利用場所）
+  final String? usedStation;
+
+  /// 利用日
+  final int? usedDateY;
+  final int? usedDateM;
+  final int? usedDateD;
+
+  /// 利用時間
+  final int? usedTimeH;
+  final int? usedTimeM;
+
+  /// 使用不可フラグ（0:使用可能、1:使用不可）
+  final int? unusableFlag;
+
+  /// チケットステータス（0:未使用、1:発券済、2:使用中、3:使用済、4:使用停止、5:払戻済）
+  final int? ticketStatus;
+
+  const DisplayData({
+
+
+
+    this.routeCand6,
+    this.startTimeH,
+    this.startTimeM,
+    this.startTimeS,
+    this.expiryTimeH,
+    this.expiryTimeM,
+    this.expiryTimeS,
+    this.usedStation,
+    this.usedDateY,
+    this.usedDateM,
+    this.usedDateD,
+    this.usedTimeH,
+    this.usedTimeM,
+    this.unusableFlag,
+    this.ticketStatus,
+  });
+
+
+      routeCand6: data['ROUTECAND6'] as int?,
+      // 株主優待乗車証
+      startTimeH: data['STARTTIMEH'] as int?,
+      startTimeM: data['STARTTIMEM'] as int?,
+      startTimeS: data['STARTTIMES'] as int?,
+      expiryTimeH: data['EXPIRYTIMEH'] as int?,
+      expiryTimeM: data['EXPIRYTIMEM'] as int?,
+      expiryTimeS: data['EXPIRYTIMES'] as int?,
+      usedStation: data['USEDSTATION'] as String?,
+      usedDateY: data['USEDDATEY'] as int?,
+      usedDateM: data['USEDDATEM'] as int?,
+      usedDateD: data['USEDDATED'] as int?,
+      usedTimeH: data['USEDTIMEH'] as int?,
+      usedTimeM: data['USEDTIMEM'] as int?,
+      unusableFlag: data['UNUSABLEFLAG'] as int?,
+      ticketStatus: data['TICKETSTATUS'] as int?,
+    );
+
+
+
+  /// 普通券かどうか（MEDIATYPE 11/12）
+  bool get isNormalTicket => MediaType.isNormal(mediaType);
+
+  /// 株主優待乗車証かどうか（MEDIATYPE 41）
+  bool get isKabuYutai => MediaType.isKabuYutai(mediaType);
+
+  /// 2桁ゼロ埋め
+  static String _two(int v) => v.toString().padLeft(2, '0');
+
+  /// 年月日を "9999/99/99" 形式にする（いずれかがnullの場合は空文字）
+  static String _formatYmd(int? y, int? m, int? d) {
+    if (y == null || m == null || d == null) return '';
+    return '$y/${_two(m)}/${_two(d)}';
+  }
+
+  /// 時分秒を "99:99:99" 形式にする（いずれかがnullの場合は空文字）
+  static String _formatHms(int? h, int? m, int? s) {
+    if (h == null || m == null || s == null) return '';
+    return '${_two(h)}:${_two(m)}:${_two(s)}';
+  }
+
+  /// 株主優待：有効開始日 (9999/99/99)
+  String get kabuStartDateFormatted =>
+      _formatYmd(startDateY, startDateM, startDateD);
+
+  /// 株主優待：有効終了日 (9999/99/99)
+  String get kabuExpiryDateFormatted =>
+      _formatYmd(expiryDateY, expiryDateM, expiryDateD);
+
+  /// 株主優待：有効開始時間 (99:99:99)
+  String get startTimeFormatted =>
+      _formatHms(startTimeH, startTimeM, startTimeS);
+
+  /// 株主優待：有効終了時間 (99:99:99)
+  String get expiryTimeFormatted =>
+      _formatHms(expiryTimeH, expiryTimeM, expiryTimeS);
+
+  /// 株主優待：利用日 (9999/99/99)
+  String get usedDateFormatted => _formatYmd(usedDateY, usedDateM, usedDateD);
+
+  /// 株主優待：利用時間 (99:99)
+  String get usedTimeFormatted {
+    if (usedTimeH == null || usedTimeM == null) return '';
+    return '${_two(usedTimeH!)}:${_two(usedTimeM!)}';
+  }
+
+
+      case CardInfoEnum.yukoKaisibi:
+        // 株主優待は 9999/99/99（年4桁）
+        if (data.isKabuYutai) return data.kabuStartDateFormatted;
+        return data.startDateFormatted;
+      case CardInfoEnum.yukoSyuryoubi:
+        // 株主優待は 9999/99/99（年4桁）
+        if (data.isKabuYutai) return data.kabuExpiryDateFormatted;
+        return data.expiryDateFormatted;
+
+
+
+      case CardInfoEnum.nyusyutuzyoBit:
+        // 株主優待：ステータスが未使用（0）の場合はブランク
+        if (data.isKabuYutai) {
+          if (data.ticketStatus == 0) return '';
+          return _csv.lookup('ENTRYSTATUS', data.entryStatus);
+        }
+        if (data.useStatus == 0) return '';
+
+
+      case CardInfoEnum.huricode:
+        return data.freeCode ?? '';
+
+      // 株主優待乗車証
+      case CardInfoEnum.yukoKaisiZikan:
+        return data.startTimeFormatted;
+      case CardInfoEnum.yukoSyuryouZikan:
+        return data.expiryTimeFormatted;
+      case CardInfoEnum.riyoueki:
+        return data.usedStation ?? '';
+      case CardInfoEnum.riyoubi:
+        return data.usedDateFormatted;
+      case CardInfoEnum.riyouZikan:
+        return data.usedTimeFormatted;
+      case CardInfoEnum.siyouFukaFlag:
+        return _csv.lookup('UNUSABLEFLAG', data.unusableFlag);
+      case CardInfoEnum.ticketStatus:
+        return _csv.lookup('TICKETSTATUS', data.ticketStatus);
+
+
+
+  huricode('フリーコード(※)', ''),
+  // 株主優待乗車証
+  yukoKaisiZikan('有効開始時間', ''),
+  yukoSyuryouZikan('有効終了時間', ''),
+  riyoueki('利用駅', ''),
+  riyoubi('利用日', ''),
+  riyouZikan('利用時間', ''),
+  siyouFukaFlag('使用不可フラグ', ''),
+  ticketStatus('ステータス', ''),
+  empty('', '');
+
+
+
+    if (MediaType.isKabuYutai(mediaType)) {
+      // 株主優待乗車証（共通ヘッダは使わず、下で専用の並びにする）
+      leftFields = const [];
+      rightFields = const [];
+    } else if (MediaType.isCoupons(mediaType)) {
+      // 回数券
+      leftFields = [
+
+
+    // 株主優待乗車証：設計（iDONEO関係の表示案）の配置どおり
+    // 左列 No.1～13 ／ 右列 No.14～26（指定箇所はブランク）
+    // ※QR有効/無効ステータスの共通ヘッダは表示しない
+    if (MediaType.isKabuYutai(mediaType)) {
+      const blank = ('', '');
+      (String, String) row(CardInfoEnum c) => (c.name, getValue(c));
+      final kabuInfo1 = <(String, String)>[
+        ('QRチケット番号', qrTicketNo), // 1
+        row(CardInfoEnum.siyouFukaFlag), // 2
+        row(CardInfoEnum.ticketStatus), // 3
+        row(CardInfoEnum.nyuusyutuzyouStatus), // 4
+        row(CardInfoEnum.baitaiSyubetu), // 5
+        blank, blank, blank, // 6～8
+        row(CardInfoEnum.yukoKaisibi), // 9
+        row(CardInfoEnum.yukoSyuryoubi), // 10
+        blank, blank, blank, // 11～13
+      ];
+      final kabuInfo2 = <(String, String)>[
+        blank, blank, blank, blank, // 14～17
+        row(CardInfoEnum.riyoueki), // 18
+        row(CardInfoEnum.nyusyutuzyoBit), // 19
+        row(CardInfoEnum.riyoubi), // 20
+        row(CardInfoEnum.riyouZikan), // 21
+        row(CardInfoEnum.yukoKaisiZikan), // 22
+        row(CardInfoEnum.yukoSyuryouZikan), // 23
+        blank, blank, blank, // 24～26
+      ];
+      return _buildDetailBody(textStyle, kabuInfo1, kabuInfo2);
+    }
+
+    // 共通ヘッダ行 (QRチケット番号 / QR有効無効ステータス)
+    final info1 = <(String, String)>[
+
+  /// 詳細情報の本体（左右2列 × 項目名／値）
+  /// ※株主優待乗車証で使用。既存の券種は従来どおり build 内で組み立てる
+  Widget _buildDetailBody(
+    TextStyle textStyle,
+    List<(String, String)> info1,
+    List<(String, String)> info2,
+  ) {
+    Widget valueText(String v) => Text(
+      v,
+      overflow: TextOverflow.visible,
+      softWrap: false,
+      style: const TextStyle(fontWeight: FontWeight.w500),
+    );
+    return DefaultTextStyle(
+      style: textStyle,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('■詳細情報'),
+            Padding(
+              padding: const EdgeInsets.only(left: 25),
+              child: Row(
+                children: [
+                  _detailColumn(
+                    children: info1.map((item) => Text(item.$1)).toList(),
+                  ),
+                  _detailColumn(
+                    children: info1.map((item) => valueText(item.$2)).toList(),
+                  ),
+                  _detailColumn(
+                    children: info2.map((item) => Text(item.$1)).toList(),
+                  ),
+                  _detailColumn(
+                    children: info2.map((item) => valueText(item.$2)).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailColumn({required List<Widget> children}) {
+
+
+
+
+    // 表示データ取得 → マッパー生成
+    final displayData = ref.watch(displayDataProvider);
+
+    // 株主優待乗車証（MEDIATYPE=41）か
+    final isKabuYutai = MediaType.isKabuYutai(displayData?.mediaType);
+
+    // 履歴情報（カードタイトルは株主優待も「入出場情報」）
+    // 2列表示のため、左→右の順に並べる
+    final historyInfo =
+        isKabuYutai
+            ? <CardInfoEnum>[
+              CardInfoEnum.riyoueki, // 利用駅
+              CardInfoEnum.riyoubi, // 利用日
+              CardInfoEnum.nyusyutuzyoBit, // 入出場状態
+              CardInfoEnum.riyouZikan, // 利用時間
+            ]
+            : <CardInfoEnum>[
+              CardInfoEnum.zyosyaeki,
+              CardInfoEnum.zyosyaTukihi,
+              CardInfoEnum.nyusyutuzyoBit,
+              CardInfoEnum.zyosyaZikoku,
+            ];
+
+    // 株主優待乗車証のステータス情報
+    final kabuStatusInfo = <CardInfoEnum>[
+      CardInfoEnum.siyouFukaFlag, // 使用不可フラグ
+      CardInfoEnum.empty,
+      CardInfoEnum.ticketStatus, // ステータス
+      CardInfoEnum.nyuusyutuzyouStatus, // 入出場ステータス
+    ];
+
+
+
+      31 || 32 => [
+        CardInfoEnum.baitaiSyubetu,
+        CardInfoEnum.empty,
+        CardInfoEnum.yukoKaisibi,
+        CardInfoEnum.yukoSyuryoubi,
+        CardInfoEnum.hatueki,
+        CardInfoEnum.keiyu1,
+        CardInfoEnum.tyakueki,
+        CardInfoEnum.huricode,
+      ],
+      // 株主優待乗車証
+      MediaType.kabuYutai => [
+        CardInfoEnum.baitaiSyubetu,
+        CardInfoEnum.empty,
+        CardInfoEnum.yukoKaisibi,
+        CardInfoEnum.yukoKaisiZikan,
+        CardInfoEnum.yukoSyuryoubi,
+        CardInfoEnum.yukoSyuryouZikan,
+      ],
+
+            content: _CardInfoContent(
+              // cardInfo: statusInfo,
+              cardInfo: isKabuYutai ? kabuStatusInfo : statusInfo,
+
+QRINFO,MEDIATYPE,41,株主優待乗車証
+QRINFO,UNUSABLEFLAG,0,使用可能
+QRINFO,UNUSABLEFLAG,1,使用不可
+QRINFO,TICKETSTATUS,0,未使用
+QRINFO,TICKETSTATUS,1,発券済
+QRINFO,TICKETSTATUS,2,使用中
+QRINFO,TICKETSTATUS,3,使用済
+QRINFO,TICKETSTATUS,4,使用停止
+QRINFO,TICKETSTATUS,5,払戻済
+
+
+
+
+
+
+
+
