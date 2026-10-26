@@ -1,0 +1,82 @@
+  static const int _defaultCameraInterval = 500;
+
+  /// 最後に使用したカメラ名の保存先
+  /// ※Cドライブは書き込み不可（再起動で消える）のため、Eドライブに保存する
+  static const String _defaultCameraNamePath =
+      'E:/FK_DATA/Settei/camera_name.txt';
+
+
+
+  int _cameraInterval = _defaultCameraInterval;
+  String _cameraNamePath = _defaultCameraNamePath;
+
+
+
+  int get cameraInterval => _cameraInterval;
+  String get cameraNamePath => _cameraNamePath;
+
+
+      _cameraInterval =
+          json['CAMERA_INTERVAL'] as int? ?? _defaultCameraInterval;
+      _cameraNamePath =
+          json['CAMERA_NAME_PATH'] as String? ?? _defaultCameraNamePath;
+
+
+
+Duration get _cameraInterval =>
+    Duration(milliseconds: TcpConfig().cameraInterval);
+
+/// 保存済みのカメラ名を読み込む（Eドライブのファイル）
+/// ファイルが無い・空・読込失敗の場合は null
+Future<String?> loadSavedCameraName() async {
+  try {
+    final file = File(TcpConfig().cameraNamePath);
+    if (!await file.exists()) return null;
+    final name = (await file.readAsString()).trim();
+    return name.isEmpty ? null : name;
+  } catch (e) {
+    AppLogger().error('CameraScanner', '★保存カメラ読込エラー', e);
+    return null;
+  }
+}
+
+/// 使用したカメラ名を保存する（Eドライブのファイル）
+/// ※保存に失敗してもカメラ動作には影響させない（ログのみ）
+Future<void> saveCameraName(String name) async {
+  try {
+    final file = File(TcpConfig().cameraNamePath);
+    // フォルダが無い場合は作成する
+    await file.parent.create(recursive: true);
+    await file.writeAsString(name, flush: true);
+    AppLogger().info('CameraScanner', '★カメラ名保存: $name');
+  } catch (e) {
+    AppLogger().error('CameraScanner', '★カメラ名保存エラー', e);
+  }
+}
+
+
+    // try {
+    //   final prefs = await SharedPreferences.getInstance();
+    //   final savedName = prefs.getString('camera_name');
+    //   if (savedName != null) {
+    //     camera = _cameras.firstWhereOrNull((c) => c.name == savedName);
+    //   }
+    // } catch (e) {
+    //   AppLogger().error('CameraScanner', '★保存カメラ読込エラー', e);
+    // }
+    final savedName = await loadSavedCameraName();
+    if (savedName != null) {
+      camera = _cameras.firstWhereOrNull((c) => c.name == savedName);
+    }
+
+
+
+                // // SharedPreferencesに保存
+                // await _saveCameraName(newName);
+                // Eドライブのファイルに保存
+                await saveCameraName(newName);
+
+
+
+
+
