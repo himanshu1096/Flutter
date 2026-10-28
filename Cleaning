@@ -1,0 +1,77 @@
+File : line	Comment says	Actually
+related_process/unselected_screen.dart:6	締切再出力画面	未選択画面
+component/time_station.dart:1	// 未使用	TimeView is used (my_home_page.dart:201); only TimeStation is unused
+model/route_label.dart:53	8〜40px	clamp is 8〜80
+config/tcp_config.dart:141	8〜40px	8〜80 (also line 150 recalculates the clamp; it could return clamped;)
+service/csv_service.dart:7-12	C:\tobu\csv\status_codes.csv, 3 columns, MEDIATYPE 1/2	Path comes from CSV_PATH (DispInfo.csv), 4 columns QRINFO,FIELD,CODE,VALUE, MEDIATYPE 11/21…
+service/app_logger.dart:40	C:\tobu\logs\…	LOG_DIR (E:/FK_DATA/Log)
+service/route_label_service.dart:11-14	format 「調整待ち」, example "TEXT"	Decided; keys are SUBTEXT/MAINTEXT
+service/tcp_service.dart:213	5秒間隔でリトライ	500ms
+qr_process/secondary_tab_process_fare_judge_route.dart:26	上限の小さい方を返す	There is no upper limit
+qr_process/secondary_tab_process_fare_judge_route.dart:197	320×120px固定	Size comes from the 2×2 grid
+qr_process/secondary_tab_process_fare_judge_route.dart:88	log 'ROUTEFLAG=1だが経路'	Message is cut off; the tag is also spelled 'SeisansyoriRoute'
+qr_process/secondary_tab_content_unselected.dart:116	KEIRO=0 で0x1301送信	0x1301 is not sent here
+component/process_completed.dart:79	成功 → 0xB101 → QR読取へ	Stays on 完了 and disables 領収書発行
+related_process/connection_staus.dart:151	色帯（緑／赤）	navy / red
+related_process/connection_staus.dart:191	リンク／リンク切れ	cloud_done / cloud_off
+related_process/close_tally.dart:90, 179	デフォルトで折りたたみ	initiallyExpanded: true
+component/software_keyboard.dart:142	22より多い場合活性化	1文字以上で活性化
+camera_scanner.dart:236	保存が無い場合はlensDirectionで選択	In the wrong place; belongs above line 241
+camera_scanner.dart:428	ズーム非対応なら何もしない	Digital zoom; nothing is checked
+utility/confirm_dialog.dart:13-14, 89-90	「はい」「いいえ」	Buttons are 実行/取消
+utility/confirm_dialog.dart:154	数秒後に消える	Only when closeSec is set, and nothing passes it
+app_color.dart:185	押下不可(グレー)	It's gold (0xffb48d43). Also line 175 has a stray // Color(0xff)
+provider/provider.dart:91	// replace:	Leftover from a find/replace; delete it. Line 40 also has empty 「（）」
+model/display_data.dart:43	53フィールド	Out of date since the 株主優待 fields were added
+model/display_data.dart:404	nullを除く	Also removes 0
+related_process/customer_service_history.dart:70, 78	TableTitleCell と同じ色 / 「精算金額」セル	Those widgets and that cell are no longer used
+related_process/customer_service_history.dart:42-46	4文字は130pxでは2行 → 160px	券種 is still 130
+qr_process/secondary_tab_menu.dart:192, 205	選択中タブ色反映の為	The tabs are never shown (see section 3)
+qr_process/qr_process_menu.dart:35, 94	—	Comments with no code under them
+qr_process/qr_process_menu.dart:74-75	—	Doc comment for gotoQrState is on the class
+component/secondary_tab_content_core.dart:86-88	—	Orphan comment (belongs to the formatter)
+main.dart:40	フルスクリーン化	setFullScreen(false)
+main.dart:51	UIをブロックしない	It waits for 0x0A81 before showing anything
+rout_config.dart:25	QRカメラ再起動の為	The observer is never subscribed
+rout_config.dart:29	ジャーナル印刷の為	Refers to the old SII sample
+my_home_page.dart:375-377	ログオフボタン	Empty spacer, no button
+related_process/related_process_menu.dart:22-24	enum index comments	//empty, // 5 is stale; connection has no number
+service/packet_codec.dart:25	Flutter → Server section	Also contains responses (0x1381, 0x0F81, C381…)
+utility/common_buttons.dart:25-26	// ✅ NEW	Leftover
+app_theme.dart:55	TemeData	Typo
+related_process/related_process_common.dart:208-214	—	The comment for closeTallyBtnPadding stayed with the commented-out cop
+
+
+
+Unused classes and functions:
+
+	•	app_icon.dart:6-17: AppIcon.
+	•	component/secondary_tab_content_core.dart: backGroundColor (20) and getTuple (81).
+	•	related_process/related_process_common.dart: ContentArea, TitleInContent, TableInContent, TableTitleCell, TableContentCell, contentBackgroundColor, TextInCloseTallyBtn with its 2 constants.
+	•	utility/confirm_dialog.dart:191-318: showPrintingAlertDialog, _PrintingProgressIndicator and PrintingStatus. Also PrintingProgress (provider.dart:118-127), closeSec, and customText/customFontColor.
+	•	provider/display_data_provider.dart:17-43: LastQrData. TcpService already keeps _last*.
+	•	service/tcp_service.dart: stop(), dispose(), connectionStateStream, packetStream. Line 250 throws away the isolate's log strings, but lines 279-282 still build a hex dump for every packet. Either log them or remove both.
+	•	utility/date_time_converter.dart: toDateTimeString, toTimeOfDay, isSameDate, and all of TimeOfDayConverter and StringToDateTime.
+	•	camera_scanner.dart:
+	•	didPush/didPopNext never fire (no subscription).
+	•	Unused controller methods: switchCamera, startDetection, stopDetection, isDetecting, dispose.
+	•	Line 299 hardcodes 500 instead of _maxDecodeEdgePixel.
+	•	Line 351 is redundant (finally does the same).
+	•	component/pop_out_button.dart: onLongPress, onLongPressStart and onLongPressEnd are never passed.
+	•	qr_process/secondary_tab_menu.dart: QrProcessMenu passes tabs: [], and SecondayTabMenuCommon never draws tabs or onTap. So _canSelect, _QrProcessTab, SecondaryTabContainer and the debug Tabs do nothing. allEnabled is always true (qr_process_menu.dart:319).
+	•	service/business_kind.dart:21-31: the 関連業務 constants are unused because related_process/related_process_menu.dart:71-77 hardcodes 50–53. Use the constants there.
+	•	Unused parameters:
+	•	onComplete in SeisanSyoriRoute.
+	•	errCode in _showAuthErrorDialog (login/login_page.dart:164).
+	•	leadingWidth (component/scanner.dart:34).
+	•	btnFontSize (utility/common_buttons.dart): the text actually uses btnIconSize (lines 60 and 88). If you switch it to btnFontSize, every ActiveLargeButton's text grows from 24 to 30.
+	•	No-op code:
+	•	Empty initState overrides (component/process_completed.dart:25, 46).
+	•	Padding(top: 0) (qr_process/secondary_tab_content_unselected.dart:84, qr_process/secondary_tab_process_fare_judge.dart:24).
+	•	SizedBox(height: 40) inside a Row (qr_process/secondary_tab_process_fare_judge.dart:64).
+	•	Wrapper-only _FooterControllers classes (related_process/close_tally_re_export.dart, related_process/customer_service_history.dart).
+	•	Duplicate hooks_riverpod import (qr_process/secondary_tab_content_unselected.dart:4).
+
+_PageNumberButtons is unused but is marked as deliberately kept, so I left it.
+
+4. Need confirmation (n
