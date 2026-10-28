@@ -1,0 +1,28 @@
+  } on FareJudgeException catch (e) {
+    // 0x1381 RESULT=false（業務エラー）→ エラー定義に基づくダイアログ
+    if (context.mounted) Navigator.of(context).pop();
+    AppLogger().warn('SeisanSyoriRoute', '再精算判定失敗: $e');
+    if (context.mounted) {
+      final result = await handleServerError(
+        context: context,
+        errKind: e.errKind,
+        errCode: e.errCode,
+      );
+      // 定義が無い場合は汎用メッセージ
+      if (!result.handled && context.mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder:
+              (context) => CustomConfirmDialog(
+                text: '精算金額の取得に失敗しました',
+                trueBtnText: '確認',
+                hasFalseBtn: false,
+              ),
+        );
+      }
+    }
+  } catch (e) {
+    // 通信エラー・タイムアウト
+    if (context.mounted) Navigator.of(context).pop();
+    AppLogger().error('SeisanSyoriRoute', '再精算判定エラー', e);
