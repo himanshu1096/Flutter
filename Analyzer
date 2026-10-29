@@ -1,0 +1,29 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  # 自動生成ファイルは解析しない
+  exclude:
+    - "**/*.g.dart"
+    - "lib/gen/**"
+  errors:
+    # 未使用のものは警告として目立たせる
+    unused_import: warning
+    unused_element: warning
+    unused_field: warning
+    unused_local_variable: warning
+    dead_code: warning
+
+linter:
+  rules:
+    # 今回のレビューで見つかった種類の問題を検出するルール
+    - avoid_unnecessary_containers   # 何もしないContainer
+    - unnecessary_overrides          # 空のinitState等
+    - avoid_redundant_argument_values # Padding(top: 0) など既定値の指定
+    - unnecessary_null_checks
+    - unnecessary_non_null_assertion # rawQrNo! のような不要な !
+    - prefer_const_constructors
+    - prefer_final_locals
+    - unawaited_futures              # awaitし忘れ（今回の0x0A01接続リトライ等）
+    - cancel_subscriptions
+    - close_sinks
+    - use_build_context_synchronously # await後のcontext使用
