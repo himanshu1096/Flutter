@@ -1,0 +1,625 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:camera/camera.dart';
+import 'package:camera_platform_interface/camera_platform_interface.dart';
+import 'package:collection/collection.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:image/image.dart' as img;
+import 'package:qr_multidemo/config/tcp_config.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'package:zxing2/qrcode.dart';
+
+/// カメラの画像取得間隔の初期設定
+/// (1秒にするとPCスペックによってはアプリ自体が立ち上がらないので注意)
+Duration get _cameraInterval =>
+    Duration(milliseconds: TcpConfig().cameraInterval);
+
+//==============================
+// 【性能計測用】カメラ起動・終了・検知の処理時間をログ出力する
+// ※計測が終わったら kCameraPerfLog を false にする（または計測コードを削除）
+//==============================
+const bool kCameraPerfLog = true;
+
+/// QR読取ボタン押下・もどる押下からの経過時間計測用
+final Stopwatch cameraPerfWatch = Stopwatch();
+
+/// 計測ログ出力（ボタン押下からの経過ms付き）
+void cameraPerfLog(String message) {
+  if (!kCameraPerfLog) return;
+  AppLogger().info(
+    'CameraPerf',
+    '[${cameraPerfWatch.elapsedMilliseconds}ms] $message',
+  );
+}
+
+/// 計測開始（経過時間を0に戻してからログ出力）
+void cameraPerfStart(String message) {
+  if (!kCameraPerfLog) return;
+  cameraPerfWatch
+    ..reset()
+    ..start();
+  cameraPerfLog(message);
+}
+
+/// 保存済みのカメラ名を読み込む（Eドライブのファイル）
+/// ファイルが無い・空・読込失敗の場合は null
+Future<String?> loadSavedCameraName() async {
+  try {
+    final file = File(TcpConfig().cameraNamePath);
+    if (!await file.exists()) return null;
+    final name = (await file.readAsString()).trim();
+    return name.isEmpty ? null : name;
+  } catch (e) {
+    AppLogger().error('CameraScanner', '★保存カメラ読込エラー', e);
+    return null;
+  }
+}
+
+/// 使用したカメラ名を保存する（Eドライブのファイル）
+/// ※保存に失敗してもカメラ動作には影響させない（ログのみ）
+Future<void> saveCameraName(String name) async {
+  try {
+    final file = File(TcpConfig().cameraNamePath);
+    // フォルダが無い場合は作成する
+    await file.parent.create(recursive: true);
+    await file.writeAsString(name, flush: true);
+    AppLogger().info('CameraScanner', '★カメラ名保存: $name');
+  } catch (e) {
+    AppLogger().error('CameraScanner', '★カメラ名保存エラー', e);
+  }
+}
+
+/// カメラの詳細情報
+// ハードウェアが変わらない限り変わらない (アプリ立ち上げ中は変わらない) ので、
+// WidgetのStateでなくクラス外に変数として持つ
+final List<CameraDescription> _cameras = <CameraDescription>[];
+
+/// カメラの詳細情報を取得、設定する
+Future<void> setCameraDescriptions() async {
+  if (_cameras.isEmpty) {
+    _cameras.addAll(await CameraPlatform.instance.availableCameras());
+  }
+}
+
+/// カメラ画面のコントローラ
+class CameraScannerController {
+  /// カメラ画面のState
+  late final _CameraScannerState _state;
+
+  /// 初期化済みか
+  final ValueNotifier<bool> isInitialized = ValueNotifier<bool>(false);
+
+  /// Stateから呼び出してStateを登録する
+  void _attach(_CameraScannerState state) {
+    if (!isInitialized.value) {
+      _state = state;
+      isInitialized.value = true;
+    }
+  }
+
+  /// カメラの変更が可能か
+  Future<bool> get canSwitchCamera async {
+    // カメラの詳細情報を取得
+    await setCameraDescriptions();
+    // 情報取得後に判定する
+    return _cameras.length > 1;
+  }
+
+  /// 検知中か (初期化済みか確認してから使用してください)
+  ValueNotifier<bool> get isDetecting => _state._isDetecting;
+
+  /// カメラを変更する
+  Future<CameraLensDirection> switchCamera({
+    CameraLensDirection? direction,
+  }) async {
+    // レンズ方向からカメラ詳細情報を取得する
+    final cameraDescription = _cameras.firstWhereOrNull(
+      (x) => x.lensDirection == direction,
+    );
+
+    // カメラを変更する
+    return await _state.switchCamera(cameraDescription);
+  }
+
+  /// カメラを切り替え、切替後のカメラ名を返す
+  Future<String> switchCameraByName() async {
+    return await _state.switchCameraByName();
+  }
+
+  void dispose() {
+    _state._controller?.dispose();
+  }
+}
+
+/// QRコード検知時の処理
+/// rawBytes: バイナリQRデータ (Uint8List)
+typedef DetectCallback = void Function(Uint8List rawBytes);
+
+class CameraScanner extends StatefulWidget {
+  /// カメラ画面
+  const CameraScanner({
+    super.key,
+    this.controller,
+    this.onDetected,
+    this.lensDirection = CameraLensDirection.back,
+    this.interval,
+    this.displayResult = false,
+  });
+
+  static const int _maxDecodeEdgePixel = 500;
+
+  /// カメラを操作するためのコントローラ
+  final CameraScannerController? controller;
+
+  /// 使用するレンズの向き（前面、背面、外付け）<br />
+  /// (見つからなければ、最初に見つけたレンズでカメラを起動する)
+  final CameraLensDirection lensDirection;
+
+  /// コード検知時の処理
+  final DetectCallback? onDetected;
+
+  /// 画像検知の間隔
+  final Duration? interval;
+
+  /// 結果を表示するか
+  final bool displayResult;
+
+  @override
+  State<CameraScanner> createState() => _CameraScannerState();
+}
+
+class _CameraScannerState extends State<CameraScanner> with RouteAware {
+  /// カメラのコントローラ
+  CameraController? _controller;
+
+  /// 検出中か
+  final ValueNotifier<bool> _isDetecting = ValueNotifier(false);
+
+  /// デコーディング中か
+  bool _isDecoding = false;
+
+  /// QRコードに関するテキスト
+  final ValueNotifier<String> _qrText = ValueNotifier("");
+
+  /// ズームレベル (1.0 = 等倍, 最大 3.0)
+  double _zoomLevel = 1.0;
+  double _baseZoomLevel = 1.0;
+  @override
+  void initState() {
+    super.initState();
+    cameraPerfLog('[OPEN] CameraScanner initState');
+    // 【性能計測】描画が重いフレーム（16ms超）をログ出力する
+    if (kCameraPerfLog) {
+      SchedulerBinding.instance.addTimingsCallback(_onFrameTimings);
+    }
+    _initializeCamera();
+    widget.controller?._attach(this);
+  }
+
+  @override
+  void didUpdateWidget(covariant CameraScanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // レンズ方向が変わったらカメラを再初期化
+    if (oldWidget.lensDirection != widget.lensDirection) {
+      _controller?.dispose();
+      _controller = null;
+      _initializeCamera();
+    }
+  }
+
+  /// カメラを初期化する
+  Future<void> _initializeCamera() async {
+    await setCameraDescriptions();
+    cameraPerfLog('[OPEN] カメラ一覧取得 完了（${_cameras.length}台）');
+
+    // 既存コントローラの方向と要求方向が違う場合は破棄して再初期化
+    if (_controller != null) {
+      if (_controller!.description.lensDirection == widget.lensDirection) {
+        // 同じ方向 → スキップ
+        return;
+      } else {
+        // 違う方向 → 破棄して再初期化
+        _isDetecting.value = false;
+        await _controller!.dispose();
+        _controller = null;
+      }
+    }
+
+    // 起動するカメラを選択する
+    // Windowsでは複数カメラが全てfrontと報告されるため、
+    // lensDirectionでは識別できない。保存済みカメラ名を優先する。
+    CameraDescription? camera;
+    // 保存が無い/見つからない場合は従来通りlensDirectionで選択
+    final savedName = await loadSavedCameraName();
+    cameraPerfLog('[OPEN] 保存カメラ名 読込 完了（$savedName）');
+    if (savedName != null) {
+      camera = _cameras.firstWhereOrNull((c) => c.name == savedName);
+    }
+    camera ??= _cameras.firstWhere(
+      (x) => x.lensDirection == widget.lensDirection,
+      orElse: () => _cameras.first,
+    );
+    cameraPerfLog('[OPEN] 使用カメラ: ${camera.name}');
+    // コントローラ作成
+    _controller = CameraController(
+      camera,
+      ResolutionPreset.high,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+      enableAudio: false,
+    );
+
+    // 初期化
+    cameraPerfLog('[OPEN] initialize() 開始');
+    await _controller!.initialize();
+    cameraPerfLog(
+      '[OPEN] initialize() 完了 '
+      'previewSize=${_controller?.value.previewSize} mounted=$mounted',
+    );
+    setState(() {
+      // 検知ループ開始
+      _startDetectionLoop();
+    });
+    // 【性能計測】カメラ映像を含む最初の描画が完了した時点
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      cameraPerfLog('[OPEN] プレビュー初回描画 完了');
+    });
+  }
+
+  /// 検知ループ開始
+  void _startDetectionLoop() {
+    _isDetecting.value = true;
+    // 定期的に画像を取得してQR解析
+    Timer.periodic(widget.interval ?? _cameraInterval, (timer) async {
+      // 画面がなくなった、または、検出中でない
+      if (!mounted || !_isDetecting.value) {
+        // タイマーを停止
+        timer.cancel();
+        return;
+      }
+
+      // カメラ初期化済みか
+      if (_controller case final controller?) {
+        // QRコードの検知済み（デコード中）なら処理を抜ける
+        if (_isDecoding) {
+          return;
+        }
+
+        // デコード開始
+        _isDecoding = true;
+        // 【性能計測】1回分の各処理時間（ms）
+        final frameWatch = Stopwatch()..start();
+        var lastMs = 0;
+        final laps = <String>[];
+        void lap(String name) {
+          final now = frameWatch.elapsedMilliseconds;
+          laps.add('$name=${now - lastMs}');
+          lastMs = now;
+        }
+        // カメラ画像のファイル
+        // (画面移動後に処理が走る場合など、
+        // 画像ファイル取得失敗に対応できるようにnullableにする)
+        XFile? imgFileOrNull;
+        try {
+          // カメラ画像をファイル化
+          imgFileOrNull = await controller.takePicture();
+          lap('takePicture');
+
+          // 画像ファイルが取得出来たら
+          if (imgFileOrNull case final imgFile) {
+            // ファイルをバイトデータとして読込
+            final bytes = await imgFile.readAsBytes();
+            lap('read(${bytes.length ~/ 1024}KB)');
+
+            // JPEGを縮小デコード (QRは低解像度でも読める。デコード負荷を大幅削減)
+            img.Image? decoded = img.decodeJpg(bytes);
+            lap('decodeJpg(${decoded?.width}x${decoded?.height})');
+            if (decoded != null) {
+              // 長辺が500pxを超える場合は縮小
+              if (decoded.width > 500 || decoded.height > 500) {
+                decoded = img.copyResize(
+                  decoded,
+                  width:
+                      decoded.width >= decoded.height
+                          ? CameraScanner._maxDecodeEdgePixel
+                          : null,
+                  height:
+                      decoded.height >= decoded.width
+                          ? CameraScanner._maxDecodeEdgePixel
+                          : null,
+                );
+              }
+            }
+            lap('resize');
+            if (decoded case final resizedImage?) {
+              // デジタルズーム: 中央を切り出す (_zoomLevel倍)
+              final image = _cropCenter(resizedImage, _zoomLevel);
+              final luminanceSource = RGBLuminanceSource(
+                image.width,
+                image.height,
+                convertToInt32List(image),
+              );
+              final bitmap = BinaryBitmap(HybridBinarizer(luminanceSource));
+              lap('convert');
+              final reader = QRCodeReader();
+
+              try {
+                final result = reader.decode(bitmap);
+                lap('qrDecode(検出)');
+                // バイナリデータを resultMetadata の byteSegments から取得
+                // result.text は符号化問題があるため使用しない
+                final byteSegments =
+                    result.resultMetadata[ResultMetadataType.byteSegments];
+                if (byteSegments != null &&
+                    byteSegments is List &&
+                    byteSegments.isNotEmpty) {
+                  // 符号付き整数を符号なしバイトに変換
+                  // 例: -121 & 0xFF = 135 = 0x87
+                  final signedBytes = byteSegments[0] as List<int>;
+                  final rawBytes = Uint8List.fromList(
+                    signedBytes.map((b) => b & 0xFF).toList(),
+                  );
+                  _qrText.value = 'Bytes: ${rawBytes.length}';
+                  _isDetecting.value = false;
+                  // 検知時の処理を呼ぶ（バイナリデータを渡す）
+                  widget.onDetected?.call(rawBytes);
+                } else {
+                  _qrText.value = 'QRコードなし';
+                }
+              } catch (e) {
+                lap('qrDecode(なし)');
+                _qrText.value = 'QRコードなし';
+              }
+            } else {
+              _qrText.value = "デコード失敗";
+              _isDecoding = false;
+            }
+          }
+        } on CameraException catch (e) {
+          _qrText.value = 'カメラエラー: $e';
+        } catch (e) {
+          _qrText.value = 'エラー: $e';
+        } finally {
+          // カメラ画像があれば削除する
+          if (imgFileOrNull case final imgFile?) {
+            // XFileをio.Fileに変換
+            final file = File(imgFile.path);
+            // 画像ファイルがあれば、
+            if (await file.exists()) {
+              // ファイルを削除
+              await file.delete();
+            }
+          }
+
+          // 検知停止中なら値を削除する
+          if (!_isDetecting.value) {
+            _qrText.value = "";
+          }
+
+          lap('delete');
+          cameraPerfLog(
+            '[SCAN] ${laps.join(' ')} 合計=${frameWatch.elapsedMilliseconds}ms',
+          );
+          _isDecoding = false;
+        }
+      }
+    });
+  }
+
+  /// デジタルズーム: 画像中央を 1/zoom のサイズで切り出す
+  img.Image _cropCenter(img.Image src, double zoom) {
+    if (zoom <= 1.0) return src;
+    final w = (src.width / zoom).round();
+    final h = (src.height / zoom).round();
+    final x = ((src.width - w) / 2).round();
+    final y = ((src.height - h) / 2).round();
+    return img.copyCrop(src, x: x, y: y, width: w, height: h);
+  }
+
+  /// 画像をInt32Listに変換 (輝度グレースケール — QR判定にはこれで十分)
+  Int32List convertToInt32List(img.Image image) {
+    final w = image.width;
+    final h = image.height;
+    final pixels = Int32List(w * h);
+    int idx = 0;
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        final p = image.getPixel(x, y);
+        // 輝度 = 0.299R + 0.587G + 0.114B の近似 (整数演算)
+        final lum =
+            (p.r.toInt() * 77 + p.g.toInt() * 150 + p.b.toInt() * 29) >> 8;
+        pixels[idx++] = (0xFF << 24) | (lum << 16) | (lum << 8) | lum;
+      }
+    }
+    return pixels;
+  }
+
+  @override
+  void dispose() {
+    cameraPerfLog('[CLOSE] dispose 開始（デコード中=$_isDecoding）');
+    if (kCameraPerfLog) {
+      SchedulerBinding.instance.removeTimingsCallback(_onFrameTimings);
+    }
+    // コントローラの後始末
+    // _controller?.dispose();
+    // 【性能計測】カメラ解放の完了時間をログ出力（処理内容は従来と同じ）
+    _controller?.dispose().then((_) {
+      cameraPerfLog('[CLOSE] カメラ解放 完了');
+    });
+    _controller = null;
+    super.dispose();
+  }
+
+  /// 【性能計測】描画に16msを超えたフレームをログ出力（画面のカクつき確認用）
+  void _onFrameTimings(List<FrameTiming> timings) {
+    for (final t in timings) {
+      final build = t.buildDuration.inMilliseconds;
+      final raster = t.rasterDuration.inMilliseconds;
+      if (build > 16 || raster > 16) {
+        cameraPerfLog('[FRAME] 重いフレーム build=${build}ms raster=${raster}ms');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // コントローラがあれば
+    if (_controller case final controller?) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // ピンチジェスチャーでズーム
+        onScaleStart: (details) {
+          _baseZoomLevel = _zoomLevel;
+        },
+        onScaleUpdate: (details) {
+          // カメラがズーム非対応なら何もしない
+          final newZoom = (_baseZoomLevel * details.scale).clamp(1.0, 3.0);
+          if ((newZoom - _zoomLevel).abs() < 0.01) return;
+          setState(() {
+            _zoomLevel = newZoom;
+          });
+        },
+        child: Stack(
+          children: [
+            // カメラのプレビュー表示
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // 縦横比を維持する
+                final width = constraints.maxWidth;
+                final height = width / controller.value.aspectRatio;
+                return Center(
+                  child: Container(
+                    width: width,
+                    height: height,
+                    alignment: Alignment.center,
+                    child: Transform.flip(
+                      flipX: true,
+                      child: Transform.scale(
+                        scale: _zoomLevel,
+                        child: CameraPreview(controller),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            // QRコード、カメラ状態などを表示
+            if (widget.displayResult)
+              ValueListenableBuilder(
+                valueListenable: _qrText,
+                builder: (context, value, child) {
+                  return value.isNotEmpty
+                      ? Positioned(
+                        bottom: 20,
+                        left: 20,
+                        right: 20,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            color: Colors.black54,
+                          ),
+                          child: Text(
+                            _qrText.value,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      )
+                      : const SizedBox.shrink();
+                },
+              ),
+            // カメラ停止中に暗幕をかける
+            ValueListenableBuilder(
+              valueListenable: _isDetecting,
+              builder: (context, isDetecting, child) {
+                return isDetecting
+                    ? SizedBox.shrink()
+                    : Positioned.fill(child: Container(color: Colors.black87));
+              },
+            ),
+          ],
+        ),
+      );
+    } else {
+      // 準備中表示
+      return const Center(child: CircularProgressIndicator());
+    }
+  }
+
+  /// カメラを変更する
+  Future<CameraLensDirection> switchCamera([
+    CameraDescription? cameraDescription,
+  ]) async {
+    if (_controller case final controller?) {
+      if (_cameras.length > 1) {
+        final nextCamera = cameraDescription ?? _getNextCamera();
+
+        if (nextCamera != controller.description) {
+          await controller.setDescription(nextCamera);
+        } else {
+          AppLogger().warn('CameraScanner', '★切替先が現在と同一 — 切替なし');
+        }
+        return nextCamera.lensDirection;
+      } else {
+        AppLogger().error('CameraScanner', '★カメラが1台のみ — 切替不可', null);
+        throw Exception("カメラが1つしかないから切り替え不可。:switchCamera()");
+      }
+    } else {
+      throw Exception("カメラのコントローラがnullです。:switchCamera()");
+    }
+  }
+
+  /// 次のカメラに切り替え、切替後のカメラ名を返す
+  Future<String> switchCameraByName() async {
+    if (_controller case final controller?) {
+      if (_cameras.length > 1) {
+        final nextCamera = _getNextCamera();
+        if (nextCamera != controller.description) {
+          await controller.setDescription(nextCamera);
+        }
+        return nextCamera.name;
+      }
+      return controller.description.name;
+    }
+    throw Exception("カメラのコントローラがnullです。:switchCameraByName()");
+  }
+
+  // 次のカメラを返す
+  CameraDescription _getNextCamera() {
+    if (_controller case final controller?) {
+      final nextIndex = _cameras.indexOf(controller.description) + 1;
+      return _cameras[nextIndex < _cameras.length ? nextIndex : 0];
+    } else {
+      throw Exception("カメラのコントローラがnullです。:_getNextCamera()");
+    }
+  }
+}
+
+
+
+
+
+                onPressed: () {
+                  cameraPerfStart('[CLOSE] もどる押下');
+                  Navigator.of(context).pop();
+                },
+
+          _detected = true;
+          cameraPerfStart('[CLOSE] QR検出 → 画面を閉じる');
+          Navigator.of(context).pop(rawBytes);
+
+import 'package:qr_multidemo/utility/common_buttons.dart';
+import 'package:qr_multidemo/camera_scanner.dart';
+
+
+              if (!context.mounted) return;
+              cameraPerfStart('[OPEN] QR読取ボタン押下');
+              final qrData = await context.pushNamed<Uint8List>(
+                Pages.qrScan.name,
+              );
+              cameraPerfLog('[CLOSE] QR読取画面に戻った');
+
+
+
