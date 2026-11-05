@@ -1,0 +1,28 @@
+総取扱計           1      55   ← data row  → section = 総取扱計, save 合計 = (1, 55)
+  現金             1      55   ← data row  → save 総取扱計 / 現金 = (1, 55)
+  ＩＣＳＦ引換      0       0   ← data row  → not on screen → skip
+
+＊＊＊ 磁気乗車券取扱 ＊＊＊     ← section header → section = 磁気乗車券取扱
+        枚数    金額            ← column header  → skip
+合計               1      55   ← data row  → save 磁気乗車券取扱 / 合計 = (1, 55)
+現金収入           1      55   ← data row  → save 磁気乗車券取扱 / 現金収入 = (1, 55)
+
+＝＝＝ 件数 ＝＝＝              ← section header → section = 件数
+        件数    金額            ← column header  → skip
+精算合計           1      55   ← data row  → save 件数 / 精算合計 = (1, 55)
+  現金             1      55   ← data row  → save 件数 / 現金 = (1, 55)
+  手入力精算        1      55   ← data row  → not on screen → skip
+
+＝＝＝ 各社別精算内訳 ＝＝＝     ← section header → section = 各社別精算内訳 (全体)
+合計               1      55   ← data row  → save 全体 / 合計
+現金               1      55   ← data row  → save 全体 / 現金
+東武（631）                     ← company row (no numbers) → company = 東武（631）
+  （増）           1      55   ← data row  → save 全体 / 東武（631） / 増
+  （減）           0       0   ← data row  → save 全体 / 東武（631） / 減
+  相殺             1      55   ← data row  → save 全体 / 東武（631） / 相殺
+
+－－－ 東武分 －－－            ← section header → section = 東武分 (company cleared)
+  ...same pattern as above...
+
+＊＊＊ 企画券発売 ＊＊＊        ← section header → not on screen → skip whole block
+券番号        0052-0059        ← skipped (section isn't on screen)
