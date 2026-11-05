@@ -1,0 +1,4 @@
+取扱（デフォルトで展開）
+        _AccordionCard(
+          // title: '磁気乗車券取扱',
+          title: 'QR乗車券取扱',
