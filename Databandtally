@@ -1,0 +1,321 @@
+//==============================
+// 締切表示データ（本体制御が出力する締切テキストファイルの内容）
+//
+// テキストファイル（SP8の締切と同じ書式）を1行ずつ読み、
+// 画面に表示する項目だけを取り出す。
+//
+// 行の種類:
+//   区切り見出し : ＝＝＝ 件数 ＝＝＝ のように「＝」「＊」「－」で挟まれた行
+//                  → 間の文字を「現在の区切り」にする
+//   列見出し     : 枚数 / 件数 / 金額 だけの行 → 読み飛ばす
+//   データ行     : 行の名前 ＋ 数字2つ（枚数・金額） → 現在の区切りに保存する
+//   会社行       : 数字が無く、括弧付きのコードで終わる行（例：東武（631））
+//                  → 「現在の会社」にする。続く（増）（減）相殺はこの会社の行
+//   その他       : 読み飛ばす
+//
+// ※総取扱計・総発売計は区切り見出しが無く、その行自体が合計の行になる
+//==============================
+
+/// 枚数（件数）と金額
+class TallyValue {
+  const TallyValue(this.count, this.amount);
+
+  /// 枚数（件数）
+  final int count;
+
+  /// 金額
+  final int amount;
+
+  @override
+  String toString() => '($count, $amount)';
+}
+
+/// 各社別精算内訳の会社1社分
+class CompanyTally {
+  const CompanyTally({required this.name, this.up, this.down, this.net});
+
+  /// 会社名（ファイルの表記のまま。例：東武（631））
+  final String name;
+
+  /// （増）
+  final TallyValue? up;
+
+  /// （減）
+  final TallyValue? down;
+
+  /// 相殺
+  final TallyValue? net;
+
+  CompanyTally copyWith({TallyValue? up, TallyValue? down, TallyValue? net}) =>
+      CompanyTally(
+        name: name,
+        up: up ?? this.up,
+        down: down ?? this.down,
+        net: net ?? this.net,
+      );
+
+  @override
+  String toString() => '$name 増=$up 減=$down 相殺=$net';
+}
+
+/// 各社別精算内訳の1グループ分（全体／東武分／メトロ分）
+class CompanyGroupTally {
+  const CompanyGroupTally({
+    required this.total,
+    required this.cash,
+    required this.companies,
+  });
+
+  /// 合計
+  final TallyValue? total;
+
+  /// 現金
+  final TallyValue? cash;
+
+  /// 会社ごとの内訳（ファイルに出てきた順）
+  final List<CompanyTally> companies;
+}
+
+/// 締切表示データ
+class CloseTallyData {
+  CloseTallyData._(this._rows, this._companies);
+
+  //------------------------------
+  // 区切りの名前（ファイルの見出しを正規化した名前）
+  //------------------------------
+  /// 総取扱計（見出し無し。「総取扱計」の行から始まる）
+  static const String sectionTotalHandled = '総取扱計';
+
+  /// 総発売計（見出し無し。表示しない）
+  static const String sectionTotalSold = '総発売計';
+
+  /// ＱＲ乗車券取扱（旧：磁気乗車券取扱）
+  static const String sectionQrTicket = 'QR乗車券取扱';
+
+  /// 件数
+  static const String sectionCount = '件数';
+
+  /// 各社別精算内訳（全体）
+  static const String sectionCompanyAll = '各社別精算内訳';
+
+  /// 各社別精算内訳（東武分）
+  static const String sectionCompanyTobu = '東武分';
+
+  /// 各社別精算内訳（メトロ分）
+  static const String sectionCompanyMetro = 'メトロ分';
+
+  /// 見出しの別名 → 区切りの名前
+  /// ※ファイルの見出しが「磁気乗車券取扱」「QR乗車券取扱」のどちらでも読めるようにする
+  static const Map<String, String> _sectionAliases = {
+    '磁気乗車券取扱': sectionQrTicket,
+    'QR乗車券取扱': sectionQrTicket,
+  };
+
+  /// 見出しが無く、行自体が区切りの始まり（＝その区切りの合計）になる行
+  static const Set<String> _headerlessSections = {
+    sectionTotalHandled,
+    sectionTotalSold,
+  };
+
+  /// 各社別精算内訳の区切り（会社行を持つ区切り）
+  static const Set<String> _companySections = {
+    sectionCompanyAll,
+    sectionCompanyTobu,
+    sectionCompanyMetro,
+  };
+
+  /// 列見出しの単語（これだけの行は読み飛ばす）
+  static const Set<String> _columnHeaderWords = {'枚数', '件数', '金額'};
+
+  /// 行の名前（合計）
+  static const String labelTotal = '合計';
+
+  /// 区切り → 行の名前 → 値
+  final Map<String, Map<String, TallyValue>> _rows;
+
+  /// 区切り → 会社ごとの内訳（出てきた順）
+  final Map<String, List<CompanyTally>> _companies;
+
+  /// 値を取得（ファイルに行が無い場合はnull）
+  TallyValue? value(String section, String label) =>
+      _rows[section]?[_normalize(label)];
+
+  //------------------------------
+  // 画面に表示する項目
+  //------------------------------
+  /// 総取扱計：合計
+  TallyValue? get totalHandled => value(sectionTotalHandled, labelTotal);
+
+  /// 総取扱計：現金
+  TallyValue? get totalHandledCash => value(sectionTotalHandled, '現金');
+
+  /// ＱＲ乗車券取扱：合計
+  TallyValue? get qrTotal => value(sectionQrTicket, labelTotal);
+
+  /// ＱＲ乗車券取扱：現金収入
+  TallyValue? get qrCashIn => value(sectionQrTicket, '現金収入');
+
+  /// ＱＲ乗車券取扱：現金支出
+  TallyValue? get qrCashOut => value(sectionQrTicket, '現金支出');
+
+  /// 件数：入場
+  TallyValue? get countEnter => value(sectionCount, '入場');
+
+  /// 件数：出場
+  TallyValue? get countExit => value(sectionCount, '出場');
+
+  /// 件数：廃札
+  TallyValue? get countHaisatsu => value(sectionCount, '廃札');
+
+  /// 件数：発駅キャンセル
+  TallyValue? get countEnterCancel => value(sectionCount, '発駅キャンセル');
+
+  /// 件数：精算合計
+  TallyValue? get countAdjustTotal => value(sectionCount, '精算合計');
+
+  /// 件数：現金
+  TallyValue? get countAdjustCash => value(sectionCount, '現金');
+
+  /// 各社別精算内訳（全体）
+  CompanyGroupTally get companyAll => _companyGroup(sectionCompanyAll);
+
+  /// 各社別精算内訳（東武分）
+  CompanyGroupTally get companyTobu => _companyGroup(sectionCompanyTobu);
+
+  /// 各社別精算内訳（メトロ分）
+  CompanyGroupTally get companyMetro => _companyGroup(sectionCompanyMetro);
+
+  CompanyGroupTally _companyGroup(String section) => CompanyGroupTally(
+    total: value(section, labelTotal),
+    cash: value(section, '現金'),
+    companies: List.unmodifiable(_companies[section] ?? const []),
+  );
+
+  //------------------------------
+  // テキストの解析
+  //------------------------------
+  /// 区切り見出し（＝＝＝ 件数 ＝＝＝ など）
+  static final RegExp _sectionHeader = RegExp(
+    r'^[＝=＊*－\-ー―−]{2,}\s*(.+?)\s*[＝=＊*－\-ー―−]{2,}$',
+  );
+
+  /// 会社行（東武（631） など。正規化後は 東武(631)）
+  static final RegExp _companyLine = RegExp(r'^.+\(\d+\)$');
+
+  /// 数値（カンマ・マイナス記号付きも可）
+  static final RegExp _number = RegExp(r'^-?[\d,]+$');
+
+  /// 締切テキストファイルの内容を解析する
+  /// [unknownLines] 読み飛ばした行（ログ出力用。不要ならnull）
+  static CloseTallyData parse(String text, {List<String>? unknownLines}) {
+    final rows = <String, Map<String, TallyValue>>{};
+    final companies = <String, List<CompanyTally>>{};
+
+    // 現在の区切り・現在の会社
+    String? section;
+    int? companyIndex;
+
+    for (final rawLine in text.split(RegExp(r'\r?\n'))) {
+      final line = _toHalfWidth(rawLine).trim();
+      if (line.isEmpty) continue;
+
+      // 区切り見出し
+      final header = _sectionHeader.firstMatch(line);
+      if (header != null) {
+        final name = _normalize(header.group(1)!);
+        section = _sectionAliases[name] ?? name;
+        companyIndex = null;
+        continue;
+      }
+
+      final tokens = line.split(RegExp(r'\s+'));
+
+      // 列見出し
+      if (tokens.every(_columnHeaderWords.contains)) continue;
+
+      // データ行（行の名前 ＋ 数字2つ）
+      if (tokens.length >= 3 &&
+          _number.hasMatch(tokens[tokens.length - 1]) &&
+          _number.hasMatch(tokens[tokens.length - 2])) {
+        final label = _normalize(tokens.sublist(0, tokens.length - 2).join());
+        final value = TallyValue(
+          _toInt(tokens[tokens.length - 2]),
+          _toInt(tokens[tokens.length - 1]),
+        );
+
+        // 総取扱計・総発売計：その行自体が区切りの始まり（合計）
+        if (_headerlessSections.contains(label)) {
+          section = label;
+          companyIndex = null;
+          rows.putIfAbsent(label, () => {})[labelTotal] = value;
+          continue;
+        }
+
+        if (section == null) {
+          unknownLines?.add(rawLine);
+          continue;
+        }
+
+        // 会社の（増）（減）相殺
+        if (companyIndex != null) {
+          final list = companies[section]!;
+          final company = list[companyIndex];
+          switch (label) {
+            case '(増)':
+              list[companyIndex] = company.copyWith(up: value);
+              continue;
+            case '(減)':
+              list[companyIndex] = company.copyWith(down: value);
+              continue;
+            case '相殺':
+              list[companyIndex] = company.copyWith(net: value);
+              continue;
+          }
+        }
+
+        // 同じ名前の行が同じ区切りに2回出た場合は、最初の行を使う
+        rows.putIfAbsent(section, () => {}).putIfAbsent(label, () => value);
+        continue;
+      }
+
+      // 会社行（各社別精算内訳の区切りの中だけ）
+      final joined = _normalize(tokens.join());
+      if (section != null &&
+          _companySections.contains(section) &&
+          _companyLine.hasMatch(joined)) {
+        final list = companies.putIfAbsent(section, () => []);
+        // 会社名はファイルの表記のまま（全角括弧など）表示する
+        list.add(CompanyTally(name: rawLine.trim()));
+        companyIndex = list.length - 1;
+        continue;
+      }
+
+      // その他（企画券発売の行など）は読み飛ばす
+      unknownLines?.add(rawLine);
+    }
+
+    return CloseTallyData._(rows, companies);
+  }
+
+  /// 全角英数字・記号・スペースを半角にする
+  static String _toHalfWidth(String s) {
+    final buf = StringBuffer();
+    for (final r in s.runes) {
+      if (r == 0x3000) {
+        buf.write(' '); // 全角スペース
+      } else if (r >= 0xFF01 && r <= 0xFF5E) {
+        buf.writeCharCode(r - 0xFEE0); // 全角英数字・記号
+      } else {
+        buf.writeCharCode(r);
+      }
+    }
+    return buf.toString();
+  }
+
+  /// 比較用に正規化する（半角化してスペースを除く）
+  static String _normalize(String s) =>
+      _toHalfWidth(s).replaceAll(RegExp(r'\s+'), '');
+
+  /// 数値に変換（カンマを除く）
+  static int _toInt(String s) => int.parse(s.replaceAll(',', ''));
+}
