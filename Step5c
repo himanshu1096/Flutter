@@ -1,0 +1,66 @@
+              _CompanyBreakdownGroup(
+                groupTitle: '全体',
+                fontColor: fontColor,
+                group: data?.companyAll,
+              ),
+              const SizedBox(height: 16),
+              _CompanyBreakdownGroup(
+                groupTitle: '東武分',
+                fontColor: fontColor,
+                group: data?.companyTobu,
+              ),
+              const SizedBox(height: 16),
+              _CompanyBreakdownGroup(
+                groupTitle: 'メトロ分',
+                fontColor: fontColor,
+                group: data?.companyMetro,
+              ),
+
+
+
+
+  const _CompanyBreakdownGroup({
+    required this.groupTitle,
+    required this.fontColor,
+    required this.group,
+  });
+
+  final String groupTitle;
+  final Color fontColor;
+
+  /// 締切テキストファイルの該当グループ（null：未読込・読み込み失敗）
+  final CompanyGroupTally? group;
+
+
+
+        _ContentTable(
+          titleText: '合計',
+          subTitleText: '枚数',
+          countValue: _countText(group?.total),
+          amountValue: _amountText(group?.total),
+        ),
+        _ContentTable(
+          titleText: '現金',
+          subTitleText: '枚数',
+          countValue: _countText(group?.cash),
+          amountValue: _amountText(group?.cash),
+        ),
+        // 会社ごとの内訳（ファイルに出てきた順）
+        for (final c in group?.companies ?? const <CompanyTally>[]) ...[
+
+
+
+            countValue: _countText(c.up),
+            amountValue: _amountText(c.up),
+
+
+            countValue: _countText(c.down),
+            amountValue: _amountText(c.down),
+
+
+            countValue: _countText(c.net),
+            amountValue: _amountText(c.net),
+
+
+
+
