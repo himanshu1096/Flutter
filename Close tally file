@@ -1,0 +1,44 @@
+import 'dart:io';
+import 'package:charset_converter/charset_converter.dart';
+import 'package:qr_multidemo/config/tcp_config.dart';
+import 'package:qr_multidemo/model/close_tally_data.dart';
+import 'app_logger.dart';
+
+/// 締切テキストファイルの読み込み
+/// 本体制御が締切・締切速報・締切再出力のたびに同じファイルへ出力するため、
+/// キャッシュせず、呼ばれるたびに読み直す
+class CloseTallyFileService {
+  static final CloseTallyFileService _instance =
+      CloseTallyFileService._internal();
+  factory CloseTallyFileService() => _instance;
+  CloseTallyFileService._internal();
+
+  String get _filePath => TcpConfig().closeTallyPath;
+  static const String _tag = 'CloseTallyFileService';
+
+  /// 締切テキストファイルを読み込んで解析する
+  /// ファイルが無い・読めない場合はnull
+  Future<CloseTallyData?> load() async {
+    try {
+      final file = File(_filePath);
+      if (!await file.exists()) {
+        AppLogger().warn(_tag, '締切ファイルが見つかりません: $_filePath');
+        return null;
+      }
+      final bytes = await file.readAsBytes();
+      final decoded = await CharsetConverter.decode('Shift_JIS', bytes);
+
+      final skipped = <String>[];
+      final data = CloseTallyData.parse(decoded, unknownLines: skipped);
+
+      AppLogger().info(_tag, '締切ファイル読み込み完了: $_filePath');
+      if (skipped.isNotEmpty) {
+        AppLogger().info(_tag, '読み飛ばした行: ${skipped.length}行 ${skipped.join(' / ')}');
+      }
+      return data;
+    } catch (e) {
+      AppLogger().error(_tag, '締切ファイル読み込みエラー', e);
+      return null;
+    }
+  }
+}
