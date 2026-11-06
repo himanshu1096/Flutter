@@ -1,0 +1,88 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import 'package:qr_multidemo/app_icon.dart';
+import 'package:qr_multidemo/model/close_tally_data.dart';
+import 'package:qr_multidemo/provider/close_tally_data_provider.dart';
+
+
+/// 締め切りの主な内容（枚数や金額など）
+/// ※締切テキストファイルの内容（closeTallyDataNotifierProvider）を表示する
+class CloseTallyMainContent extends ConsumerWidget {
+  /// 締め切りの主な内容（枚数や金額など）
+  const CloseTallyMainContent({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 締切表示データ（null：未読込・読み込み失敗）
+    final data = ref.watch(closeTallyDataNotifierProvider);
+
+
+/// 数値の表示形式（カンマ区切り）
+final NumberFormat _numberFormat = NumberFormat('#,##0');
+
+/// 枚数（件数）の表示文字列（データ無しは「－」）
+String _countText(TallyValue? v) =>
+    v == null ? '－' : _numberFormat.format(v.count);
+
+/// 金額の表示文字列（データ無しは「－」）
+String _amountText(TallyValue? v) =>
+    v == null ? '－' : _numberFormat.format(v.amount);
+
+/// 件数、金額のテーブル
+class _ContentTable extends StatelessWidget {
+
+                countValue: _countText(data?.totalHandled),
+                amountValue: _amountText(data?.totalHandled),
+
+
+
+
+                countValue: _countText(data?.totalHandledCash),
+                amountValue: _amountText(data?.totalHandledCash),
+
+
+
+                countValue: _countText(data?.qrTotal),
+                amountValue: _amountText(data?.qrTotal),
+
+
+
+
+                countValue: _countText(data?.qrCashIn),
+                amountValue: _amountText(data?.qrCashIn),
+
+
+
+                countValue: _countText(data?.qrCashOut),
+                amountValue: _amountText(data?.qrCashOut),
+
+
+
+
+                countValue: _countText(data?.countEnter),
+                amountValue: _amountText(data?.countEnter),
+
+
+                countValue: _countText(data?.countExit),
+                amountValue: _amountText(data?.countExit),
+
+
+                titleText: '精算合計',
+                subTitleText: '件数',
+                countValue: _countText(data?.countAdjustTotal),
+                amountValue: _amountText(data?.countAdjustTotal),
+
+
+
+                countValue: _countText(data?.countAdjustCash),
+                amountValue: _amountText(data?.countAdjustCash),
+
+
+
+
+
+
+
+
