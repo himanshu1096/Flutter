@@ -1,0 +1,110 @@
+  void _updateConnectionStatus(String unit, int? status) {
+    if (status == null) {
+      return;
+    }
+    _connectionStatus[unit] = status;
+    _onConnectionStatusChanged?.call(unit, status);
+  }
+
+  /// 応答DATAの接続結果（Bool）で接続状態を更新する
+  /// true：接続、false：未接続、null：DATAに無いため更新しない
+  void _updateConnectResult(String unit, bool? connected) {
+    if (connected == null) return;
+    _updateConnectionStatus(
+      unit,
+      connected
+          ? ConnectionStatusValue.connected
+          : ConnectionStatusValue.disconnected,
+    );
+  }
+
+
+
+          final qrResponse = QrServerResponse.fromJson(packet.json);
+          AppLogger().info(
+            _tag,
+            'QR照会応答: RESULT=${qrResponse.result}, ERRCODE=${qrResponse.errCode}, '
+            'EKINET=${qrResponse.ekinetConnect}, IDONEO=${qrResponse.idoneoConnect}',
+          );
+          // えきねっと → QRアイコン、iDONEO → 接続状態画面のカード
+          _updateConnectResult(ConnectionUnit.qrModule, qrResponse.ekinetConnect);
+          _updateConnectResult(ConnectionUnit.idoneo, qrResponse.idoneoConnect);
+          _qrCompleter?.complete(qrResponse);
+
+
+        AppLogger().info(_tag, '業務処理応答 受信: $cmdHex');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          AppLogger().info(
+            _tag,
+            '業務処理応答: EKINET=${response.ekinetConnect}, IDONEO=${response.idoneoConnect}',
+          );
+          // えきねっと → QRアイコン、iDONEO → 接続状態画面のカード
+          _updateConnectResult(ConnectionUnit.qrModule, response.ekinetConnect);
+          _updateConnectResult(ConnectionUnit.idoneo, response.idoneoConnect);
+          _processCompleter?.complete(response);
+
+
+
+        AppLogger().info(_tag, '印字応答 受信 :$cmdHex');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          AppLogger().info(
+            _tag,
+            '印字応答: PRINTERCONNECT=${response.printerConnect}',
+          );
+          // プリンタ接続結果 → ヘッダーのプリンタアイコン
+          _updateConnectResult(ConnectionUnit.printer, response.printerConnect);
+          _printCompleter?.complete(response);
+
+
+
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:qr_multidemo/component/secondary_tab_content_core.dart';
+import 'package:qr_multidemo/provider/provider.dart';
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'package:qr_multidemo/utility/constant.dart';
+import 'related_process_common.dart';
+
+//==============================
+// 接続状態画面
+// iDONEOの接続状態を表示する（connectionStatusProvider の IDONEO）
+// ※IDONEOCONNECT（0x1181／0x2181〜0x2581の応答）で更新される
+//   最初の応答を受信するまでは未接続（赤）
+//==============================
+
+
+
+class ConnectionStatusScreen extends ConsumerWidget {
+  /// 接続状態画面
+  const ConnectionStatusScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(connectionStatusProvider);
+
+    final items = [
+      // iDONEO（1:接続中、それ以外:未接続）
+      _ConnectionItem(
+        name: 'iDONEO',
+        isConnected:
+            status[ConnectionUnit.idoneo] == ConnectionStatusValue.connected,
+      ),
+    ];
+
+    // ボタンが無いため、枠を下端まで広げる
+    return PaddingForContent(child: _ConnectionCard(items: items));
+  }
+}
+
+
+
+/// ダミーの接続状態（接続中・未接続の表示確認用）
+/// ※実データ接続に差し替え済み。表示確認する場合は items に渡す
+// const List<_ConnectionItem> _dummyItems = [
+//   _ConnectionItem(name: 'iDONEO', isConnected: true),
+//   _ConnectionItem(name: 'iDONEO', isConnected: false),
+// ];
