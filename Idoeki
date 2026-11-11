@@ -1,0 +1,94 @@
+  /// null も含めて接続状態を設定する（null：未使用・非表示）
+  void _setConnectionStatusNullable(String unit, int? status) {
+    _connectionStatus[unit] = status;
+    _onConnectionStatusChanged?.call(unit, status);
+  }
+
+  /// えきねっと・iDONEOの接続結果を更新し、ヘッダーのQRアイコンに反映する
+  /// [hasEkinet]/[hasIdoneo]：DATAにキーがあるか（キー無しは前回の状態を維持）
+  /// 値 true：接続(1)、false：未接続(-1)、null：未使用（カード非表示）
+  ///
+  /// QRアイコン（null＝未使用は判定から除く）
+  ///   両方null              → 非表示
+  ///   null以外が全てtrue    → 緑
+  ///   1つでもfalse          → 赤
+  void _updateServiceConnect({
+    required bool hasEkinet,
+    required bool? ekinet,
+    required bool hasIdoneo,
+    required bool? idoneo,
+  }) {
+    if (!hasEkinet && !hasIdoneo) return;
+
+    int? toStatus(bool? v) =>
+        v == null
+            ? null
+            : (v
+                ? ConnectionStatusValue.connected
+                : ConnectionStatusValue.disconnected);
+
+    if (hasEkinet) {
+      _setConnectionStatusNullable(ConnectionUnit.ekinet, toStatus(ekinet));
+    }
+    if (hasIdoneo) {
+      _setConnectionStatusNullable(ConnectionUnit.idoneo, toStatus(idoneo));
+    }
+
+    // 未使用（null）を除いた接続状態
+    final used =
+        [
+          _connectionStatus[ConnectionUnit.ekinet],
+          _connectionStatus[ConnectionUnit.idoneo],
+        ].whereType<int>();
+
+    final int? qrStatus;
+    if (used.isEmpty) {
+      qrStatus = null; // 両方未使用 → 非表示
+    } else if (used.every((s) => s == ConnectionStatusValue.connected)) {
+      qrStatus = ConnectionStatusValue.connected; // 緑
+    } else {
+      qrStatus = ConnectionStatusValue.disconnected; // 赤
+    }
+    _setConnectionStatusNullable(ConnectionUnit.qrModule, qrStatus);
+  }
+
+
+          // ※CONNTESTRESULT は EKINETSVCONNRESULT に変更
+          // _updateConnectionStatus(
+          //   ConnectionUnit.qrModule,
+          //   initData.connectionTestResult
+          //       ? ConnectionStatusValue.connected
+          //       : ConnectionStatusValue.disconnected,
+          // );
+          // えきねっと・iDONEO → 接続状態画面のカード・QRアイコン
+          _updateServiceConnect(
+            hasEkinet: initData.hasEkinet,
+            ekinet: initData.ekinetConnect,
+            hasIdoneo: initData.hasIdoneo,
+            idoneo: initData.idoneoConnect,
+          );
+
+
+          // iDONEO → 接続状態画面のiDONEOカード
+          // ※QRアイコン・えきねっとの扱いは協議後に対応
+          _updateConnectResult(ConnectionUnit.idoneo, initData.idoneoConnect);
+
+
+
+          _updateServiceConnect(
+            hasEkinet: qrResponse.hasEkinet,
+            ekinet: qrResponse.ekinetConnect,
+            hasIdoneo: qrResponse.hasIdoneo,
+            idoneo: qrResponse.idoneoConnect,
+          );
+
+
+          _updateServiceConnect(
+            hasEkinet: response.hasEkinet,
+            ekinet: response.ekinetConnect,
+            hasIdoneo: response.hasIdoneo,
+            idoneo: response.idoneoConnect,
+          );
+
+
+
