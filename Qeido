@@ -1,0 +1,60 @@
+    // 接続状態 → カード
+    // 1：接続中、-1：未接続、null：未使用（カード非表示。位置は空けたまま）
+    _ConnectionItem? card(String name, String unit) {
+      final s = status[unit];
+      if (s == null) return null;
+      return _ConnectionItem(
+        name: name,
+        isConnected: s == ConnectionStatusValue.connected,
+      );
+    }
+
+    // ※並び順＝表示順（左→右、上→下）
+    final items = <_ConnectionItem?>[
+      // えきねっと（左）：EKINETSVCONNRESULT（0x0A81／0x1181／0x2181〜0x2581）
+      card('えきねっと', ConnectionUnit.ekinet),
+      // iDONEO（右）：IDONEOSVCONNRESULT（0x0A81／0x1181／0x2181〜0x2581）
+      card('iDONEO', ConnectionUnit.idoneo),
+    ];
+
+
+  const _ConnectionCard({required this.items});
+
+  /// 接続先（null：非表示）
+  final List<_ConnectionItem?> items;
+
+
+
+  const _StatusTiles({required this.items});
+
+  /// 接続先（null：非表示）
+  final List<_ConnectionItem?> items;
+
+
+                    // 範囲外・未使用（null）は空ける
+                    child: switch (r * _cardColumns + c < items.length
+                        ? items[r * _cardColumns + c]
+                        : null) {
+                      final item? => _StatusTile(item: item),
+                      null => const SizedBox.shrink(),
+                    },
+
+
+
+            // QRサーバ接続状態 (QRMODULE)
+            // ※えきねっと・iDONEOが両方null（未使用）の場合は非表示（位置は空けたまま）
+            if (status[ConnectionUnit.qrModule] == null)
+              const SizedBox(width: 54, height: 54)
+            else
+              FramedIcon(
+                borderColor: iconColor(ConnectionUnit.qrModule),
+                icon: Image.asset(
+                  Assets.icon.qRWord.keyName,
+                  width: 44,
+                  height: 44,
+                ),
+              ),
+
+
+
+
