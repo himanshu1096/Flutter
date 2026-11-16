@@ -1,0 +1,180 @@
+import 'dart:io';
+import 'package:charset_converter/charset_converter.dart';
+import 'package:qr_multidemo/config/tcp_config.dart';
+import 'app_logger.dart';
+
+//==============================
+// 接客履歴CSV（ServiceHis.csv）の読み込み
+// ※Shift_JIS、1行目は見出し行
+// ※1ファイルに全日分の履歴が入っているため、選択日の行だけを取り出す
+// ※本体制御が随時追記するため、キャッシュせず呼ばれるたびに読み直す
+//==============================
+
+/// 接客履歴1件（CSVの1行）
+class ServiceHistoryRecord {
+  const ServiceHistoryRecord({
+    required this.dateTime,
+    required this.operatorId,
+    required this.ticketCode,
+    required this.processId,
+    required this.amount,
+  });
+
+  /// 日時
+  final DateTime dateTime;
+
+  /// 取扱者ID
+  final int operatorId;
+
+  /// 券種(原券)
+  final int ticketCode;
+
+  /// 処理内容(業務ID)
+  final int processId;
+
+  /// 金額（Value1）
+  final int amount;
+
+  /// 券種名（未定義のコードは空文字）
+  String get ticketName => ServiceHistoryService.ticketNames[ticketCode] ?? '';
+
+  /// 処理名
+  String get processName =>
+      ServiceHistoryService.processNames[processId] ?? '';
+
+  /// 精算処理か（精算金額を表示する）
+  bool get isAdjust => processId == ServiceHistoryService.processAdjust;
+}
+
+class ServiceHistoryService {
+  static final ServiceHistoryService _instance =
+      ServiceHistoryService._internal();
+  factory ServiceHistoryService() => _instance;
+  ServiceHistoryService._internal();
+
+  static const String _tag = 'ServiceHistoryService';
+
+  /// 精算処理の業務ID
+  static const int processAdjust = 3040;
+
+  /// 処理内容(業務ID) → 処理名（4文字の略称）
+  /// ※ここに無い業務ID（手入力精算 5010 など）の行は表示しない
+  static const Map<int, String> processNames = {
+    3020: '入場処理',
+    3030: '出場処理',
+    3040: '精算処理',
+    3050: '廃券処理',
+    3060: '発キャン',
+  };
+
+  /// 券種(原券) → 券種名
+  static const Map<int, String> ticketNames = {
+    0: '普通券',
+    1: '回数券',
+    5: '入場券',
+    20: '企画券',
+    50: '乗車券',
+  };
+
+  // CSVの列番号（0始まり）
+  static const int _colDateTime = 0; // 日時
+  static const int _colOperatorId = 1; // 取扱者ID
+  static const int _colTicket = 3; // 券種(原券)
+  static const int _colProcess = 4; // 処理内容(業務ID)
+  static const int _colValue1 = 12; // Value1（金額）
+
+  String get _filePath => TcpConfig().serviceHistoryPath;
+
+  /// [date] の接客履歴を返す（ファイルの順）
+  /// ファイルが無い・読めない場合は空リスト
+  Future<List<ServiceHistoryRecord>> load(DateTime date) async {
+    try {
+      final file = File(_filePath);
+      if (!await file.exists()) {
+        AppLogger().warn(_tag, '接客履歴ファイルが見つかりません: $_filePath');
+        return [];
+      }
+      final bytes = await file.readAsBytes();
+      final text = await CharsetConverter.decode('Shift_JIS', bytes);
+
+      final records = <ServiceHistoryRecord>[];
+      final lines = text.split(RegExp(r'\r?\n'));
+      // 1行目は見出し行のため読み飛ばす
+      for (final line in lines.skip(1)) {
+        if (line.trim().isEmpty) continue;
+        final record = _parseLine(line);
+        if (record == null) continue;
+        if (!_isSameDay(record.dateTime, date)) continue;
+        records.add(record);
+      }
+      AppLogger().info(
+        _tag,
+        '接客履歴読み込み完了: ${records.length}件 '
+        '(${date.year}/${date.month}/${date.day})',
+      );
+      return records;
+    } catch (e) {
+      AppLogger().error(_tag, '接客履歴ファイル読み込みエラー', e);
+      return [];
+    }
+  }
+
+  /// CSVの1行を解析する（不正な行・表示対象外の業務IDはnull）
+  ServiceHistoryRecord? _parseLine(String line) {
+    final cols = line.split(',');
+    if (cols.length <= _colValue1) {
+      AppLogger().warn(_tag, '列数不足のため読み飛ばし: $line');
+      return null;
+    }
+
+    final dateTime = _parseDateTime(cols[_colDateTime].trim());
+    final operatorId = int.tryParse(cols[_colOperatorId].trim());
+    final ticketCode = int.tryParse(cols[_colTicket].trim());
+    final processId = int.tryParse(cols[_colProcess].trim());
+    final amount = int.tryParse(cols[_colValue1].trim());
+    if (dateTime == null ||
+        operatorId == null ||
+        ticketCode == null ||
+        processId == null ||
+        amount == null) {
+      AppLogger().warn(_tag, '値が不正なため読み飛ばし: $line');
+      return null;
+    }
+
+    // 表示対象外の業務ID（手入力精算など）
+    if (!processNames.containsKey(processId)) {
+      AppLogger().info(_tag, '表示対象外の業務IDのため読み飛ばし: $processId');
+      return null;
+    }
+    if (!ticketNames.containsKey(ticketCode)) {
+      AppLogger().warn(_tag, '未定義の券種コード: $ticketCode（空欄で表示）');
+    }
+
+    return ServiceHistoryRecord(
+      dateTime: dateTime,
+      operatorId: operatorId,
+      ticketCode: ticketCode,
+      processId: processId,
+      amount: amount,
+    );
+  }
+
+  /// 「2026/11/5 19:19」形式の日時を解析する（不正な場合はnull）
+  DateTime? _parseDateTime(String s) {
+    final parts = s.split(RegExp(r'\s+'));
+    if (parts.length < 2) return null;
+    final d = parts[0].split('/');
+    final t = parts[1].split(':');
+    if (d.length != 3 || t.length < 2) return null;
+    final y = int.tryParse(d[0]);
+    final mo = int.tryParse(d[1]);
+    final da = int.tryParse(d[2]);
+    final h = int.tryParse(t[0]);
+    final mi = int.tryParse(t[1]);
+    if ([y, mo, da, h, mi].contains(null)) return null;
+    return DateTime(y!, mo!, da!, h!, mi!);
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+}
