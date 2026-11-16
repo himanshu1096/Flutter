@@ -1,0 +1,74 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import 'package:qr_multidemo/app_color.dart';
+import 'package:qr_multidemo/service/service_history_service.dart';
+
+
+
+class _CustomerServiceHistoryState extends State<CustomerServiceHistory> {
+  /// 選択中の日付（初期表示は当日）
+  /// ※一覧とフッターで共有するため、親で管理する
+  DateTime _selectedDate = DateUtils.dateOnly(DateTime.now());
+
+  /// 選択日の接客履歴（接客履歴CSVから読み込む）
+  List<_HistoryItem> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  /// 日付選択（日付ボタン／カレンダー）
+  void _onDateSelected(DateTime date) {
+    setState(() {
+      _selectedDate = DateUtils.dateOnly(date);
+    });
+    _loadHistory();
+  }
+
+  /// 選択日の接客履歴をCSVから読み込む
+  /// ※読み込み中は前回の表示のまま（「データはありません」が一瞬出ないようにする）
+  Future<void> _loadHistory() async {
+    final date = _selectedDate;
+    final records = await ServiceHistoryService().load(date);
+    // 読み込み中に画面を閉じた・別の日付を選んだ場合は反映しない
+    if (!mounted || date != _selectedDate) return;
+    setState(() {
+      _items = records.map(_toHistoryItem).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 選択した日付の接客履歴（データが無い場合は空）
+    // final items = _makeHistoryItemList(_selectedDate);
+    final items = _items;
+
+
+
+/// 金額の表示形式（カンマ区切り）
+final NumberFormat _amountFormat = NumberFormat('#,##0');
+
+/// 接客履歴CSVの1件 → 一覧の1行
+/// 日付 M/d、時刻 H:mm、取扱番号は取扱者IDを8桁0埋め
+/// 精算金額は精算処理（業務ID 3040）のみ表示
+_HistoryItem _toHistoryItem(ServiceHistoryRecord r) => _HistoryItem(
+  date: r.dateTime.toStringWithFormat('M/d'),
+  time: r.dateTime.toStringWithFormat('H:mm'),
+  number: r.operatorId.toString().padLeft(8, '0'),
+  ticketName: r.ticketName,
+  processName: r.processName,
+  amount: r.isAdjust ? _amountFormat.format(r.amount) : null,
+);
+
+/// 接客履歴データ（モック）
+/// [date] の接客履歴を返す。データが無い日は空リストを返す
+/// ※接客履歴CSV（ServiceHistoryService）に差し替え済み。表示確認用に残している
+// ignore: unused_element
+List<_HistoryItem> _makeHistoryItemList(DateTime date) {
+
+
+
+
