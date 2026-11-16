@@ -1,0 +1,28 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:qr_multidemo/model/relation_response.dart';
+part 'related_process_provider.g.dart';
+
+/// 締切再出力の締切履歴日時（0x0C01 の PROPERTY1〜8、新しい順）
+/// ※null：履歴無し（ボタンは非活性）
+@Riverpod(keepAlive: true)
+class CloseHistoryDates extends _$CloseHistoryDates {
+  @override
+  List<DateTime?> build() =>
+      List<DateTime?>.filled(RelationResponse.propertyCount, null);
+
+  void set(List<DateTime?> dates) => state = List.unmodifiable(dates);
+
+  void clear() =>
+      state = List<DateTime?>.filled(RelationResponse.propertyCount, null);
+}
+
+/// 接客履歴の再読み込み通知
+/// 関連業務メニューで 0x0C01（接客履歴）の正常応答を受信するたびに +1 する
+/// ※接客履歴画面はこの値の変化を見てCSVを読み直す
+@Riverpod(keepAlive: true)
+class ServiceHistoryReload extends _$ServiceHistoryReload {
+  @override
+  int build() => 0;
+
+  void notify() => state++;
+}
