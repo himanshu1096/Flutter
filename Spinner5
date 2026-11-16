@@ -1,0 +1,77 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:qr_multidemo/provider/related_process_provider.dart';
+import 'package:qr_multidemo/utility/date_time_converter.dart';
+
+
+class _SelectDateButtons extends HookConsumerWidget {
+  /// 締切履歴ボタン
+  const _SelectDateButtons();
+
+  // ※ダミーの締切履歴は 0x0C01 の PROPERTY1〜8 に差し替え済み
+  // /// 締切履歴
+  // final _historyDates = [
+  //   DateTime.now().add(Duration(hours: -2)),
+  //   DateTime.now().add(Duration(hours: -4)),
+  //   DateTime.now().add(Duration(hours: -6)),
+  //   DateTime.now().add(Duration(hours: -8)),
+  //   DateTime.now().add(Duration(hours: -10)),
+  //   DateTime.now().add(Duration(hours: -12)),
+  //   DateTime.now().add(Duration(hours: -14)),
+  //   DateTime.now().add(Duration(hours: -16)),
+  // ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 締切履歴日時（0x0C01 PROPERTY1〜8、新しい順。null：履歴無し）
+    final historyDates = ref.watch(closeHistoryDatesProvider);
+
+    // ユーザーが選択したボタンのIndex（未選択はnull）
+    final userSelected = useState<int?>(null);
+
+    // 実際に選択中とするIndex
+    // ユーザーの選択が有効（履歴あり）ならそれ、無効なら最新（履歴がある最初のボタン）
+    // ※履歴が1件も無い場合は -1（どれも選択しない）
+    final sel = userSelected.value;
+    final selectedIndex =
+        (sel != null && sel < historyDates.length && historyDates[sel] != null)
+            ? sel
+            : historyDates.indexWhere((d) => d != null);
+
+    Widget historyBtn(int i) => _historyBtn(
+      date: i < historyDates.length ? historyDates[i] : null,
+      isSelected: i == selectedIndex,
+      onSelected: () => userSelected.value = i,
+    );
+
+    return RelatedProcessFooter(
+      cells: [
+        for (var i = 0; i < 4; i++) historyBtn(i),
+        null,
+        // 2行目：履歴5〜8 ＋ 印刷
+        for (var i = 4; i < 8; i++) historyBtn(i),
+        CloseTallyPrintBtn(onPressed: () {}),
+      ],
+    );
+  }
+
+  /// 締切履歴1件分のボタン
+  /// [date] が null（履歴無し）の場合は「－」を表示し、非活性にする
+  Widget _historyBtn({
+    required DateTime? date,
+    required bool isSelected,
+    required VoidCallback onSelected,
+  }) => CloseTallyToggleBtn(
+    isSelected: isSelected,
+    onPressed: date == null ? null : onSelected,
+    child: Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: Text(
+        date == null ? '－' : date.toStringWithFormat("yyyy/MM/dd HH:mm"),
+        style: TextStyle(fontSize: 24),
+      ),
+    ),
+  );
+}
+
