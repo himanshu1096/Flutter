@@ -1,0 +1,155 @@
+import 'package:qr_multidemo/config/tcp_config.dart';
+import 'package:qr_multidemo/provider/close_tally_data_provider.dart';
+import 'package:qr_multidemo/provider/related_process_provider.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'package:qr_multidemo/utility/confirm_dialog.dart';
+import 'package:qr_multidemo/utility/error_handler.dart';
+
+
+      onTap: (index) async {
+        // ※0xAA01（業務選択通知）は 0x0C81（関連業務選択要求）に変更
+        // // タブインデックスに応じて0xAA01送信
+        // final business = switch (_RelatedProcessTab.values[index]) {
+        //   _RelatedProcessTab.closeTally => 50,
+        //   _RelatedProcessTab.closeQuick => 52,
+        //   _RelatedProcessTab.closeTallyRe => 51,
+        //   _RelatedProcessTab.history => 53,
+        //   _ => null,
+        // };
+        // if (business != null) {
+        //   AppLogger().info('RelatedProcess', '0xAA01 BUSINESS=$business');
+        //   await TcpService().sendBusinessSelect(business);
+        // }
+        // if (business == 50 || business == 51 || business == 52) {
+        //   final closeTally = ref.read(closeTallyDataProvider.notifier);
+        //   closeTally.clear();
+        //   await closeTally.load();
+        // }
+
+        // タブに応じた関連業務番号（0x0C81 RELATIONNUMBER）
+        final tab = _RelatedProcessTab.values[index];
+        final relationNumber = switch (tab) {
+          _RelatedProcessTab.closeTally => 3, // 日計締切
+          _RelatedProcessTab.closeQuick => 0, // 締切速報
+          _RelatedProcessTab.closeTallyRe => 4, // 締切再出力
+          _RelatedProcessTab.history => 6, // 接客履歴
+          _RelatedProcessTab.connection => 19, // 接続状態
+          _ => null,
+        };
+        if (relationNumber == null) return;
+        await _selectRelation(context, ref, tab, relationNumber);
+      },
+    );
+  }
+}
+
+/// くるくるの最低表示時間（ミリ秒）
+/// ※応答がすぐ返る場合に一瞬で消えてちらつかないようにする
+const int _spinnerMinMs = 300;
+
+/// 関連業務選択：0x0C81送信 → 0x0C01受信 → 各画面のデータ読み込み
+/// 待っている間はくるくるを表示し、画面を操作不可にする
+///   RESULT=true  → 締切系：締切ファイル読み込み（締切再出力は締切履歴日時も保存）
+///                  接客履歴：CSV再読み込みを通知
+///   RESULT=false → KbaErrorMessage.json のエラーダイアログ
+///   タイムアウト → 「通信エラーが発生しました」
+/// タイムアウト：日計締切は CLOSE_TALLY_TIMEOUT_SEC、その他は RESPONSE_TIMEOUT_SEC
+Future<void> _selectRelation(
+  BuildContext context,
+  WidgetRef ref,
+  _RelatedProcessTab tab,
+  int relationNumber,
+) async {
+  const tag = 'RelatedProcess';
+  final isCloseTab =
+      tab == _RelatedProcessTab.closeTally ||
+      tab == _RelatedProcessTab.closeQuick ||
+      tab == _RelatedProcessTab.closeTallyRe;
+  final closeTally = ref.read(closeTallyDataProvider.notifier);
+  final historyDates = ref.read(closeHistoryDatesProvider.notifier);
+
+  // 前回の表示を残さない
+  if (isCloseTab) closeTally.clear();
+  if (tab == _RelatedProcessTab.closeTallyRe) historyDates.clear();
+
+  // くるくる表示（画面操作不可）
+  // ※閉じるNavigatorを先に取得しておき、必ず1回だけ閉じる
+  final navigator = Navigator.of(context, rootNavigator: true);
+  showLoadingSpinner(context: context);
+  var spinnerOpen = true;
+  void closeSpinner() {
+    if (!spinnerOpen) return;
+    spinnerOpen = false;
+    navigator.pop();
+  }
+
+  final minWait = Future.delayed(const Duration(milliseconds: _spinnerMinMs));
+
+  try {
+    final response = await TcpService().sendRelationRequest(
+      relationNumber,
+      // 日計締切はデータ作成に時間がかかるため、専用のタイムアウトを使う
+      timeoutSec:
+          tab == _RelatedProcessTab.closeTally
+              ? TcpConfig().closeTallyTimeoutSec
+              : null,
+    );
+
+    if (response.result) {
+      AppLogger().info(tag, '0x0C01 正常: RELATIONNUMBER=$relationNumber');
+      if (isCloseTab) await closeTally.load();
+      if (tab == _RelatedProcessTab.closeTallyRe) {
+        historyDates.set(response.properties);
+      }
+      if (tab == _RelatedProcessTab.history) {
+        ref.read(serviceHistoryReloadProvider.notifier).notify();
+      }
+      await minWait;
+      closeSpinner();
+      return;
+    }
+
+    // RESULT=false：KbaErrorMessage.json のエラーダイアログ
+    AppLogger().warn(
+      tag,
+      '0x0C01 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+    );
+    closeSpinner();
+    if (!context.mounted) return;
+    final result = await handleServerError(
+      context: context,
+      errKind: response.errKind,
+      errCode: response.errCode,
+    );
+    if (!result.handled && context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => CustomConfirmDialog(
+              text: '処理に失敗しました\nエラーコード: ${response.errCode}',
+              trueBtnText: '確認',
+              hasFalseBtn: false,
+            ),
+      );
+    }
+  } catch (e) {
+    // タイムアウト・通信エラー（QR読取と同じダイアログ）
+    AppLogger().error(tag, '0x0C81 エラー: RELATIONNUMBER=$relationNumber', e);
+    closeSpinner();
+    if (context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => CustomConfirmDialog(
+              text: '通信エラーが発生しました',
+              trueBtnText: '確認',
+              hasFalseBtn: false,
+            ),
+      );
+    }
+  }
+}
+
