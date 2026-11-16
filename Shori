@@ -1,0 +1,40 @@
+  /// 選択日の接客履歴をCSVから読み込む
+  /// 読み込み中は「処理中」ダイアログを表示する（画面操作不可）
+  /// ※読み込み中は前回の表示のまま（「データはありません」が一瞬出ないようにする）
+  Future<void> _loadHistory() async {
+    if (!mounted) return;
+    final date = _selectedDate;
+
+    // ダイアログを閉じるNavigatorを先に取得しておく
+    // （読み込み中に画面が破棄されても確実に閉じるため）
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showCustomAlertDialog(context: context, text: '処理中');
+
+    List<ServiceHistoryRecord> records = [];
+    try {
+      // 読み込みは数ミリ秒で終わるため、ダイアログが一瞬で消えないよう最低表示時間を待つ
+      final results = await Future.wait([
+        ServiceHistoryService().load(date),
+        Future.delayed(const Duration(milliseconds: _loadingDialogMinMs)),
+      ]);
+      records = results[0] as List<ServiceHistoryRecord>;
+    } finally {
+      navigator.pop();
+    }
+
+    // 読み込み中に画面を閉じた・別の日付を選んだ場合は反映しない
+    if (!mounted || date != _selectedDate) return;
+    setState(() {
+      _items = records.map(_toHistoryItem).toList();
+    });
+  }
+
+
+
+const Set<int> _mockNoDataDaysAgo = {2, 5};
+
+/// 「処理中」ダイアログの最低表示時間（ミリ秒）
+/// ※CSVの読み込みは数ミリ秒で終わり、ダイアログが一瞬だけ表示されて
+///   ちらついて見えるため、最低限この時間は表示する（0で無効）
+const int _loadingDialogMinMs = 300;
+
