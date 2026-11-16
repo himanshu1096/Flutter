@@ -1,0 +1,146 @@
+  static const int serviceHistoryPrintRequest = 0xC501;
+
+  // 関連業務選択（※通常と逆で、要求が0x81・応答が0x01）
+  static const int relationRequest = 0x0C81; // Flutter → Server
+  static const int relationResponse = 0x0C01; // Server → Flutter
+}
+
+
+/// 関連業務選択要求応答 (0x0C01) データモデル
+/// COMMON：RESULT / ERRKIND / ERRCODE
+/// DATA  ：PROPERTY1〜8（締切再出力のみ使用。締切履歴の日時、新しい順）
+class RelationResponse {
+  final bool result;
+  final int errCode;
+  final int errKind;
+
+  /// PROPERTY1〜8 の日時（常に8件）
+  /// ※"0000/00/00 00:00:00"（履歴無し）・キー無し・形式不正は null
+  final List<DateTime?> properties;
+
+  /// PROPERTYの件数
+  static const int propertyCount = 8;
+
+  const RelationResponse({
+    required this.result,
+    required this.errCode,
+    required this.errKind,
+    required this.properties,
+  });
+
+  factory RelationResponse.fromJson(Map<String, dynamic> json) {
+    final common = json['COMMON'] as Map<String, dynamic>? ?? {};
+    final data = json['DATA'] as Map<String, dynamic>? ?? {};
+    return RelationResponse(
+      result: common['RESULT'] as bool? ?? false,
+      errCode: common['ERRCODE'] as int? ?? -1,
+      errKind: common['ERRKIND'] as int? ?? -1,
+      properties: [
+        for (var i = 1; i <= propertyCount; i++)
+          _parseDateTime(data['PROPERTY$i'] as String?),
+      ],
+    );
+  }
+
+  /// 「YYYY/MM/DD HH:MM:SS」→ DateTime
+  /// ※"0000/…"（履歴無し）・不正な形式は null
+  static DateTime? _parseDateTime(String? s) {
+    if (s == null) return null;
+    final v = s.trim();
+    if (v.isEmpty || v.startsWith('0000')) return null;
+    final parts = v.split(RegExp(r'\s+'));
+    if (parts.length < 2) return null;
+    final d = parts[0].split('/');
+    final t = parts[1].split(':');
+    if (d.length != 3 || t.length < 2) return null;
+    final nums = [
+      ...d.map(int.tryParse),
+      ...t.map(int.tryParse),
+    ];
+    if (nums.contains(null)) return null;
+    return DateTime(
+      nums[0]!,
+      nums[1]!,
+      nums[2]!,
+      nums[3]!,
+      nums[4]!,
+      t.length >= 3 ? nums[5]! : 0,
+    );
+  }
+
+  @override
+  String toString() =>
+      'RelationResponse(result: $result, errCode: $errCode, errKind: $errKind, '
+      'properties: $properties)';
+}
+
+
+import 'package:qr_multidemo/model/process_response.dart';
+import 'package:qr_multidemo/model/relation_response.dart';
+
+
+
+  // 再精算判定レスポンス Completer
+  Completer<int>? _fareCompleter;
+
+  // 関連業務選択要求応答 (0x0C01) Completer
+  Completer<RelationResponse>? _relationCompleter;
+
+
+
+      // 関連業務選択要求応答 (0x0C01) Server → Flutter
+      case CommandId.relationResponse:
+        AppLogger().info(_tag, '0x0C01 関連業務選択要求応答 受信');
+        try {
+          final response = RelationResponse.fromJson(packet.json);
+          AppLogger().info(_tag, '0x0C01: $response');
+          _relationCompleter?.complete(response);
+        } catch (e) {
+          AppLogger().error(_tag, '0x0C01 パースエラー', e);
+          _relationCompleter?.completeError(e);
+        } finally {
+          _relationCompleter = null;
+        }
+        break;
+
+      case CommandId.logoffResponse:
+
+
+  Future<void> sendBusinessSelect(int business) async {
+    AppLogger().info(_tag, '0xAA01 業務選択通知 送信: BUSINESS=$business');
+    await sendPacket(
+      commandId: CommandId.businessSelect,
+      json: {'BUSINESS': business},
+    );
+  }
+
+  /// 関連業務選択要求送信 (0x0C81) Flutter → Server → 応答 (0x0C01)
+  /// [relationNumber]：日計締切 3／締切速報 0／締切再出力 4／接客履歴 6／接続状態 19
+  /// [timeoutSec]：省略時は RESPONSE_TIMEOUT_SEC（日計締切は CLOSE_TALLY_TIMEOUT_SEC を渡す）
+  Future<RelationResponse> sendRelationRequest(
+    int relationNumber, {
+    int? timeoutSec,
+  }) async {
+    final sec = timeoutSec ?? TcpConfig().responseTimeoutSec;
+    AppLogger().info(
+      _tag,
+      '0x0C81 関連業務選択要求 送信: RELATIONNUMBER=$relationNumber（タイムアウト$sec秒）',
+    );
+    _relationCompleter = Completer<RelationResponse>();
+    await sendPacket(
+      commandId: CommandId.relationRequest,
+      json: {'RELATIONNUMBER': relationNumber},
+    );
+    return _relationCompleter!.future.timeout(
+      Duration(seconds: sec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x0C81 タイムアウト ($sec秒)');
+        _relationCompleter = null;
+        throw TimeoutException('関連業務選択要求タイムアウト');
+      },
+    );
+  }
+
+
+
+
