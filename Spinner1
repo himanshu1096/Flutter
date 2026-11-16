@@ -1,0 +1,46 @@
+/// 読み込み中のくるくる（円形プログレス）
+/// 画面全体を薄暗くして操作不可にし、中央に回転する円を表示する
+/// ※自動では消えないため、呼び出し元で
+///   Navigator.of(context, rootNavigator: true).pop() で閉じる
+void showLoadingSpinner({required BuildContext context}) {
+  showDialog(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: false,
+    builder:
+        (context) => const Center(
+          child: SizedBox(
+            width: 120,
+            height: 120,
+            child: CircularProgressIndicator(strokeWidth: 10),
+          ),
+        ),
+  );
+}
+
+/// contentのみのダイアログ
+/// 「はい」「いいえ」ボタンなし
+class _ContentOnlyDialog extends StatelessWidget {
+
+
+
+  static const int _defaultPrintTimeoutSec = 180;
+
+  /// 日計締切のデータ作成待ちタイムアウト（秒）
+  /// ※本体制御が締切ファイルを作成するまで時間がかかるため、通常より長くする
+  static const int _defaultCloseTallyTimeoutSec = 300;
+
+
+  int _printTimeoutSec = _defaultPrintTimeoutSec;
+  int _closeTallyTimeoutSec = _defaultCloseTallyTimeoutSec;
+
+
+  int get printTimeoutSec => _printTimeoutSec;
+  int get closeTallyTimeoutSec => _closeTallyTimeoutSec;
+
+
+      _printTimeoutSec =
+          json['PRINT_TIMEOUT_SEC'] as int? ?? _defaultPrintTimeoutSec;
+      _closeTallyTimeoutSec =
+          json['CLOSE_TALLY_TIMEOUT_SEC'] as int? ??
+          _defaultCloseTallyTimeoutSec;
