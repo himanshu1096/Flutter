@@ -1,0 +1,51 @@
+      case CommandId.connectionStatusNotify:
+        try {
+          final data = packet.json['DATA'] as Map<String, dynamic>? ?? {};
+          // UNIT：TOTALSERVER（デ集）／EKINETSERVER（えきねっと）／IDONEOSERVER（iDONEO）
+          // ※UNIT無しは従来どおりデ集とする
+          final unit =
+              (data['UNIT'] as String?)?.trim().toUpperCase() ?? 'TOTALSERVER';
+          // STATUS：true:接続、false:未接続、null:非表示
+          // ※旧形式の数値（1:接続、それ以外:未接続）も受け付ける
+          final raw = data['STATUS'];
+          final bool? connected = switch (raw) {
+            bool b => b,
+            int i => i == ConnectionStatusValue.connected,
+            _ => null,
+          };
+          AppLogger().info(_tag, '0xF181 接続状態変化通知: UNIT=$unit STATUS=$raw');
+
+          switch (unit) {
+            case 'TOTALSERVER':
+              // デ集アイコン（null：非表示）
+              _setConnectionStatusNullable(
+                ConnectionUnit.totalServer,
+                connected == null
+                    ? null
+                    : (connected
+                        ? ConnectionStatusValue.connected
+                        : ConnectionStatusValue.disconnected),
+              );
+            case 'EKINETSERVER':
+              // えきねっとのみ更新（iDONEOは前回の状態を維持）→ QRアイコンを再判定
+              _updateServiceConnect(
+                hasEkinet: true,
+                ekinet: connected,
+                hasIdoneo: false,
+                idoneo: null,
+              );
+            case 'IDONEOSERVER':
+              // iDONEOのみ更新（えきねっとは前回の状態を維持）→ QRアイコンを再判定
+              _updateServiceConnect(
+                hasEkinet: false,
+                ekinet: null,
+                hasIdoneo: true,
+                idoneo: connected,
+              );
+            default:
+              AppLogger().warn(_tag, '0xF181 未対応のUNIT: $unit');
+          }
+        } catch (e) {
+          AppLogger().error(_tag, '0xF181 パースエラー', e);
+        }
+        break;
