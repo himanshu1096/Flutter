@@ -1,0 +1,152 @@
+        AppLogger().error(_tag, '0xC201 タイムアウト');
+        _printCompleter = null;
+        throw TimeoutException('領収書印刷タイムアウト');
+      },
+    );
+  }
+
+  /// 締切ジャーナル印字要求送信 (0xC301) → 応答 (0xC381)
+  /// ※締切速報・締切再出力の印刷ボタン。データ部なし（コマンドのみ）
+  Future<ProcessResponse> sendClosePrint() async {
+    AppLogger().info(_tag, '0xC301 締切ジャーナル印字要求 送信');
+    _printCompleter = Completer<ProcessResponse>();
+    await sendPacket(commandId: CommandId.dailyClosePrintRequest, json: {});
+    return _printCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().printTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC301 タイムアウト');
+        _printCompleter = null;
+        throw TimeoutException('締切ジャーナル印刷タイムアウト');
+      },
+    );
+  }
+
+
+      case CommandId.printQrInfoResponse:
+      case CommandId.printReceiptResponse:
+      case CommandId.dailyClosePrintResponse: // 締切ジャーナル印字応答
+
+import 'package:flutter/material.dart';
+
+import 'package:qr_multidemo/app_color.dart';
+import 'package:qr_multidemo/component/pop_out_button.dart';
+import 'package:qr_multidemo/component/secondary_tab_content_core.dart';
+import 'package:qr_multidemo/model/process_response.dart';
+import 'package:qr_multidemo/service/app_logger.dart';
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'package:qr_multidemo/utility/confirm_dialog.dart';
+import 'package:qr_multidemo/utility/error_handler.dart';
+
+
+/// 関連業務のジャーナル印字（締切ジャーナル・接客履歴ジャーナル）
+/// 「印刷中」ダイアログ表示 → [send] で印字要求送信 → 応答待ち
+///   RESULT=true  → 「印刷が完了しました」
+///   RESULT=false → エラーメッセージJSONのダイアログ（再試行ボタンで再印刷）
+///                  定義が無い場合は既定メッセージ「印刷に失敗しました」
+///   タイムアウト → 「通信エラーが発生しました」
+/// ※関連業務はQRの業務が無いため、取消（0xB101）は送らず画面に留まる
+Future<void> runJournalPrint({
+  required BuildContext context,
+  required String tag,
+  required Future<ProcessResponse> Function() send,
+}) async {
+  Future<void> showMessage(String text) async {
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => CustomConfirmDialog(
+            text: text,
+            trueBtnText: '確認',
+            hasFalseBtn: false,
+          ),
+    );
+  }
+
+  var retry = true;
+  while (retry) {
+    retry = false;
+    if (!context.mounted) return;
+
+    // 印刷中ダイアログ（閉じるNavigatorを先に取得し、必ず1回だけ閉じる）
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showCustomAlertDialog(context: context, text: '印刷中');
+    TcpService().setBlockingDialogOpen(true);
+    var dialogOpen = true;
+    void closeDialog() {
+      TcpService().setBlockingDialogOpen(false);
+      if (!dialogOpen) return;
+      dialogOpen = false;
+      try {
+        navigator.pop();
+      } catch (_) {
+        // 0xFB81により既にダイアログが閉じられている場合は何もしない
+      }
+    }
+
+    try {
+      final response = await send();
+      closeDialog();
+
+      if (response.result) {
+        await showMessage('印刷が完了しました');
+        return;
+      }
+
+      AppLogger().warn(
+        tag,
+        '印刷失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+      );
+      if (!context.mounted) return;
+      final result = await handleServerError(
+        context: context,
+        errKind: response.errKind,
+        errCode: response.errCode,
+      );
+      if (result.isRetryPrint) {
+        retry = true; // 再試行 → ループ
+      } else if (!result.handled) {
+        await showMessage('印刷に失敗しました');
+      }
+    } catch (e) {
+      closeDialog();
+      AppLogger().error(tag, '印刷エラー', e);
+      await showMessage('通信エラーが発生しました');
+    }
+  }
+}
+
+class CloseTallyPrintBtn extends StatelessWidget {
+
+
+        // 締切ジャーナル印字（0xC301 → 0xC381）
+        CloseTallyPrintBtn(
+          onPressed:
+              () => runJournalPrint(
+                context: context,
+                tag: 'CloseQuickTally',
+                send: TcpService().sendClosePrint,
+              ),
+        ),
+
+        // 締切ジャーナル印字（0xC301 → 0xC381）
+        // ※印字対象は本体側が選択中の締切（履歴ボタンの選択は締切履歴要求で本体に通知予定）
+        CloseTallyPrintBtn(
+          onPressed:
+              () => runJournalPrint(
+                context: context,
+                tag: 'CloseTallyReExport',
+                send: TcpService().sendClosePrint,
+              ),
+        ),
+
+
+
+
+
+
+
+
+
+
