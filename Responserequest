@@ -1,0 +1,20 @@
+Screen / action	Request → Response	While waiting	RESULT=false	Timeout / comm. error
+ログイン	0xA101 → 0xA181	no dialog (button loading state)	Error JSON, fallback 「パスワードが違います」	「通信エラー: (detail)」
+QR照会	0x1101 → 0x1181	照会中	Error JSON, fallback 「QR照会に失敗しました\nエラーコード: n」	「通信エラーが発生しました」
+└ then 表示データ	0x1201 → 0x1281	no dialog (照会中 has already closed)	Error JSON, fallback 「表示データの取得に失敗しました」	「通信エラーが発生しました」 ⚠️ see below
+経路選択 → 精算金額	0x1301 → 0x1381	処理中	Error JSON, fallback 「精算金額の取得に失敗しました」	「通信エラーが発生しました」
+実行 (入場/出場/精算/廃券/発駅キャンセル)	0x2101–0x2501 → 0x2181–0x2581	処理中	no dialog: goes to the 失敗 tab with the message from Error JSON (default text if none)	「通信エラーが発生しました」
+QR券情報 印刷	0xC101 → 0xC181	印刷中	Error JSON (再試行 / 取消 buttons), fallback 「印刷に失敗しました」 then 取消 → QR読取	「通信エラーが発生しました」
+領収書 印刷	0xC201 → 0xC281	印刷中	same as QR券情報 印刷	「通信エラーが発生しました」
+取消 (header もどる etc.)	0xB101 → 0xB181	処理中	no dialog (result ignored)	no dialog (logged only)
+取消 (完了画面 終了)	0xB101 → 0xB181	no dialog	no dialog	no dialog (logged only)
+ログオフ	0xA201 → 0xA281	処理中	Error JSON, fallback 「ログオフに失敗しました」	「通信エラーが発生しました」
+関連業務 tab tap (日計締切 / 速報 / 再出力 / 接客履歴 / 接続状態)	0x0C81 → 0x0C01	spinner	Error JSON, fallback 「処理に失敗しました\nエラーコード: n」	「通信エラーが発生しました」 (日計締切 after CLOSE_TALLY_TIMEOUT_SEC)
+接客履歴 date change	no command (CSV read)	spinner (0.3s min)	—	—
+                                                                                                                            
+Command	What the app shows
+0x0A81 初期化要求	Error JSON if RESULT=false (printer error and so on)
+0xF181 接続状態変化通知	no dialog, only the header icons
+0xFA81 本体制御異常通知	Error JSON (the button can send 0x0F01 / 0xB101 and so on)
+0xFB81 強制取消通知	closes any 処理中 / 印刷中 dialog and returns to QR読取
+                          
