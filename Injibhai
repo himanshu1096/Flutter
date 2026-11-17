@@ -1,0 +1,67 @@
+  // 締切ジャーナル印字（締切速報・締切再出力の印刷）
+  static const int dailyClosePrintResponse = 0xC381;
+  static const int dailyClosePrintRequest = 0xC301;
+  // 接客履歴ジャーナル印字（IF仕様書どおり 0xC401/0xC481）
+  static const int serviceHistoryPrintResponse = 0xC481;
+  static const int serviceHistoryPrintRequest = 0xC401;
+  // ※IF仕様書に無いため削除（締切速報は 0xC301、接客履歴は 0xC401 を使用）
+  // static const int closeNoticePrintResponse = 0xC481;
+  // static const int serviceHistoryPrintResponse = 0xC581;
+  // static const int closeNoticePrintRequest = 0xC401;
+  // static const int serviceHistoryPrintRequest = 0xC501;
+
+
+      _commandId == CommandId.dailyClosePrintRequest ||
+      // _commandId == CommandId.closeNoticePrintRequest || // ※削除（0xC301に統合）
+      _commandId == CommandId.serviceHistoryPrintRequest;
+
+
+        AppLogger().error(_tag, '0xC301 タイムアウト');
+        _printCompleter = null;
+        throw TimeoutException('締切ジャーナル印刷タイムアウト');
+      },
+    );
+  }
+
+  /// 接客履歴ジャーナル印字要求送信 (0xC401) → 応答 (0xC481)
+  /// ※接客履歴の印刷ボタン。データ部なし（コマンドのみ）
+  Future<ProcessResponse> sendServiceHistoryPrint() async {
+    AppLogger().info(_tag, '0xC401 接客履歴ジャーナル印字要求 送信');
+    _printCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: CommandId.serviceHistoryPrintRequest,
+      json: {},
+    );
+    return _printCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().printTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0xC401 タイムアウト');
+        _printCompleter = null;
+        throw TimeoutException('接客履歴ジャーナル印刷タイムアウト');
+      },
+    );
+  }
+
+
+
+      case CommandId.dailyClosePrintResponse: // 締切ジャーナル印字応答
+      case CommandId.serviceHistoryPrintResponse: // 接客履歴ジャーナル印字応答
+
+          // 接客履歴ジャーナル印字（0xC401 → 0xC481）
+          // ※印字対象は本体側の接客履歴ファイル（選択日の切替は接客履歴要求で本体に通知予定）
+          onPressed:
+              widget.canPrint
+                  ? () => runJournalPrint(
+                    context: context,
+                    tag: 'CustomerServiceHistory',
+                    send: TcpService().sendServiceHistoryPrint,
+                  )
+                  : null,
+
+
+
+
+
+
+
+
