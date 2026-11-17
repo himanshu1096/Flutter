@@ -1,0 +1,150 @@
+import 'package:qr_multidemo/service/tcp_service.dart';
+import 'package:qr_multidemo/utility/error_handler.dart';
+
+const int _kRelatedProcessTabIndex = 1;
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  /// 現在表示中のメインタブ（0：QR処理、1：関連業務）
+  /// ※TabBarはタップした時点で切り替わるため、0x0B01の正常応答を受けるまでは
+  ///   このタブに戻しておく
+  int _currentTab = 0;
+
+  /// メインタブを切り替える（0x0B01の正常応答後・QR処理へ直接戻る場合に呼ぶ）
+  void _changeTab(int index) {
+    _currentTab = index;
+    if (_tabController.index != index) {
+      _tabController.index = index;
+    }
+  }
+
+  /// 確認ダイアログ（確認ボタンのみ）
+  Future<void> _showMessage(String text) => showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder:
+        (context) => CustomConfirmDialog(
+          text: text,
+          trueBtnText: '確認',
+          hasFalseBtn: false,
+        ),
+  );
+
+  /// 画面タブ切替要求 (0x0B81) → 応答 (0x0B01)
+  /// [tabNumber]：0：QR処理、1：関連業務待機
+  /// 待っている間はくるくるを表示（画面操作不可）
+  /// RESULT=true のとき true を返す
+  /// RESULT=false はエラーメッセージJSON（無ければ既定メッセージ）、
+  /// タイムアウトは「通信エラーが発生しました」を表示して false を返す
+  Future<bool> _requestTabChange(int tabNumber) async {
+    if (!mounted) return false;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showLoadingSpinner(context: context);
+    var spinnerOpen = true;
+    void closeSpinner() {
+      if (!spinnerOpen) return;
+      spinnerOpen = false;
+      navigator.pop();
+    }
+
+    try {
+      final response = await TcpService().sendTabChange(tabNumber);
+      closeSpinner();
+      if (response.result) return true;
+
+      AppLogger().warn(
+        'MyHomePage',
+        '0x0B01 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+      );
+      if (!mounted) return false;
+      final result = await handleServerError(
+        context: context,
+        errKind: response.errKind,
+        errCode: response.errCode,
+      );
+      if (!result.handled && mounted) {
+        await _showMessage('処理に失敗しました\nエラーコード: ${response.errCode}');
+      }
+      return false;
+    } catch (e) {
+      closeSpinner();
+      AppLogger().error('MyHomePage', '0x0B81 エラー: TABNUMBER=$tabNumber', e);
+      if (mounted) await _showMessage('通信エラーが発生しました');
+      return false;
+    }
+  }
+
+  /// メインタブのタップ
+  /// QR処理 → 関連業務：0x0B81（TABNUMBER=1）の正常応答後に切り替える
+  /// 関連業務 → QR処理：取消と同じ（0x0B81（TABNUMBER=0）の正常応答後に戻る）
+  Future<void> _onMainTabTapped(int index) async {
+    // TabBarはタップした時点でタブを切り替えるため、いったん元のタブに戻す
+    if (_tabController.index != _currentTab) {
+      _tabController.index = _currentTab;
+    }
+    if (index == _currentTab) return;
+
+    if (index == _kRelatedProcessTabIndex) {
+      if (await _requestTabChange(1)) {
+        _changeTab(_kRelatedProcessTabIndex);
+      }
+    } else {
+      _goFirstTab();
+    }
+  }
+
+
+
+  /// 最初のタブを表示する（取消ボタン・関連業務からQR処理タブ押下）
+  void _goFirstTab() async {
+    // 関連業務 → QR処理：0x0B81（TABNUMBER=0）の正常応答を受けてから戻る
+    // ※失敗・タイムアウトの場合は関連業務に留まる
+    if (_currentTab == _kRelatedProcessTabIndex) {
+      if (!await _requestTabChange(0)) return;
+    }
+
+
+    ref.read(fareAmountProvider.notifier).clear();
+
+    _changeTab(0);
+
+
+
+    ref.read(qrTicketNoProvider.notifier).reset();
+    // ※QR処理タブ上での処理完了後のため、0x0B81は送らない
+    _changeTab(0);
+
+
+            bottom: _MainTabMenu(
+              controller: _tabController,
+              onCancelPressed: _goFirstTab,
+              onTabTapped: _onMainTabTapped,
+            ),
+
+
+
+class _MainTabMenu extends ConsumerWidget implements PreferredSizeWidget {
+  final TabController controller;
+  final VoidCallback onCancelPressed;
+
+  /// タブ押下（0x0B81の応答を受けてから切り替える）
+  final ValueChanged<int> onTabTapped;
+
+  const _MainTabMenu({
+    required this.controller,
+    required this.onCancelPressed,
+    required this.onTabTapped,
+  });
+
+
+              child: TabBar(
+                controller: controller,
+                onTap: onTabTapped,
+
+
+
+
