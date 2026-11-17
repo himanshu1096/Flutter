@@ -1,0 +1,60 @@
+  // 関連業務選択（※通常と逆で、要求が0x81・応答が0x01）
+  static const int relationRequest = 0x0C81; // Flutter → Server
+  static const int relationResponse = 0x0C01; // Server → Flutter
+
+  // 画面タブ切替（※通常と逆で、要求が0x81・応答が0x01）
+  static const int tabChangeRequest = 0x0B81; // Flutter → Server
+  static const int tabChangeResponse = 0x0B01; // Server → Flutter
+
+
+  // 関連業務選択要求応答 (0x0C01) Completer
+  Completer<RelationResponse>? _relationCompleter;
+
+  // 画面タブ切替要求応答 (0x0B01) Completer
+  Completer<ProcessResponse>? _tabChangeCompleter;
+
+
+      // 画面タブ切替要求応答 (0x0B01) Server → Flutter
+      // ※COMMONのみ（データ部なし）のため ProcessResponse で受ける
+      case CommandId.tabChangeResponse:
+        AppLogger().info(_tag, '0x0B01 画面タブ切替要求応答 受信');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          AppLogger().info(_tag, '0x0B01: $response');
+          _tabChangeCompleter?.complete(response);
+        } catch (e) {
+          AppLogger().error(_tag, '0x0B01 パースエラー', e);
+          _tabChangeCompleter?.completeError(e);
+        } finally {
+          _tabChangeCompleter = null;
+        }
+        break;
+
+      // 関連業務選択要求応答 (0x0C01) Server → Flutter
+      case CommandId.relationResponse:
+
+
+  /// 画面タブ切替要求送信 (0x0B81) Flutter → Server → 応答 (0x0B01)
+  /// [tabNumber]：0：QR処理（Business3000）／1：関連業務待機（Business6110）
+  /// ※ログイン直後のQR読取表示では送らない
+  Future<ProcessResponse> sendTabChange(int tabNumber) async {
+    AppLogger().info(_tag, '0x0B81 画面タブ切替要求 送信: TABNUMBER=$tabNumber');
+    _tabChangeCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: CommandId.tabChangeRequest,
+      json: {'TABNUMBER': tabNumber},
+    );
+    return _tabChangeCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x0B81 タイムアウト');
+        _tabChangeCompleter = null;
+        throw TimeoutException('画面タブ切替要求タイムアウト');
+      },
+    );
+  }
+
+  /// 関連業務選択要求送信 (0x0C81) Flutter → Server → 応答 (0x0C01)
+
+
+
