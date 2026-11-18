@@ -1,0 +1,165 @@
+  // 締切実行（日計締切の実行ボタン）
+  static const int closeExecuteRequest = 0x6301; // Flutter → Server
+  static const int closeExecuteResponse = 0x6381; // Server → Flutter
+
+  // 締切履歴選択（締切再出力の日時ボタン）
+  static const int closeHistorySelectRequest = 0x6401; // Flutter → Server
+  static const int closeHistorySelectResponse = 0x6481; // Server → Flutter
+
+
+
+  // 締切実行要求応答 (0x6381) Completer
+  Completer<ProcessResponse>? _closeExecuteCompleter;
+
+  // 締切履歴選択要求応答 (0x6481) Completer
+  Completer<ProcessResponse>? _closeHistorySelectCompleter;
+
+
+      // 締切履歴選択要求応答 (0x6481) Server → Flutter
+      // ※COMMONのみ（データ部なし）
+      case CommandId.closeHistorySelectResponse:
+        AppLogger().info(_tag, '0x6481 締切履歴選択要求応答 受信');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          AppLogger().info(_tag, '0x6481: $response');
+          _closeHistorySelectCompleter?.complete(response);
+        } catch (e) {
+          AppLogger().error(_tag, '0x6481 パースエラー', e);
+          _closeHistorySelectCompleter?.completeError(e);
+        } finally {
+          _closeHistorySelectCompleter = null;
+        }
+        break;
+
+      // 締切実行要求応答 (0x6381) Server → Flutter
+      // ※COMMONのみ（データ部なし）
+      case CommandId.closeExecuteResponse:
+
+
+
+  /// 締切履歴選択要求送信 (0x6401) Flutter → Server → 応答 (0x6481)
+  /// ※締切再出力の日時ボタン。[dateTime]：ボタンの日時「YYYY/MM/DD HH:MM:SS」
+  ///   （0x0C81 の PROPERTY と同じ形式）
+  /// ※本体側で選択した締切を締切ファイルにコピーしてから応答する
+  Future<ProcessResponse> sendCloseHistorySelect(String dateTime) async {
+    AppLogger().info(_tag, '0x6401 締切履歴選択要求 送信: SIMEDATASELECT=$dateTime');
+    _closeHistorySelectCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: CommandId.closeHistorySelectRequest,
+      json: {'SIMEDATASELECT': dateTime},
+    );
+    return _closeHistorySelectCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x6401 タイムアウト');
+        _closeHistorySelectCompleter = null;
+        throw TimeoutException('締切履歴選択要求タイムアウト');
+      },
+    );
+  }
+
+  /// 締切実行要求送信 (0x6301) Flutter → Server → 応答 (0x6381)
+
+
+    Widget historyBtn(int i) => _historyBtn(
+      date: i < historyDates.length ? historyDates[i] : null,
+      isSelected: i == selectedIndex,
+      onSelected: () async {
+        // 選択中のボタンは何もしない
+        if (i == selectedIndex) return;
+        final date = historyDates[i];
+        if (date == null) return;
+        // 0x6401送信 → 0x6481の正常応答後に選択を切り替え、締切ファイルを読み直す
+        final ok = await _selectCloseHistory(context, ref, date);
+        if (ok && context.mounted) userSelected.value = i;
+      },
+    );
+
+        date == null ? '－' : date.toStringWithFormat("yyyy/MM/dd HH:mm"),
+        style: TextStyle(fontSize: 24),
+      ),
+    ),
+  );
+}
+
+/// くるくるの最低表示時間（ミリ秒）
+const int _spinnerMinMs = 300;
+
+/// 締切履歴選択：くるくる表示 → 0x6401送信 → 0x6481待ち
+///   RESULT=true  → 締切ファイルを読み直して true を返す
+///   RESULT=false → エラーメッセージJSON（無ければ既定メッセージ）
+///   タイムアウト → 「通信エラーが発生しました」
+Future<bool> _selectCloseHistory(
+  BuildContext context,
+  WidgetRef ref,
+  DateTime date,
+) async {
+  const tag = 'CloseTallyReExport';
+  final closeTally = ref.read(closeTallyDataProvider.notifier);
+
+  Future<void> showMessage(String text) async {
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => CustomConfirmDialog(
+            text: text,
+            trueBtnText: '確認',
+            hasFalseBtn: false,
+          ),
+    );
+  }
+
+  // くるくる（閉じるNavigatorを先に取得し、必ず1回だけ閉じる）
+  final navigator = Navigator.of(context, rootNavigator: true);
+  showLoadingSpinner(context: context);
+  var spinnerOpen = true;
+  void closeSpinner() {
+    if (!spinnerOpen) return;
+    spinnerOpen = false;
+    navigator.pop();
+  }
+
+  final minWait = Future.delayed(const Duration(milliseconds: _spinnerMinMs));
+
+  try {
+    // ボタンの日時をPROPERTYと同じ形式で送る
+    final response = await TcpService().sendCloseHistorySelect(
+      date.toStringWithFormat('yyyy/MM/dd HH:mm:ss'),
+    );
+
+    if (response.result) {
+      // 本体側で選択した締切が締切ファイルにコピーされているため読み直す
+      await closeTally.load();
+      await minWait;
+      closeSpinner();
+      return true;
+    }
+
+    AppLogger().warn(
+      tag,
+      '0x6481 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+    );
+    closeSpinner();
+    if (!context.mounted) return false;
+    final result = await handleServerError(
+      context: context,
+      errKind: response.errKind,
+      errCode: response.errCode,
+    );
+    if (!result.handled) {
+      await showMessage('処理に失敗しました\nエラーコード: ${response.errCode}');
+    }
+    return false;
+  } catch (e) {
+    closeSpinner();
+    AppLogger().error(tag, '締切履歴選択エラー', e);
+    await showMessage('通信エラーが発生しました');
+    return false;
+  }
+}
+
+
+
+
