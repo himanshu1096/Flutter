@@ -1,0 +1,72 @@
+  /// 処理完了後のQR読取ページへの直接遷移
+  /// ※関連業務から戻る場合（日計締切の完了・失敗画面の確認など）は
+  ///   0x0B01（TABNUMBER=0）の正常応答を受けてから戻る。失敗時は関連業務に留まる
+  ///   QR読取内の処理完了から戻る場合は送らない
+  void _goFirstTabDirect() async {
+    if (_currentTab == _kRelatedProcessTabIndex) {
+      if (!await _requestTabChange(0)) return;
+    }
+
+
+
+      onPressed: () async {
+        // 締切実行（0x6301 → 0x6381）
+        final ok = await _executeClose(context);
+        if (!context.mounted) return;
+
+        // 完了画面（正常）／失敗画面（失敗・タイムアウト）に遷移する
+        // ※確認ボタン押下でQR読取へ戻る
+        //   （関連業務から戻るため、0x0B01（TABNUMBER=0）を送信してから戻る）
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) {
+              Future<void> closePage() async {
+                // ネストしたナビゲーターを取得する
+                final navState = Navigator.of(context, rootNavigator: false);
+
+                // ネストしたナビゲーターの画面を元の締め切り画面に戻す
+                if (navState.canPop()) {
+                  navState.pop();
+                }
+              }
+
+              return ok
+                  ? ProcessCompleted(onCompleteButtonPressed: closePage)
+                  : ProcessFailed(
+                    message: '処理が失敗しました。',
+                    onCompleteButtonPressed: closePage,
+                  );
+            },
+            transitionDuration: Duration.zero,
+          ),
+        );
+      },
+
+
+/// 締切実行：「実行中」ダイアログ表示 → 0x6301送信 → 0x6381待ち
+/// （タイムアウト：CLOSE_TALLY_TIMEOUT_SEC）
+///   RESULT=true            → true を返す（呼び出し元で完了画面へ）
+///   RESULT=false・タイムアウト → false を返す（呼び出し元で失敗画面へ）
+Future<bool> _executeClose(BuildContext context) async {
+  const tag = 'CloseTally';
+
+
+    AppLogger().warn(
+      tag,
+      '締切実行 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+    );
+    return false;
+  } catch (e) {
+    closeDialog();
+    AppLogger().error(tag, '締切実行エラー（タイムアウト・通信エラー）', e);
+    return false;
+  }
+}
+
+
+
+
+
+
+
