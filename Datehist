@@ -1,0 +1,162 @@
+  // 締切履歴選択（締切再出力の日時ボタン）
+  static const int closeHistorySelectRequest = 0x6401; // Flutter → Server
+  static const int closeHistorySelectResponse = 0x6481; // Server → Flutter
+
+  // 接客履歴要求（接客履歴の日付ボタン・その他の日付）
+  static const int serviceHistoryRequest = 0x6601; // Flutter → Server
+  static const int serviceHistoryResponse = 0x6681; // Server → Flutter
+
+
+
+  // 締切履歴選択要求応答 (0x6481) Completer
+  Completer<ProcessResponse>? _closeHistorySelectCompleter;
+
+  // 接客履歴要求応答 (0x6681) Completer
+  Completer<ProcessResponse>? _serviceHistoryCompleter;
+
+
+
+      // 接客履歴要求応答 (0x6681) Server → Flutter
+      // ※COMMONのみ（データ部なし）
+      case CommandId.serviceHistoryResponse:
+        AppLogger().info(_tag, '0x6681 接客履歴要求応答 受信');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          AppLogger().info(_tag, '0x6681: $response');
+          _serviceHistoryCompleter?.complete(response);
+        } catch (e) {
+          AppLogger().error(_tag, '0x6681 パースエラー', e);
+          _serviceHistoryCompleter?.completeError(e);
+        } finally {
+          _serviceHistoryCompleter = null;
+        }
+        break;
+
+      // 締切履歴選択要求応答 (0x6481) Server → Flutter
+      // ※COMMONのみ（データ部なし）
+      case CommandId.closeHistorySelectResponse:
+
+
+
+  /// 接客履歴要求送信 (0x6601) Flutter → Server → 応答 (0x6681)
+  /// ※接客履歴の日付ボタン・その他の日付。
+  ///   [start]／[end]：「YYYY/MM/DD 00:00:00」（時刻は常に00:00:00）
+  ///   ※画面は1日のみ選択のため end は start と同じ値（旧システムの期間指定に合わせた形式）
+  /// ※本体側で指定日の接客履歴ファイルを作成してから応答する
+  Future<ProcessResponse> sendServiceHistoryRequest({
+    required String start,
+    required String end,
+  }) async {
+    AppLogger().info(
+      _tag,
+      '0x6601 接客履歴要求 送信: SERVICEHISSTART=$start SERVICEHISEND=$end',
+    );
+    _serviceHistoryCompleter = Completer<ProcessResponse>();
+    await sendPacket(
+      commandId: CommandId.serviceHistoryRequest,
+      json: {'SERVICEHISSTART': start, 'SERVICEHISEND': end},
+    );
+    return _serviceHistoryCompleter!.future.timeout(
+      Duration(seconds: TcpConfig().responseTimeoutSec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x6601 タイムアウト');
+        _serviceHistoryCompleter = null;
+        throw TimeoutException('接客履歴要求タイムアウト');
+      },
+    );
+  }
+
+  /// 締切履歴選択要求送信 (0x6401) Flutter → Server → 応答 (0x6481)
+
+
+  // /// 日付選択（日付ボタン／カレンダー）
+  // void _onDateSelected(DateTime date) {
+  //   setState(() {
+  //     _selectedDate = DateUtils.dateOnly(date);
+  //   });
+  //   _loadHistory();
+  // }
+
+  /// 日付選択（日付ボタン／その他の日付）
+  /// くるくる表示 → 0x6601送信 → 0x6681待ち
+  ///   RESULT=true  → 指定日のCSVを読み込み、選択日と一覧を切り替える
+  ///   RESULT=false → エラーメッセージJSON（無ければ既定メッセージ）、選択日はそのまま
+  ///   タイムアウト → 「通信エラーが発生しました」、選択日はそのまま
+  Future<void> _onDateSelected(DateTime date) async {
+    if (!mounted) return;
+    const tag = 'CustomerServiceHistory';
+    final day = DateUtils.dateOnly(date);
+
+    Future<void> showMessage(String text) async {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => CustomConfirmDialog(
+              text: text,
+              trueBtnText: '確認',
+              hasFalseBtn: false,
+            ),
+      );
+    }
+
+    // くるくる（閉じるNavigatorを先に取得し、必ず1回だけ閉じる）
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showLoadingSpinner(context: context);
+    var spinnerOpen = true;
+    void closeSpinner() {
+      if (!spinnerOpen) return;
+      spinnerOpen = false;
+      navigator.pop();
+    }
+
+    final minWait = Future.delayed(
+      const Duration(milliseconds: _loadingDialogMinMs),
+    );
+
+    try {
+      // 開始・終了とも選択日の 00:00:00（1日分）
+      final stamp = '${day.toStringWithFormat('yyyy/MM/dd')} 00:00:00';
+      final response = await TcpService().sendServiceHistoryRequest(
+        start: stamp,
+        end: stamp,
+      );
+
+      if (response.result) {
+        // 本体側で指定日の接客履歴ファイルが作成されているため読み込む
+        final records = await ServiceHistoryService().load(day);
+        await minWait;
+        closeSpinner();
+        if (!mounted) return;
+        setState(() {
+          _selectedDate = day;
+          _items = records.map(_toHistoryItem).toList();
+        });
+        return;
+      }
+
+      AppLogger().warn(
+        tag,
+        '0x6681 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+      );
+      closeSpinner();
+      if (!mounted) return;
+      final result = await handleServerError(
+        context: context,
+        errKind: response.errKind,
+        errCode: response.errCode,
+      );
+      if (!result.handled) {
+        await showMessage('処理に失敗しました\nエラーコード: ${response.errCode}');
+      }
+    } catch (e) {
+      closeSpinner();
+      AppLogger().error(tag, '接客履歴要求エラー', e);
+      await showMessage('通信エラーが発生しました');
+    }
+  }
+
+
+
+
