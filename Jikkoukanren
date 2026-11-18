@@ -1,0 +1,153 @@
+  // 画面タブ切替
+  static const int tabChangeRequest = 0x0B01; // Flutter → Server
+  static const int tabChangeResponse = 0x0B81; // Server → Flutter
+
+  // 締切実行（日計締切の実行ボタン）
+  static const int closeExecuteRequest = 0x6301; // Flutter → Server
+  static const int closeExecuteResponse = 0x6381; // Server → Flutter
+
+
+
+  // 画面タブ切替要求応答 (0x0B01) Completer
+  Completer<ProcessResponse>? _tabChangeCompleter;
+
+  // 締切実行要求応答 (0x6381) Completer
+  Completer<ProcessResponse>? _closeExecuteCompleter;
+
+
+
+      // 締切実行要求応答 (0x6381) Server → Flutter
+      // ※COMMONのみ（データ部なし）
+      case CommandId.closeExecuteResponse:
+        AppLogger().info(_tag, '0x6381 締切実行要求応答 受信');
+        try {
+          final response = ProcessResponse.fromJson(packet.json);
+          AppLogger().info(_tag, '0x6381: $response');
+          _closeExecuteCompleter?.complete(response);
+        } catch (e) {
+          AppLogger().error(_tag, '0x6381 パースエラー', e);
+          _closeExecuteCompleter?.completeError(e);
+        } finally {
+          _closeExecuteCompleter = null;
+        }
+        break;
+
+      case CommandId.tabChangeResponse:
+
+
+  /// 締切実行要求送信 (0x6301) Flutter → Server → 応答 (0x6381)
+  /// ※日計締切の実行ボタン。データ部なし（コマンドのみ）
+  /// ※本体側でデ集へのデータ送信・ジャーナル印字などを行うため、
+  ///   タイムアウトは CLOSE_TALLY_TIMEOUT_SEC（通常より長い）
+  Future<ProcessResponse> sendCloseExecute() async {
+    final sec = TcpConfig().closeTallyTimeoutSec;
+    AppLogger().info(_tag, '0x6301 締切実行要求 送信（タイムアウト$sec秒）');
+    _closeExecuteCompleter = Completer<ProcessResponse>();
+    await sendPacket(commandId: CommandId.closeExecuteRequest, json: {});
+    return _closeExecuteCompleter!.future.timeout(
+      Duration(seconds: sec),
+      onTimeout: () {
+        AppLogger().error(_tag, '0x6301 タイムアウト ($sec秒)');
+        _closeExecuteCompleter = null;
+        throw TimeoutException('締切実行要求タイムアウト');
+      },
+    );
+  }
+
+  Future<ProcessResponse> sendTabChange(int tabNumber) async {
+
+
+
+      onPressed: () async {
+        // 締切実行（0x6301 → 0x6381）。正常応答の場合のみ完了画面へ
+        if (!await _executeClose(context)) return;
+        if (!context.mounted) return;
+
+        // 完了画面に遷移する
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+
+
+            transitionDuration: Duration.zero,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 締切実行：「実行中」ダイアログ表示 → 0x6301送信 → 0x6381待ち
+/// （タイムアウト：CLOSE_TALLY_TIMEOUT_SEC）
+///   RESULT=true  → true を返す（呼び出し元で完了画面へ）
+///   RESULT=false → エラーメッセージJSON（無ければ既定メッセージ「締切に失敗しました」）
+///   タイムアウト → 「通信エラーが発生しました」
+Future<bool> _executeClose(BuildContext context) async {
+  const tag = 'CloseTally';
+
+  Future<void> showMessage(String text) async {
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => CustomConfirmDialog(
+            text: text,
+            trueBtnText: '確認',
+            hasFalseBtn: false,
+          ),
+    );
+  }
+
+  // 実行中ダイアログ（閉じるNavigatorを先に取得し、必ず1回だけ閉じる）
+  final navigator = Navigator.of(context, rootNavigator: true);
+  showCustomAlertDialog(context: context, text: '実行中');
+  TcpService().setBlockingDialogOpen(true);
+  var dialogOpen = true;
+  void closeDialog() {
+    TcpService().setBlockingDialogOpen(false);
+    if (!dialogOpen) return;
+    dialogOpen = false;
+    try {
+      navigator.pop();
+    } catch (_) {
+      // 0xFB81により既にダイアログが閉じられている場合は何もしない
+    }
+  }
+
+  try {
+    final response = await TcpService().sendCloseExecute();
+    closeDialog();
+    if (response.result) {
+      AppLogger().info(tag, '締切実行 正常終了');
+      return true;
+    }
+
+    AppLogger().warn(
+      tag,
+      '締切実行 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+    );
+    if (!context.mounted) return false;
+    final result = await handleServerError(
+      context: context,
+      errKind: response.errKind,
+      errCode: response.errCode,
+    );
+    if (!result.handled) {
+      await showMessage('締切に失敗しました\nエラーコード: ${response.errCode}');
+    }
+    return false;
+  } catch (e) {
+    closeDialog();
+    AppLogger().error(tag, '締切実行エラー', e);
+    await showMessage('通信エラーが発生しました');
+    return false;
+  }
+}
+
+
+
+
+
+
+
