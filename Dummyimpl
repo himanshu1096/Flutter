@@ -1,0 +1,65 @@
+  int _closeTallyTimeoutSec = _defaultCloseTallyTimeoutSec;
+
+  /// 【暫定】関連業務の応答を待たずに正常応答として扱う（本体側の応答が未実装の間のみ）
+  /// ※本体側の応答が揃ったら false にする（またはキーを削除）
+  bool _dummyRelationResponse = false;
+
+
+
+  int get closeTallyTimeoutSec => _closeTallyTimeoutSec;
+  bool get dummyRelationResponse => _dummyRelationResponse;
+
+
+      _closeTallyTimeoutSec =
+          json['CLOSE_TALLY_TIMEOUT_SEC'] as int? ??
+          _defaultCloseTallyTimeoutSec;
+      _dummyRelationResponse =
+          json['DUMMY_RELATION_RESPONSE'] as bool? ?? false;
+
+
+
+  //==============================
+  // 【暫定】本体側の応答が未実装の間、関連業務の応答を待たずに正常応答として扱う
+  // ※app_config.json の DUMMY_RELATION_RESPONSE: true のときのみ
+  //   本体側の応答が揃ったら false にする（コードの修正は不要）
+  //==============================
+  bool get _dummyResponse => TcpConfig().dummyRelationResponse;
+
+  ProcessResponse _dummyOk(String cmd) {
+    AppLogger().warn(_tag, '【暫定】$cmd の応答を待たずに正常応答として扱います');
+    return const ProcessResponse(result: true, errCode: 0, errKind: 0);
+  }
+
+  RelationResponse _dummyRelationOk() {
+    AppLogger().warn(_tag, '【暫定】0x0C01 の応答を待たずに正常応答として扱います');
+    final now = DateTime.now();
+    return RelationResponse(
+      result: true,
+      errCode: 0,
+      errKind: 0,
+      // 締切再出力の日時ボタン用ダミー（1日ずつ前の23:00、新しい順）
+      properties: [
+        for (var i = 1; i <= RelationResponse.propertyCount; i++)
+          DateTime(now.year, now.month, now.day - i, 23, 0, 0),
+      ],
+    );
+  }
+
+  /// 接客履歴要求送信 (0x6601) Flutter → Server → 応答 (0x6681)
+
+
+      json: {'SERVICEHISSTART': start, 'SERVICEHISEND': end},
+    );
+    if (_dummyResponse) {
+      _serviceHistoryCompleter = null;
+      return _dummyOk('0x6601');
+    }
+
+      json: {'SIMEDATASELECT': dateTime},
+    );
+    if (_dummyResponse) {
+      _closeHistorySelectCompleter = null;
+      return _dummyOk('0x6401');
+    }
+
+
