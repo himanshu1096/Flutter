@@ -1,0 +1,219 @@
+/// 読み込み中のくるくる（円形プログレス）
+/// 画面全体を薄暗くして操作不可にし、中央に回転する円を表示する
+/// ※自動では消えないため、戻り値の LoadingSpinnerHandle.close() で閉じる
+///   （pop() は最前面のダイアログを閉じるため、異常通知ダイアログ等が
+///     上に重なっていると誤って閉じてしまう → close() は自分自身だけを閉じる）
+// void showLoadingSpinner({required BuildContext context}) {
+//   showDialog(
+//     context: context,
+//     useRootNavigator: true,
+//     barrierDismissible: false,
+//     builder:
+//         (context) => const Center(
+//           child: SizedBox(
+//             width: 120,
+//             height: 120,
+//             child: CircularProgressIndicator(strokeWidth: 10),
+//           ),
+//         ),
+//   );
+// }
+LoadingSpinnerHandle showLoadingSpinner({required BuildContext context}) {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final route = DialogRoute<void>(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.black54,
+    themes: InheritedTheme.capture(from: context, to: navigator.context),
+    builder:
+        (context) => const Center(
+          child: SizedBox(
+            width: 120,
+            height: 120,
+            child: CircularProgressIndicator(strokeWidth: 10),
+          ),
+        ),
+  );
+  navigator.push(route);
+  return LoadingSpinnerHandle._(navigator, route);
+}
+
+/// くるくるの操作ハンドル
+class LoadingSpinnerHandle {
+  LoadingSpinnerHandle._(this._navigator, this._route);
+
+  final NavigatorState _navigator;
+  final Route<void> _route;
+  bool _closedBySelf = false;
+
+  /// 自分で閉じる前に、他の処理（0xFB81 業務強制取消 等）で閉じられた
+  /// → 呼び出し元は以降のダイアログ表示をスキップする
+  bool get closedByOthers => !_closedBySelf && !_route.isActive;
+
+  /// このくるくるだけを閉じる（上に別ダイアログがあっても影響しない）
+  /// ※既に閉じられていれば何もしない／2回呼んでも安全
+  void close() {
+    if (_closedBySelf) return;
+    _closedBySelf = true;
+    if (_route.isActive) _navigator.removeRoute(_route);
+  }
+}
+
+
+
+  // くるくる表示（画面操作不可）
+  // ※閉じるNavigatorを先に取得しておき、必ず1回だけ閉じる
+  // final navigator = Navigator.of(context, rootNavigator: true);
+  // showLoadingSpinner(context: context);
+  // var spinnerOpen = true;
+  // void closeSpinner() {
+  //   if (!spinnerOpen) return;
+  //   spinnerOpen = false;
+  //   navigator.pop();
+  // }
+  // ※pop() は最前面を閉じるため、0xFA81 異常ダイアログが上にあると誤って閉じる
+  //   → ハンドルで自分のくるくるだけを閉じる
+  final spinner = showLoadingSpinner(context: context);
+  void closeSpinner() => spinner.close();
+
+
+
+    // RESULT=false：KbaErrorMessage.json のエラーダイアログ
+    AppLogger().warn(
+      tag,
+      '0x0C81 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+    );
+    // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため表示しない
+    final closedByOthers = spinner.closedByOthers;
+    closeSpinner();
+    if (closedByOthers) {
+      AppLogger().info(tag, 'くるくるが他処理で閉じられたため、エラー表示をスキップ');
+      return;
+    }
+    if (!context.mounted) return;
+
+
+
+  } catch (e) {
+    // タイムアウト・通信エラー（QR読取と同じダイアログ）
+    AppLogger().error(tag, '0x0C81 エラー: RELATIONNUMBER=$relationNumber', e);
+    // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため表示しない
+    final closedByOthers = spinner.closedByOthers;
+    closeSpinner();
+    if (closedByOthers) {
+      AppLogger().info(tag, 'くるくるが他処理で閉じられたため、通信エラー表示をスキップ');
+      return;
+    }
+    if (context.mounted) {
+
+
+
+
+  // くるくる（閉じるNavigatorを先に取得し、必ず1回だけ閉じる）
+  // final navigator = Navigator.of(context, rootNavigator: true);
+  // showLoadingSpinner(context: context);
+  // var spinnerOpen = true;
+  // void closeSpinner() {
+  //   if (!spinnerOpen) return;
+  //   spinnerOpen = false;
+  //   navigator.pop();
+  // }
+  // ※pop() は最前面を閉じるため、0xFA81 異常ダイアログが上にあると誤って閉じる
+  //   → ハンドルで自分のくるくるだけを閉じる
+  final spinner = showLoadingSpinner(context: context);
+  void closeSpinner() => spinner.close();
+
+
+    AppLogger().warn(
+      tag,
+      '0x6481 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+    );
+    // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため表示しない
+    final closedByOthers = spinner.closedByOthers;
+    closeSpinner();
+    if (closedByOthers) {
+      AppLogger().info(tag, 'くるくるが他処理で閉じられたため、エラー表示をスキップ');
+      return false;
+    }
+    if (!context.mounted) return false;
+
+
+  } catch (e) {
+    // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため表示しない
+    final closedByOthers = spinner.closedByOthers;
+    closeSpinner();
+    AppLogger().error(tag, '締切履歴選択エラー', e);
+    if (closedByOthers) {
+      AppLogger().info(tag, 'くるくるが他処理で閉じられたため、通信エラー表示をスキップ');
+      return false;
+    }
+    await showMessage('通信エラーが発生しました');
+    return false;
+  }
+
+
+    // くるくる（閉じるNavigatorを先に取得し、必ず1回だけ閉じる）
+    // final navigator = Navigator.of(context, rootNavigator: true);
+    // showLoadingSpinner(context: context);
+    // var spinnerOpen = true;
+    // void closeSpinner() {
+    //   if (!spinnerOpen) return;
+    //   spinnerOpen = false;
+    //   navigator.pop();
+    // }
+    // ※pop() は最前面を閉じるため、0xFA81 異常ダイアログが上にあると誤って閉じる
+    //   → ハンドルで自分のくるくるだけを閉じる
+    final spinner = showLoadingSpinner(context: context);
+    void closeSpinner() => spinner.close();
+
+
+
+      AppLogger().warn(
+        tag,
+        '0x6681 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+      );
+      // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため表示しない
+      final closedByOthers = spinner.closedByOthers;
+      closeSpinner();
+      if (closedByOthers) {
+        AppLogger().info(tag, 'くるくるが他処理で閉じられたため、エラー表示をスキップ');
+        return;
+      }
+      if (!mounted) return;
+
+
+
+    } catch (e) {
+      // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため表示しない
+      final closedByOthers = spinner.closedByOthers;
+      closeSpinner();
+      AppLogger().error(tag, '接客履歴要求エラー', e);
+      if (closedByOthers) {
+        AppLogger().info(tag, 'くるくるが他処理で閉じられたため、通信エラー表示をスキップ');
+        return;
+      }
+      await showMessage('通信エラーが発生しました');
+    }
+  }
+
+
+
+    // ダイアログを閉じるNavigatorを先に取得しておく
+    // （読み込み中に画面が破棄されても確実に閉じるため）
+    // final navigator = Navigator.of(context, rootNavigator: true);
+    // showLoadingSpinner(context: context);
+    // ※pop() は最前面を閉じるため、0xFA81 異常ダイアログが上にあると誤って閉じる
+    //   → ハンドルで自分のくるくるだけを閉じる
+    final spinner = showLoadingSpinner(context: context);
+    List<ServiceHistoryRecord> records = [];
+
+
+
+    } finally {
+      // navigator.pop();
+      spinner.close();
+    }
+
+
+
+
