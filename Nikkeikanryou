@@ -1,0 +1,91 @@
+  /// 処理完了後の直接遷移 (取消確認ダイアログなし、0xB101送信なし)
+  /// ※戻り値：true = ＱＲ読取へ遷移した／false = 0x0B81 失敗・タイムアウトで遷移しなかった
+  // final VoidCallback goFirstTabDirect;
+  final Future<bool> Function() goFirstTabDirect;
+
+
+
+  // void _goFirstTabDirect() async {
+  Future<bool> _goFirstTabDirect() async {
+    if (_currentTab == _kRelatedProcessTabIndex) {
+      // if (!await _requestTabChange(0)) return;
+      if (!await _requestTabChange(0)) return false;
+    }
+    ref.read(displayDataProvider.notifier).clear();
+    ref.read(qrTicketNoProvider.notifier).reset();
+    // ※QR処理タブ上での処理完了後のため、0x0B81は送らない
+    _changeTab(0);
+    qrProcessMenu.currentState?.executeCancel();
+    return true;
+  }
+
+
+
+  const ProcessCompleted({
+    super.key,
+    this.onCompleteButtonPressed,
+    this.move = true,
+  });
+
+  /// 完了ボタン押下時に実行する処理
+  final Future<void> Function()? onCompleteButtonPressed;
+
+  /// 確認押下後にＱＲ読取へ自動で遷移するか
+  /// ※false の場合は onCompleteButtonPressed 側で遷移する
+  final bool move;
+
+
+
+    return _ProcessCompleteBase(
+      onCompleteButtonPressed: widget.onCompleteButtonPressed,
+      move: widget.move,
+    );
+
+
+
+  const ProcessFailed({
+    super.key,
+    this.message,
+    this.onCompleteButtonPressed,
+    this.move = true,
+  });
+
+  /// 確認押下後にＱＲ読取へ自動で遷移するか
+  /// ※false の場合は onCompleteButtonPressed 側で遷移する
+  final bool move;
+
+
+
+      message: message ?? "処理に失敗しました",
+      completeButtonLabel: '確認   ',
+      onCompleteButtonPressed: onCompleteButtonPressed,
+      move: move,
+    );
+
+
+
+              Future<void> closePage() async {
+                // ネストしたナビゲーターを取得する
+                final navState = Navigator.of(context, rootNavigator: false);
+
+                // 完了・失敗画面を表示したまま 0x0B01（TABNUMBER=0）→ 0x0B81 を待つ
+                // ※先に画面を閉じると、応答待ちの間に日計締切画面が見えてしまうため
+                //   true  → ＱＲ読取へ遷移済み
+                //   false → エラーダイアログ表示済み（関連業務に留まる）
+                await HomeTabData.of(context).goFirstTabDirect();
+
+                // ネストしたナビゲーターの画面を元の締め切り画面に戻す
+                // （成功時はＱＲ読取に切替済みのため見えない／失敗時は日計締切画面に戻る）
+                if (navState.canPop()) {
+                  navState.pop();
+                }
+              }
+
+              return ok
+                  // ? ProcessCompleted(onCompleteButtonPressed: closePage)
+                  ? ProcessCompleted(onCompleteButtonPressed: closePage, move: false)
+                  : ProcessFailed(
+                    message: '処理が失敗しました。',
+                    onCompleteButtonPressed: closePage,
+                    move: false,
+                  );
