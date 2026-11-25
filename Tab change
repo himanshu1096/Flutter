@@ -1,0 +1,173 @@
+                            onPressed: () async {
+                              // 表示中と同じサブタブは押下不可（0x0C01 を再送しない）
+                              if (tabController.index == index) return;
+                              // tabController.animateTo(index);
+                              // onTap?.call(index);
+                              // 正常応答を受けてからタブを切り替える
+                              // （待っている間・失敗時は押下前のタブ・データのまま）
+                              if (onBeforeChange != null) {
+                                final ok = await onBeforeChange!(index);
+                                if (!ok) return;
+                              }
+                              tabController.animateTo(index);
+                              onTap?.call(index);
+                            },
+
+
+
+                            onPressed: () async {
+                              // 表示中と同じサブタブは押下不可（0x0C01 を再送しない）
+                              if (tabController.index == index) return;
+                              // tabController.animateTo(index);
+                              // onTap?.call(index);
+                              // 正常応答を受けてからタブを切り替える
+                              // （待っている間・失敗時は押下前のタブ・データのまま）
+                              if (onBeforeChange != null) {
+                                final ok = await onBeforeChange!(index);
+                                if (!ok) return;
+                              }
+                              tabController.animateTo(index);
+                              onTap?.call(index);
+                            },
+
+
+
+      // onTap: (index) async {
+      //   ...（旧：タブ切替後に 0x0C01 を送信していた）
+      // },
+      // 0x0C01 → 0x0C81 正常応答を受けてからタブを切り替える
+      onBeforeChange: (index) async {
+        // タブに応じた関連業務番号（0x0C81 RELATIONNUMBER）
+        final tab = _RelatedProcessTab.values[index];
+        final relationNumber = switch (tab) {
+          _RelatedProcessTab.closeTally => 3, // 日計締切
+          _RelatedProcessTab.closeQuick => 0, // 締切速報
+          _RelatedProcessTab.closeTallyRe => 4, // 締切再出力
+          _RelatedProcessTab.history => 6, // 接客履歴
+          _RelatedProcessTab.connection => 19, // 接続状態
+          _ => null,
+        };
+        // 送信しないタブ（ログオフ等）はそのまま切り替える
+        if (relationNumber == null) return true;
+        return _selectRelation(context, ref, tab, relationNumber);
+      },
+      // タブ切替後の処理
+      onTap: (index) {
+        final tab = _RelatedProcessTab.values[index];
+        // 接客履歴：画面が表示されてから再読み込みを通知する
+        // （表示前に通知すると受け取れないため、描画後に通知する）
+        if (tab == _RelatedProcessTab.history) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(serviceHistoryReloadProvider.notifier).notify();
+          });
+        }
+      },
+
+
+
+
+// Future<void> _selectRelation(
+// ※戻り値：true = 正常応答（タブを切り替える）／false = 失敗・タイムアウト（元のタブのまま）
+Future<bool> _selectRelation(
+  BuildContext context,
+  WidgetRef ref,
+  _RelatedProcessTab tab,
+  int relationNumber,
+) async {
+  const tag = 'RelatedProcess';
+  final isCloseTab =
+      tab == _RelatedProcessTab.closeTally ||
+      tab == _RelatedProcessTab.closeQuick ||
+      tab == _RelatedProcessTab.closeTallyRe;
+  final closeTally = ref.read(closeTallyDataProvider.notifier);
+  final historyDates = ref.read(closeHistoryDatesProvider.notifier);
+
+  // 前回の表示を残さない
+  // ※失敗・タイムアウト時は押下前の画面・データのままにするため、事前にクリアしない
+  // if (isCloseTab) closeTally.clear();
+  // if (tab == _RelatedProcessTab.closeTallyRe) historyDates.clear();
+
+  // くるくる表示（画面操作不可）
+  // ※pop() は最前面を閉じるため、0xFA81 異常ダイアログが上にあると誤って閉じる
+  //   → ハンドルで自分のくるくるだけを閉じる
+  final spinner = showLoadingSpinner(context: context);
+  void closeSpinner() => spinner.close();
+
+  final minWait = Future.delayed(const Duration(milliseconds: _spinnerMinMs));
+
+  try {
+    final response = await TcpService().sendRelationRequest(relationNumber);
+
+    // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため反映しない
+    if (spinner.closedByOthers) {
+      AppLogger().info(tag, 'くるくるが他処理で閉じられたため、0x0C81 の結果を反映しない');
+      closeSpinner();
+      return false;
+    }
+
+    if (response.result) {
+      AppLogger().info(tag, '0x0C81 正常: RELATIONNUMBER=$relationNumber');
+      // 切り替え先のデータを読み込む（読み込み後にタブを切り替える）
+      if (isCloseTab) await closeTally.load();
+      if (tab == _RelatedProcessTab.closeTallyRe) {
+        historyDates.set(response.properties);
+      }
+      // 接客履歴の再読み込み通知は、タブ切替後に onTap で行う
+      // if (tab == _RelatedProcessTab.history) {
+      //   ref.read(serviceHistoryReloadProvider.notifier).notify();
+      // }
+      await minWait;
+      closeSpinner();
+      return true;
+    }
+
+    // RESULT=false：KbaErrorMessage.json のエラーダイアログ
+    AppLogger().warn(
+      tag,
+      '0x0C81 失敗: ERRKIND=${response.errKind} ERRCODE=${response.errCode}',
+    );
+    closeSpinner();
+    if (!context.mounted) return false;
+    final result = await handleServerError(
+      context: context,
+      errKind: response.errKind,
+      errCode: response.errCode,
+    );
+    if (!result.handled && context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => CustomConfirmDialog(
+              text: '処理に失敗しました\nエラーコード: ${response.errCode}',
+              trueBtnText: '確認',
+              hasFalseBtn: false,
+            ),
+      );
+    }
+    return false;
+  } catch (e) {
+    // タイムアウト・通信エラー（QR読取と同じダイアログ）
+    AppLogger().error(tag, '0x0C81 エラー: RELATIONNUMBER=$relationNumber', e);
+    // 0xFB81 等で既にくるくるが閉じられていた → QR読取へ戻っているため表示しない
+    final closedByOthers = spinner.closedByOthers;
+    closeSpinner();
+    if (closedByOthers) {
+      AppLogger().info(tag, 'くるくるが他処理で閉じられたため、通信エラー表示をスキップ');
+      return false;
+    }
+    if (context.mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => CustomConfirmDialog(
+              text: '通信エラーが発生しました',
+              trueBtnText: '確認',
+              hasFalseBtn: false,
+            ),
+      );
+    }
+    return false;
+  }
+}
