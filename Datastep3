@@ -1,0 +1,121 @@
+                card.isCompanyCard
+                    // 各社別精算内訳：ファイルのグループ（全体・東武分・メトロ分・新しいグループ）
+                    // ※行が1つも無いグループは見出しごと非表示
+                    ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      spacing: 16,
+                      children: [
+                        for (final g in card.groups)
+                          if (g.rows.isNotEmpty || g.companies.isNotEmpty)
+                            _CompanyBreakdownGroup(
+                              groupTitle: g.title,
+                              fontColor: fontColor,
+                              section: g,
+                            ),
+                      ],
+                    )
+
+
+
+
+/// 各社別精算内訳の1グループ分（全体／東武分／メトロ分／新しいグループで共通のレイアウト）
+/// ファイルの行・会社をそのまま表示する
+class _CompanyBreakdownGroup extends StatelessWidget {
+  const _CompanyBreakdownGroup({
+    required this.groupTitle,
+    required this.fontColor,
+    required this.section,
+  });
+
+  final String groupTitle;
+  final Color fontColor;
+
+  /// 締切テキストファイルの該当グループの区切り
+  final TallySection section;
+
+  @override
+  Widget build(BuildContext context) {
+    final groupTitleStyle = titleTextStyle.copyWith(
+      color: fontColor,
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // グループ見出し（- - - 全体 - - -）
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  '- ' * 40,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.clip,
+                  textAlign: TextAlign.right,
+                  style: groupTitleStyle,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Text(groupTitle, style: groupTitleStyle),
+              ),
+              Expanded(
+                child: Text(
+                  '- ' * 40,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.clip,
+                  style: groupTitleStyle,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // グループの行（合計・現金など、ファイルの順）
+        for (final row in section.rows)
+          _ContentTable(
+            titleText: row.name,
+            subTitleText: section.unit ?? '',
+            countValue: _countText(row.value),
+            amountValue: _amountText(row.value),
+            showAmount: _hasAmount(row.value),
+            titleLeftPadding: row.indent ? initialPadding : null,
+          ),
+        // 会社ごとの内訳（ファイルに出てきた順）
+        for (final c in section.companies) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 10.0, bottom: 2.0),
+            child: Text(
+              c.name,
+              style: titleTextStyle.copyWith(
+                color: fontColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          // 会社の行（増・減・相殺、ファイルの順）
+          for (final r in c.rows)
+            _ContentTable(
+              titleText: r.name,
+              subTitleText: section.companyUnit ?? '',
+              countValue: _countText(r.value),
+              amountValue: _amountText(r.value),
+              showAmount: _hasAmount(r.value),
+              titleLeftPadding: initialPadding * 2,
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+
+
+
+
+
