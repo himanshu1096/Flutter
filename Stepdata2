@@ -1,0 +1,111 @@
+    final data = ref.watch(closeTallyDataProvider);
+    // ファイルを読めたか（読めた場合のみ、無い行を非表示にする）
+    // final loaded = data != null;
+    // ※ファイルの内容からカードを作るため、無い行はそもそも表示されない
+    // 読み込み失敗時は従来の固定レイアウト（値は「－」）
+    final cards = (data ?? CloseTallyData.placeholder).cards;
+
+
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // カード（既知の区切りは従来の順、各社別精算内訳、未知の区切りはファイルの順）
+        for (final card in cards)
+          _AccordionCard(
+            title: card.title,
+            initiallyExpanded: true,
+            fontColor: fontColor,
+            cardBackgroundColor: cardBackgroundColor,
+            cardOutlineColor: cardOutlineColor,
+            icon: _sectionIcon(card, fontColor, cardBackgroundColor),
+            content:
+                card.isCompanyCard
+                    // 各社別精算内訳（Step 3 でファイルのグループ順に変更）
+                    ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _CompanyBreakdownGroup(
+                          groupTitle: '全体',
+                          fontColor: fontColor,
+                          group: data?.companyAll,
+                        ),
+                        const SizedBox(height: 16),
+                        _CompanyBreakdownGroup(
+                          groupTitle: '東武分',
+                          fontColor: fontColor,
+                          group: data?.companyTobu,
+                        ),
+                        const SizedBox(height: 16),
+                        _CompanyBreakdownGroup(
+                          groupTitle: 'メトロ分',
+                          fontColor: fontColor,
+                          group: data?.companyMetro,
+                        ),
+                      ],
+                    )
+                    // 通常のカード：ファイルの行をそのまま表示
+                    : Column(
+                      children: [
+                        for (final row in card.section.rows)
+                          _ContentTable(
+                            titleText: row.name,
+                            subTitleText: card.section.unit ?? '',
+                            countValue: _countText(row.value),
+                            amountValue: _amountText(row.value),
+                            showAmount: _hasAmount(row.value),
+                            titleLeftPadding:
+                                row.indent ? initialPadding : null,
+                          ),
+                      ],
+                    ),
+          ),
+      ],
+    );
+
+
+
+/// カードのアイコン（既知の区切りは従来のアイコン、未知の区切りは既定のアイコン）
+Widget _sectionIcon(TallyCard card, Color fontColor, Color backgroundColor) {
+  if (card.isCompanyCard) {
+    return Icon(Icons.account_balance_outlined, size: 40.0, color: fontColor);
+  }
+  switch (card.section.key) {
+    case CloseTallyData.sectionTotalHandled:
+      return DualIconOverlay(
+        baseIcon: Icons.receipt_long_outlined,
+        topIcon: Icons.info_outline_rounded,
+        baseColor: fontColor,
+        topColor: fontColor,
+        topBackgroundColor: backgroundColor,
+      );
+    case CloseTallyData.sectionTotalSold:
+      return Icon(Icons.receipt_long_outlined, size: 40.0, color: fontColor);
+    case CloseTallyData.sectionQrTicket:
+      return Icon(
+        Icons.confirmation_number_outlined,
+        size: 40.0,
+        color: fontColor,
+      );
+    case CloseTallyData.sectionCount:
+      return Icon(
+        Icons.format_list_numbered_outlined,
+        size: 40.0,
+        color: fontColor,
+      );
+    default:
+      // 未知の区切り
+      return Icon(Icons.description_outlined, size: 40.0, color: fontColor);
+  }
+}
+
+/// 数値の表示形式（カンマ区切り）
+
+  // String get _countUnit => subTitleText == '枚数' ? '枚' : '件';
+  // 列見出しが無い区切り（subTitleText が空）は単位なし
+  String get _countUnit => switch (subTitleText) {
+    '枚数' => '枚',
+    '件数' => '件',
+    _ => '',
+  };
+
